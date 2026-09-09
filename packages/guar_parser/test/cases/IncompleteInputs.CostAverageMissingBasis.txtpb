@@ -1,23 +1,15 @@
 directives {
   date { year: 2010 month: 5 day: 28 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Account1"
-      spec {
-        units { number { exact: "2" } currency: "HOOL" }
-        cost {
-          date { year: 2015 month: 9 day: 21 }
-          label: "blablabla"
-          merge_cost: true
-        }
-      }
+      account { name: "Assets:Account1" }
+      units { number { verbatim: "2" resolved: "2" } currency { name: "HOOL" } }
+      cost { merge: true date { year: 2015 month: 9 day: 21 } label: "blablabla" }
     }
     postings {
-      account: "Assets:Account2"
-      spec {
-        units { number { exact: "120.00" } currency: "CAD" }
-      }
+      account { name: "Assets:Account2" }
+      units { number { verbatim: "120.00" resolved: "120.00" } currency { name: "CAD" } }
     }
   }
 }

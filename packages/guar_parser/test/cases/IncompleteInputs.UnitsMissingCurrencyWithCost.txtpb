@@ -1,19 +1,15 @@
 directives {
   date { year: 2010 month: 5 day: 28 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Account1"
-      spec {
-        units { number { exact: "10" } }
-        cost { per_unit { number { exact: "300.00" } } currency: "USD" }
-      }
+      account { name: "Assets:Account1" }
+      units { number { verbatim: "10" resolved: "10" } }
+      cost { number_per { verbatim: "300.00" resolved: "300.00" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Account2"
-      spec {
-        units { number { exact: "-600.00" } currency: "USD" }
-      }
+      account { name: "Assets:Account2" }
+      units { number { verbatim: "-600.00" resolved: "-600.00" } currency { name: "USD" } }
     }
   }
 }
