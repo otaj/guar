@@ -1,0 +1,40 @@
+---
+description: Require Conventional Commits and one concern per commit
+alwaysApply: true
+---
+
+# Semantic and atomic commits
+
+Every commit must use [Conventional Commits](https://www.conventionalcommits.org/) and contain a single logical change.
+
+## Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body explaining why]
+```
+
+Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+
+- Imperative, lowercase description; no trailing period
+- Optional scope in parentheses (`feat(proto):`, `ci:`, `chore(dart):`)
+- Body is optional; use it for motivation, not a file list
+
+```
+# ❌ BAD
+Add stuff and also fix CI
+WIP
+feat: Add the new Ledger type.
+
+# ✅ GOOD
+feat(proto): add processed ledger messages
+
+ci: run buf lint via pre-commit
+```
+
+## Atomic
+
+- One concern per commit: do not mix unrelated work (schema vs CI vs package metadata)
+- Split independent changes; keep refactors separate from features
+- If a change is hard to describe in one conventional subject, split it

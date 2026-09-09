@@ -1,0 +1,15 @@
+---
+description: Domain modelling for the Beancount parser
+alwaysApply: true
+---
+
+# Domain design
+
+- Freezed models in `packages/guar_parser/lib/src/domain/` are the parser's domain and public shape.
+- Align types with Beancount language meaning, not protobuf field numbers.
+- `protobean` is **test-only**: map domain → proto for goldens; do not depend on it from `lib/`.
+- Prefer sealed Freezed unions for directive bodies, flags, meta values, and similar alternatives.
+- Use civil `BeanDate` (y/m/d), not `DateTime`. Numbers keep `verbatim` plus a resolved `Decimal`.
+- Successful parse vs errors is XOR (same as protobean `ParsedLedger`).
+- `pushtag` / `poptag` / `pushmeta` / `popmeta` apply at parse time and are not directives.
+- Ask when a modelling choice is ambiguous; do not invent booking/interpolation semantics in the parser domain (`ProcessedLedger` is out of scope).

@@ -1,0 +1,20 @@
+---
+description: Comment policy for source files
+alwaysApply: true
+---
+
+# Comments
+
+- Every source file starts with one short comment stating why the file exists (not a restatement of the path).
+- Do not add other comments, dartdocs, or TODOs unless the logic is non-obvious.
+- Non-obvious is rare: indent/lexer tricks, skip-list semantics, number verbatim vs resolved, protobean XOR, and similar.
+- Leave generated Freezed (and similar) files alone.
+
+```dart
+# ❌ BAD
+/// Parses an open directive.
+ParsedDirective parseOpen(...) { ... }
+
+# ✅ GOOD
+// Petitparser productions for dated Beancount directives.
+```
