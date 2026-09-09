@@ -1,15 +1,12 @@
 directives {
   date { year: 2000 month: 1 day: 1 }
-  open { account: "Assets:Before" }
+  open { account { name: "Assets:Before" } }
 }
 directives {
   date { year: 2001 month: 2 day: 2 }
-  balance {
-    account: "Assets:Before"
-    amount { number { exact: "23.00" } currency: "USD" }
-  }
+  balance { account { name: "Assets:Before" } amount { number { verbatim: "23.00" resolved: "23.00" } currency { name: "USD" } } }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  close { account: "Assets:Before" }
+  close { account { name: "Assets:Before" } }
 }

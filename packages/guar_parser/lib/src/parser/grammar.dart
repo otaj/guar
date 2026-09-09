@@ -89,12 +89,13 @@ class BeancountGrammar {
       }
       final header = _parseDirectiveHeader(code, lineNo);
       if (header == null) {
+        final dateError = _invalidDateMessage(code);
         final failurePos = _directiveFailurePosition(code);
         final dated = date().parse(code) is Success;
         return ParsedLedger.errors(
           errors: [
             ParseError(
-              message: dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos),
+              message: dateError ?? (dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos)),
               location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
             ),
           ],
@@ -490,10 +491,20 @@ class BeancountGrammar {
         body: DirectiveBody.custom(type: values[4] as String, values: values[5] as List<CustomValue>),
       );
     });
-    final parser =
-        (open | close | commodity | balance | pad | note | price | event | query | document | custom | transaction)
-            .cast<ParsedDirective>()
-            .end();
+    final parser = [
+      open,
+      close,
+      commodity,
+      balance,
+      pad,
+      note,
+      price,
+      event,
+      query,
+      document,
+      custom,
+      transaction,
+    ].toChoiceParser(failureJoiner: selectFarthest).cast<ParsedDirective>().end();
     final result = parser.parse(line);
     if (result is Failure) {
       _lastFailurePosition = result.position;
@@ -651,6 +662,22 @@ class BeancountGrammar {
       }
     }
     return open;
+  }
+
+  String? _invalidDateMessage(String line) {
+    final match = RegExp(r'^(\d{4})[-/](\d{2})[-/](\d{2})').firstMatch(line);
+    if (match == null) {
+      return null;
+    }
+    final month = int.parse(match.group(2)!);
+    final day = int.parse(match.group(3)!);
+    if (month < 1 || month > 12) {
+      return "found 'ERROR month out of range'";
+    }
+    if (day < 1 || day > 31) {
+      return "found 'ERROR day out of range'";
+    }
+    return null;
   }
 
   ParsedPosting? _parsePosting(String line, int lineNo) {

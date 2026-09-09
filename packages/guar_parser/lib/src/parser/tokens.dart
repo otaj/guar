@@ -14,9 +14,11 @@ Parser<BeanDate> date() {
   final month = digit().times(2).flatten().map(int.parse);
   final day = digit().times(2).flatten().map(int.parse);
   final sep = char('-') | char('/');
-  return (year & sep & month & sep & day).map((values) {
-    return BeanDate(year: values[0] as int, month: values[2] as int, day: values[4] as int);
-  });
+  return (year & sep & month & sep & day)
+      .map((values) {
+        return BeanDate(year: values[0] as int, month: values[2] as int, day: values[4] as int);
+      })
+      .where((date) => date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 31);
 }
 
 Parser<String> quotedString() {

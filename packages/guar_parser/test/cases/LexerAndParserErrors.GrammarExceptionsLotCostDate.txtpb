@@ -1,27 +1,23 @@
 directives {
   date { year: 2000 month: 1 day: 1 }
-  open { account: "Assets:Before" }
+  open { account { name: "Assets:Before" } }
 }
 directives {
   date { year: 2001 month: 2 day: 2 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Before"
-      spec {
-        units { number { exact: "10.00" } currency: "HOOL" }
-        cost { per_unit { number { exact: "100.00" } } currency: "USD" }
-      }
+      account { name: "Assets:Before" }
+      units { number { verbatim: "10.00" resolved: "10.00" } currency { name: "HOOL" } }
+      cost { number_per { verbatim: "100.00" resolved: "100.00" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:After"
-      spec {
-        units { number { exact: "-100.00" } currency: "USD" }
-      }
+      account { name: "Assets:After" }
+      units { number { verbatim: "-100.00" resolved: "-100.00" } currency { name: "USD" } }
     }
   }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  close { account: "Assets:Before" }
+  close { account { name: "Assets:Before" } }
 }
