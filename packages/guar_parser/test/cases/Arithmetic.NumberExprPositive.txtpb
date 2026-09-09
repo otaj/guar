@@ -1,19 +1,15 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Test"
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "12" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "+12" resolved: "12" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "-7.5" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "-7.5" resolved: "-7.5" } currency { name: "USD" } }
     }
   }
 }

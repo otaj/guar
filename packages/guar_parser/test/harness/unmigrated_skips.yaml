@@ -1,15 +1,8 @@
 # Fixture stems skipped until their .txtpb is rewritten to the protobean schema.
 unmigrated:
-  - cases/Arithmetic.NumberExprAdd
   - cases/Arithmetic.NumberExprDifferentPlaces
   - cases/Arithmetic.NumberExprDifferentPlaces2
-  - cases/Arithmetic.NumberExprDivide
-  - cases/Arithmetic.NumberExprGroups
   - cases/Arithmetic.NumberExprMultiply
-  - cases/Arithmetic.NumberExprNegative
-  - cases/Arithmetic.NumberExprPositive
-  - cases/Arithmetic.NumberExprPrecedence
-  - cases/Arithmetic.NumberExprSubtract
   - cases/Balance.TotalCost
   - cases/Balance.TotalPrice
   - cases/Currencies.DifferentCostAndPriceCurrency

@@ -1,31 +1,23 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Test"
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "10" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "2 * 3 + 4" resolved: "10" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "14" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "2 + 3 * 4" resolved: "14" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "-10" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "2 + -3 * 4" resolved: "-10" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "-4" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "(2 + -3) * 4" resolved: "-4" } currency { name: "USD" } }
     }
   }
 }
