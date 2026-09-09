@@ -66,8 +66,10 @@ Parser<Flag> flag() {
 }
 
 Parser<IncompleteAmount?> units() {
-  final amount = (numberLiteral() & spaces() & currency()).map((values) {
+  final both = (numberLiteral() & spaces() & currency()).map((values) {
     return IncompleteAmount(number: values[0] as BeanNumber, currency: values[2] as Currency);
   });
-  return amount.optional();
+  final numberOnly = numberLiteral().map((number) => IncompleteAmount(number: number));
+  final currencyOnly = currency().map((currency) => IncompleteAmount(currency: currency));
+  return (both | numberOnly | currencyOnly).optional().cast();
 }
