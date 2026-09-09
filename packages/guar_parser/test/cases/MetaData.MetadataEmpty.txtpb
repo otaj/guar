@@ -1,20 +1,18 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
   meta {
-    kv { key: "oranges" value {} }
-    kv { key: "bananas" value {} }
+    entries { key: "oranges" }
+    entries { key: "bananas" }
   }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "blabla"
   }
 }
 directives {
   date { year: 2013 month: 5 day: 19 }
   meta {
-    kv { key: "apples" value {} }
+    entries { key: "apples" }
   }
-  open {
-    account: "Assets:Something"
-  }
+  open { account { name: "Assets:Something" } }
 }

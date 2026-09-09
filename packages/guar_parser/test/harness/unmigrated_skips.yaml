@@ -46,9 +46,6 @@ unmigrated:
   - cases/LexerAndParserErrors.LexerInvalidToken
   - cases/LexerAndParserErrors.LexerInvalidTokenRecovery
   - cases/LexerAndParserErrors.ParsingErrorAtRoot
-  - cases/MetaData.MetadataDataTypes
-  - cases/MetaData.MetadataEmpty
-  - cases/MetaData.MetadataKeySyntax
   - cases/MetaData.MetadataOther
   - cases/MetaData.MetadataTransactionBegin
   - cases/MetaData.MetadataTransactionEnd

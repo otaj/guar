@@ -1,17 +1,17 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
   meta {
-    kv { key: "string" value { text: "Something" } }
-    kv { key: "account" value { account: "Assets:Investments:Cash" } }
-    kv { key: "date" value { date { year: 2012 month: 1 day: 1 } } }
-    kv { key: "currency" value { currency: "HOOL" } }
-    kv { key: "tag" value { tag: "trip-florida" } }
-    kv { key: "number" value { number { exact: "345.67" } } }
-    kv { key: "amount" value { amount { number { exact: "345.67" } currency: "USD" } } }
-    kv { key: "boolt" value { boolean: true } }
-    kv { key: "boolf" value { boolean: false } }
+    entries { key: "string" value { text: "Something" } }
+    entries { key: "account" value { account { name: "Assets:Investments:Cash" } } }
+    entries { key: "date" value { date { year: 2012 month: 1 day: 1 } } }
+    entries { key: "currency" value { currency { name: "HOOL" } } }
+    entries { key: "tag" value { tag { name: "trip-florida" } } }
+    entries { key: "number" value { number { verbatim: "345.67" resolved: "345.67" } } }
+    entries { key: "amount" value { amount { number { verbatim: "345.67" resolved: "345.67" } currency { name: "USD" } } } }
+    entries { key: "boolt" value { boolean: true } }
+    entries { key: "boolf" value { boolean: false } }
   }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
   }
 }
