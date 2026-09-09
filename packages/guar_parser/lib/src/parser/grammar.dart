@@ -15,6 +15,7 @@ class BeancountGrammar {
     final lines = normalized.split('\n');
     final directives = <ParsedDirective>[];
     final tagStack = <String>[];
+    final metaStack = <MetaEntry>[];
     var index = 0;
     while (index < lines.length) {
       final raw = lines[index];
@@ -37,6 +38,28 @@ class BeancountGrammar {
           ],
           info: _info(),
         );
+      }
+      final pushMeta = _parsePushMeta(code);
+      if (pushMeta != null) {
+        metaStack.add(pushMeta);
+        continue;
+      }
+      final popMeta = _parsePopMeta(code);
+      if (popMeta != null) {
+        final at = metaStack.lastIndexWhere((entry) => entry.key == popMeta);
+        if (at < 0) {
+          return ParsedLedger.errors(
+            errors: [
+              ParseError(
+                message: 'invalid popmeta',
+                location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+              ),
+            ],
+            info: _info(),
+          );
+        }
+        metaStack.removeAt(at);
+        continue;
       }
       final push = _parsePushTag(code);
       if (push != null) {
@@ -155,7 +178,7 @@ class BeancountGrammar {
         directives.add(
           applied.copyWith(
             location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-            meta: Meta(entries: metaEntries),
+            meta: _metaWithStack(metaStack, metaEntries),
             body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
           ),
         );
@@ -199,7 +222,7 @@ class BeancountGrammar {
         directives.add(
           applied.copyWith(
             location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-            meta: Meta(entries: metaEntries),
+            meta: _metaWithStack(metaStack, metaEntries),
           ),
         );
       }
@@ -209,6 +232,17 @@ class BeancountGrammar {
         errors: [
           ParseError(
             message: 'invalid pushtag',
+            location: BeanLocation(filename: filename, linenoBegin: lines.length, linenoEnd: lines.length),
+          ),
+        ],
+        info: _info(),
+      );
+    }
+    if (metaStack.isNotEmpty) {
+      return ParsedLedger.errors(
+        errors: [
+          ParseError(
+            message: 'invalid pushmeta',
             location: BeanLocation(filename: filename, linenoBegin: lines.length, linenoEnd: lines.length),
           ),
         ],
@@ -237,6 +271,35 @@ class BeancountGrammar {
     }
     final tag = result.value[2];
     return tag is Tag ? tag.name : null;
+  }
+
+  MetaEntry? _parsePushMeta(String line) {
+    final result = (string('pushmeta') & spaces() & metaEntry()).end().parse(line);
+    return result is Success ? result.value[2] as MetaEntry : null;
+  }
+
+  String? _parsePopMeta(String line) {
+    final key = (pattern('a-z') & pattern(r'A-Za-z0-9_-').star()).flatten();
+    final result = (string('popmeta') & spaces() & key & spaces() & char(':') & spaces()).end().parse(line);
+    return result is Success ? result.value[2] as String : null;
+  }
+
+  Meta _metaWithStack(List<MetaEntry> stack, List<MetaEntry> explicit) {
+    final byKey = <String, MetaEntry>{};
+    final order = <String>[];
+    for (final entry in stack) {
+      if (!byKey.containsKey(entry.key)) {
+        order.add(entry.key);
+      }
+      byKey[entry.key] = entry;
+    }
+    for (final entry in explicit) {
+      if (!byKey.containsKey(entry.key)) {
+        order.add(entry.key);
+      }
+      byKey[entry.key] = entry;
+    }
+    return Meta(entries: [for (final key in order) byKey[key]!]);
   }
 
   List<Tag> _uniqueTags(Iterable<Tag> tags) {

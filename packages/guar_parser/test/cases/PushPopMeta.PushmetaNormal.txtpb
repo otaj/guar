@@ -1,18 +1,18 @@
 directives {
   date { year: 2015 month: 6 day: 7 }
   meta {
-    kv { key: "location" value { text: "Lausanne, Switzerland" } }
+    entries { key: "location" value { text: "Lausanne, Switzerland" } }
   }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Something"
     postings {
-      account: "Assets:Something"
-      spec { units { number { exact: "1" } currency: "USD" } }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "1" resolved: "1" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec { units { number { exact: "-1" } currency: "USD" } }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "-1" resolved: "-1" } currency { name: "USD" } }
     }
   }
 }
