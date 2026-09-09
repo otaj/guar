@@ -54,13 +54,13 @@ class BeancountGrammar {
         var endLine = lineNo;
         while (index < lines.length) {
           final postingRaw = lines[index];
+          if (postingRaw.trimLeft().startsWith(';')) {
+            index += 1;
+            continue;
+          }
           final postingCode = _stripTrailingComment(postingRaw).trimRight();
           if (postingCode.trim().isEmpty) {
             break;
-          }
-          if (postingCode.trimLeft().startsWith(';')) {
-            index += 1;
-            continue;
           }
           if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
             break;
