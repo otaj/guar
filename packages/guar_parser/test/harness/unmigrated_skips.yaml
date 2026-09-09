@@ -1,4 +1,4 @@
-# Fixture stems (relative to test/, without .beancount) not yet on protobean schema.
+# Fixture stems skipped until their .txtpb is rewritten to the protobean schema.
 unmigrated:
   - cases/Arithmetic.NumberExprAdd
   - cases/Arithmetic.NumberExprDifferentPlaces
@@ -126,15 +126,10 @@ unmigrated:
   - cases/ParseLots.CostTwoComponents
   - cases/ParseLots.CostWithSlashes
   - cases/Parser.BasicTesting
-  - cases/ParserComplete.Comment
-  - cases/ParserComplete.CommentEOF
-  - cases/ParserComplete.Empty1
-  - cases/ParserComplete.Empty2
   - cases/ParserComplete.ExtraWhitespaceComment
   - cases/ParserComplete.ExtraWhitespaceCommentIndented
   - cases/ParserComplete.ExtraWhitespaceNote
   - cases/ParserComplete.ExtraWhitespaceTransaction
-  - cases/ParserComplete.IndentEOF
   - cases/ParserComplete.NoEmptyLines
   - cases/ParserComplete.TransactionImbalanceFromSinglePosting
   - cases/ParserComplete.TransactionSinglePostingAtZero
@@ -186,8 +181,6 @@ unmigrated:
   - cases/PushPopTag.Multiple
   - cases/PushPopTag.PopInvalidTag
   - cases/PushPopTag.TagLeftUnclosed
-  - cases/Simple.CRLF
-  - cases/Simple
   - cases/Sort.OpenBeforeTransactionSameDate
   - cases/SyntaxErrors.ErrorInPosting
   - cases/SyntaxErrors.ErrorInTransactionLine
