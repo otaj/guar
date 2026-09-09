@@ -349,10 +349,10 @@ packages:
     dependency: transitive
     description:
       name: protobean
-      sha256: d0ee60711b90d2f51a2e11e62207062056eb5846bd4d0a14e230489e8c439d30
+      sha256: "10a965e9b1fc09340e3755899d8b9c5745888c6c0bc42df24ee7b3efae7f65c7"
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.0"
+    version: "0.3.0"
   protobuf:
     dependency: transitive
     description:
