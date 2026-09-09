@@ -2,14 +2,14 @@
 directives {
   date { year: 2014 month: 11 day: 2 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Something"
-      spec { units { number { exact: "1" } currency: "USD" } }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "1" resolved: "1" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Other"
-      spec { units { number { exact: "-1" } currency: "USD" } }
+      account { name: "Assets:Other" }
+      units { number { verbatim: "-1" resolved: "-1" } currency { name: "USD" } }
     }
   }
 }

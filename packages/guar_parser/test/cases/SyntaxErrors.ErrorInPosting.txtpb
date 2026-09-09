@@ -1,4 +1,3 @@
 errors {
-  message: "found 'urant'"
-  location { lineno: 4 }
+  message: "found '('"
 }
