@@ -64,9 +64,7 @@ class BeancountGrammar {
           }
           final postingCode = _stripTrailingComment(postingRaw).trimRight();
           if (postingCode.trim().isEmpty) {
-            // Blank lines between postings are allowed (lima anomaly vs Beancount strictness).
-            index += 1;
-            continue;
+            break;
           }
           if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
             break;
@@ -75,29 +73,19 @@ class BeancountGrammar {
           final trimmed = postingCode.trimLeft();
           final tagsLinks = _parseTagsLinksLine(trimmed);
           if (tagsLinks != null) {
-            if (lastPosting == null) {
-              tags.addAll(tagsLinks.tags);
-              links.addAll(tagsLinks.links);
-            } else {
-              // Lima attaches standalone tags after a posting as that posting's metadata.
-              final entries = [
-                ...lastPosting.meta.entries,
-                for (final tag in tagsLinks.tags) MetaEntry(key: '', value: MetaValue.tag(tag)),
-              ];
-              if (tagsLinks.links.isNotEmpty) {
-                return ParsedLedger.errors(
-                  errors: [
-                    ParseError(
-                      message: _foundExpected(trimmed, _postingFailurePosition(trimmed)),
-                      location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
-                    ),
-                  ],
-                  info: _info(),
-                );
-              }
-              lastPosting = lastPosting.copyWith(meta: Meta(entries: entries));
-              postings[postings.length - 1] = lastPosting;
+            if (lastPosting != null) {
+              return ParsedLedger.errors(
+                errors: [
+                  ParseError(
+                    message: _foundExpected(trimmed, 0),
+                    location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
+                  ),
+                ],
+                info: _info(),
+              );
             }
+            tags.addAll(tagsLinks.tags);
+            links.addAll(tagsLinks.links);
             endLine = postingLine;
             index += 1;
             continue;
@@ -412,11 +400,7 @@ class BeancountGrammar {
       return (tags: tags, links: links);
     });
     final result = parser.parse(line);
-    if (result is Failure) {
-      _lastFailurePosition = result.position;
-      return null;
-    }
-    return result.value;
+    return result is Success ? result.value : null;
   }
 
   ParsedPosting? _parsePosting(String line, int lineNo) {

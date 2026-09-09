@@ -1,6 +1,5 @@
 # Fixture stems skipped until their .txtpb is rewritten to the protobean schema.
 unmigrated:
-  - cases/Transactions.BlankLineWithSpacesNotAllowed
   - cases/Arithmetic.NumberExprAdd
   - cases/Arithmetic.NumberExprDifferentPlaces
   - cases/Arithmetic.NumberExprDifferentPlaces2
@@ -168,6 +167,7 @@ unmigrated:
   - cases/TotalsAndSigns.ZeroAmount
   - cases/TotalsAndSigns.ZeroCost
   - cases/Transactions.BlankLineNotAllowed
+  - cases/Transactions.BlankLineWithSpacesNotAllowed
   - cases/Transactions.TagsAfterFirstPosting
   - cases/Transactions.ZeroCosts
   - cases/Transactions.ZeroPrices
