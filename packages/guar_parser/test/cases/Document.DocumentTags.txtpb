@@ -1,9 +1,4 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
-  tags: "something"
-  tags: "else"
-  document {
-    account: "Assets:US:BestBank:Checking"
-    filename: "/Accounting/statement.pdf"
-  }
+  document { account { name: "Assets:US:BestBank:Checking" } filename: "/Accounting/statement.pdf" tags { name: "something" } tags { name: "else" } }
 }

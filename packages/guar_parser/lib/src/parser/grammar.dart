@@ -14,6 +14,7 @@ class BeancountGrammar {
     final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     final lines = normalized.split('\n');
     final directives = <ParsedDirective>[];
+    final tagStack = <String>[];
     var index = 0;
     while (index < lines.length) {
       final raw = lines[index];
@@ -37,6 +38,28 @@ class BeancountGrammar {
           info: _info(),
         );
       }
+      final push = _parsePushTag(code);
+      if (push != null) {
+        tagStack.add(push);
+        continue;
+      }
+      final pop = _parsePopTag(code);
+      if (pop != null) {
+        final at = tagStack.lastIndexOf(pop);
+        if (at < 0) {
+          return ParsedLedger.errors(
+            errors: [
+              ParseError(
+                message: 'invalid poptag',
+                location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+              ),
+            ],
+            info: _info(),
+          );
+        }
+        tagStack.removeAt(at);
+        continue;
+      }
       final header = _parseDirectiveHeader(code, lineNo);
       if (header == null) {
         return ParsedLedger.errors(
@@ -49,9 +72,10 @@ class BeancountGrammar {
           info: _info(),
         );
       }
-      if (header.body is TransactionBody) {
+      final applied = _withPushedTags(header, tagStack);
+      if (applied.body is TransactionBody) {
         final postings = <ParsedPosting>[];
-        final txn = (header.body as TransactionBody).value;
+        final txn = (applied.body as TransactionBody).value;
         final tags = [...txn.tags];
         final links = [...txn.links];
         ParsedPosting? lastPosting;
@@ -108,20 +132,95 @@ class BeancountGrammar {
           index += 1;
         }
         directives.add(
-          header.copyWith(
+          applied.copyWith(
             location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
             body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
           ),
         );
       } else {
-        directives.add(header);
+        directives.add(applied);
       }
+    }
+    if (tagStack.isNotEmpty) {
+      return ParsedLedger.errors(
+        errors: [
+          ParseError(
+            message: 'invalid pushtag',
+            location: BeanLocation(filename: filename, linenoBegin: lines.length, linenoEnd: lines.length),
+          ),
+        ],
+        info: _info(),
+      );
     }
     directives.sort(_compareDirectives);
     return ParsedLedger.directives(directives: directives, info: _info());
   }
 
   ProcessingInfo _info() => ProcessingInfo(filename: filename.isEmpty ? null : filename);
+
+  String? _parsePushTag(String line) {
+    final result = (string('pushtag') & spaces() & _tagOrLink()).end().parse(line);
+    if (result is! Success) {
+      return null;
+    }
+    final tag = result.value[2];
+    return tag is Tag ? tag.name : null;
+  }
+
+  String? _parsePopTag(String line) {
+    final result = (string('poptag') & spaces() & _tagOrLink()).end().parse(line);
+    if (result is! Success) {
+      return null;
+    }
+    final tag = result.value[2];
+    return tag is Tag ? tag.name : null;
+  }
+
+  List<Tag> _uniqueTags(Iterable<Tag> tags) {
+    final seen = <String>{};
+    final out = <Tag>[];
+    for (final tag in tags) {
+      if (seen.add(tag.name)) {
+        out.add(tag);
+      }
+    }
+    return out;
+  }
+
+  ParsedDirective _withPushedTags(ParsedDirective directive, List<String> tagStack) {
+    if (tagStack.isEmpty) {
+      return directive;
+    }
+    final fromStack = <Tag>[];
+    final seen = <String>{};
+    for (final name in tagStack) {
+      if (seen.add(name)) {
+        fromStack.add(Tag(name: name));
+      }
+    }
+    return switch (directive.body) {
+      TransactionBody(:final value) => directive.copyWith(
+        body: DirectiveBody.transaction(value.copyWith(tags: _uniqueTags([...fromStack, ...value.tags]))),
+      ),
+      DocumentBody(:final account, :final filename, :final tags, :final links) => directive.copyWith(
+        body: DirectiveBody.document(
+          account: account,
+          filename: filename,
+          tags: _uniqueTags([...fromStack, ...tags]),
+          links: links,
+        ),
+      ),
+      NoteBody(:final account, :final comment, :final tags, :final links) => directive.copyWith(
+        body: DirectiveBody.note(
+          account: account,
+          comment: comment,
+          tags: _uniqueTags([...fromStack, ...tags]),
+          links: links,
+        ),
+      ),
+      _ => directive,
+    };
+  }
 
   String _stripTrailingComment(String line) {
     final inString = false;

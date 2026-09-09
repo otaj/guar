@@ -19,7 +19,6 @@ unmigrated:
   - cases/DisplayContextOptions.RenderCommasNo
   - cases/DisplayContextOptions.RenderCommasYes
   - cases/DisplayContextOptions.RenderCommasYes2
-  - cases/Document.DocumentTags
   - cases/Expressions.ExplicitPrecision
   - cases/Expressions.ExplicitPrecision2
   - cases/IncompleteInputs.CostAverage
@@ -144,9 +143,6 @@ unmigrated:
   - cases/PushPopMeta.PushmetaNormal
   - cases/PushPopMeta.PushmetaOverride
   - cases/PushPopMeta.PushmetaShadow
-  - cases/PushPopTag.Multiple
-  - cases/PushPopTag.PopInvalidTag
-  - cases/PushPopTag.TagLeftUnclosed
   - cases/SyntaxErrors.ErrorInPosting
   - cases/SyntaxErrors.ErrorInTransactionLine
   - cases/SyntaxErrors.NoFinalNewline
