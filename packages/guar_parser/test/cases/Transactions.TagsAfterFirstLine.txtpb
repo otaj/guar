@@ -1,23 +1,21 @@
 directives {
   date { year: 2014 month: 4 day: 20 }
-  meta {
-    kv { value { tag: "tag1" } }
-    kv { value { link: "link1" } }
-    kv { value { tag: "tag2" } }
-    kv { value { link: "link2" } }
-  }
-  tags: "basetag"
-  links: "baselink"
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Links and tags on subsequent lines"
+    tags { name: "basetag" }
+    tags { name: "tag1" }
+    tags { name: "tag2" }
+    links { name: "baselink" }
+    links { name: "link1" }
+    links { name: "link2" }
     postings {
-      account: "Assets:Checking"
-      spec { units { number { exact: "100" } currency: "USD" } }
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Checking"
-      spec { units { number { exact: "-99" } currency: "USD" } }
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "-99" resolved: "-99" } currency { name: "USD" } }
     }
   }
 }

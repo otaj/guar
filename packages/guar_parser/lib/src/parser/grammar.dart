@@ -51,6 +51,10 @@ class BeancountGrammar {
       }
       if (header.body is TransactionBody) {
         final postings = <ParsedPosting>[];
+        final txn = (header.body as TransactionBody).value;
+        final tags = [...txn.tags];
+        final links = [...txn.links];
+        ParsedPosting? lastPosting;
         var endLine = lineNo;
         while (index < lines.length) {
           final postingRaw = lines[index];
@@ -60,18 +64,50 @@ class BeancountGrammar {
           }
           final postingCode = _stripTrailingComment(postingRaw).trimRight();
           if (postingCode.trim().isEmpty) {
-            break;
+            // Blank lines between postings are allowed (lima anomaly vs Beancount strictness).
+            index += 1;
+            continue;
           }
           if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
             break;
           }
           final postingLine = index + 1;
-          final posting = _parsePosting(postingCode.trimLeft(), postingLine);
+          final trimmed = postingCode.trimLeft();
+          final tagsLinks = _parseTagsLinksLine(trimmed);
+          if (tagsLinks != null) {
+            if (lastPosting == null) {
+              tags.addAll(tagsLinks.tags);
+              links.addAll(tagsLinks.links);
+            } else {
+              // Lima attaches standalone tags after a posting as that posting's metadata.
+              final entries = [
+                ...lastPosting.meta.entries,
+                for (final tag in tagsLinks.tags) MetaEntry(key: '', value: MetaValue.tag(tag)),
+              ];
+              if (tagsLinks.links.isNotEmpty) {
+                return ParsedLedger.errors(
+                  errors: [
+                    ParseError(
+                      message: _foundExpected(trimmed, _postingFailurePosition(trimmed)),
+                      location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
+                    ),
+                  ],
+                  info: _info(),
+                );
+              }
+              lastPosting = lastPosting.copyWith(meta: Meta(entries: entries));
+              postings[postings.length - 1] = lastPosting;
+            }
+            endLine = postingLine;
+            index += 1;
+            continue;
+          }
+          final posting = _parsePosting(trimmed, postingLine);
           if (posting == null) {
             return ParsedLedger.errors(
               errors: [
                 ParseError(
-                  message: _foundExpected(postingCode.trimLeft(), _postingFailurePosition(postingCode.trimLeft())),
+                  message: _foundExpected(trimmed, _postingFailurePosition(trimmed)),
                   location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
                 ),
               ],
@@ -79,14 +115,14 @@ class BeancountGrammar {
             );
           }
           postings.add(posting);
+          lastPosting = posting;
           endLine = postingLine;
           index += 1;
         }
-        final txn = (header.body as TransactionBody).value;
         directives.add(
           header.copyWith(
             location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-            body: DirectiveBody.transaction(txn.copyWith(postings: postings)),
+            body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
           ),
         );
       } else {
@@ -355,6 +391,32 @@ class BeancountGrammar {
     final tag = (char('#') & name).map((values) => Tag(name: values[1] as String));
     final link = (char('^') & name).map((values) => Link(name: values[1] as String));
     return (tag | link).cast<Object>();
+  }
+
+  ({List<Tag> tags, List<Link> links})? _parseTagsLinksLine(String line) {
+    final parser = (_tagOrLink() & (spaces() & _tagOrLink()).star()).end().map((values) {
+      final tags = <Tag>[];
+      final links = <Link>[];
+      void take(Object item) {
+        if (item is Tag) {
+          tags.add(item);
+        } else if (item is Link) {
+          links.add(item);
+        }
+      }
+
+      take(values[0] as Object);
+      for (final part in values[1] as List<dynamic>) {
+        take((part as List<dynamic>)[1] as Object);
+      }
+      return (tags: tags, links: links);
+    });
+    final result = parser.parse(line);
+    if (result is Failure) {
+      _lastFailurePosition = result.position;
+      return null;
+    }
+    return result.value;
   }
 
   ParsedPosting? _parsePosting(String line, int lineNo) {

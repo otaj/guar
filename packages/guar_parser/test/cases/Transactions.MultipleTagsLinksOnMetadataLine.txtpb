@@ -1,3 +1,20 @@
-errors {
-  message: "found 'tag2'"
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    narration: "Links and tags on subsequent lines"
+    tags { name: "basetag" }
+    tags { name: "tag1" }
+    tags { name: "tag2" }
+    links { name: "baselink" }
+    links { name: "link1" }
+    postings {
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
+    }
+    postings {
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "-99" resolved: "-99" } currency { name: "USD" } }
+    }
+  }
 }
