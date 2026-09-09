@@ -20,8 +20,6 @@ unmigrated:
   - cases/DisplayContextOptions.RenderCommasNo
   - cases/DisplayContextOptions.RenderCommasYes
   - cases/DisplayContextOptions.RenderCommasYes2
-  - cases/Document.DocumentLinks
-  - cases/Document.DocumentNoTagsLinks
   - cases/Document.DocumentTags
   - cases/Expressions.ExplicitPrecision
   - cases/Expressions.ExplicitPrecision2
