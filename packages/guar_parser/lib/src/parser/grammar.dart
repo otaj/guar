@@ -21,7 +21,7 @@ class BeancountGrammar {
       final raw = lines[index];
       final lineNo = index + 1;
       index += 1;
-      final code = _stripTrailingComment(raw).trimRight();
+      var code = _stripTrailingComment(raw).trimRight();
       if (code.trim().isEmpty) {
         continue;
       }
@@ -38,6 +38,10 @@ class BeancountGrammar {
           ],
           info: _info(),
         );
+      }
+      while (_hasUnclosedQuote(code) && index < lines.length) {
+        code = '$code\n${lines[index]}';
+        index += 1;
       }
       final pushMeta = _parsePushMeta(code);
       if (pushMeta != null) {
@@ -632,6 +636,21 @@ class BeancountGrammar {
   MetaEntry? _parseMetaEntry(String line) {
     final result = metaEntry().end().parse(line);
     return result is Success ? result.value : null;
+  }
+
+  bool _hasUnclosedQuote(String input) {
+    var open = false;
+    for (var i = 0; i < input.length; i += 1) {
+      final ch = input[i];
+      if (ch == '\\' && open && i + 1 < input.length) {
+        i += 1;
+        continue;
+      }
+      if (ch == '"') {
+        open = !open;
+      }
+    }
+    return open;
   }
 
   ParsedPosting? _parsePosting(String line, int lineNo) {

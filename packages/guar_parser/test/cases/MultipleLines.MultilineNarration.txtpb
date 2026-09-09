@@ -1,15 +1,15 @@
 directives {
   date { year: 2014 month: 7 day: 11 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Hello one line\nand yet another,\nand why not another!"
     postings {
-      account: "Expenses:Restaurant"
-      spec { units { number { exact: "100" } currency: "USD" } }
+      account { name: "Expenses:Restaurant" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Cash"
-      spec { units { number { exact: "-100" } currency: "USD" } }
+      account { name: "Assets:Cash" }
+      units { number { verbatim: "-100" resolved: "-100" } currency { name: "USD" } }
     }
   }
 }
