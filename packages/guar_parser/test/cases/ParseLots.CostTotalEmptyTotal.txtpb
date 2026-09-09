@@ -1,19 +1,15 @@
 directives {
   date { year: 2014 month: 1 day: 1 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Invest:AAPL"
-      spec {
-        units { number { exact: "20" } currency: "AAPL" }
-        cost { per_unit { number { exact: "45.23" } } currency: "USD" }
-      }
+      account { name: "Assets:Invest:AAPL" }
+      units { number { verbatim: "20" resolved: "20" } currency { name: "AAPL" } }
+      cost { number_per { verbatim: "45.23" resolved: "45.23" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Invest:Cash"
-      spec {
-        units { number { exact: "-45.23" } currency: "USD" }
-      }
+      account { name: "Assets:Invest:Cash" }
+      units { number { verbatim: "-45.23" resolved: "-45.23" } currency { name: "USD" } }
     }
   }
 }
