@@ -1,19 +1,15 @@
 directives {
   date { year: 2017 month: 6 day: 27 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Bitcoin network fee"
     postings {
-      account: "Expenses:Crypto:NetworkFees"
-      spec {
-        units { number { exact: "0.00082487" } currency: "BTC" }
-      }
+      account { name: "Expenses:Crypto:NetworkFees" }
+      units { number { verbatim: "0.00082487" resolved: "0.00082487" } currency { name: "BTC" } }
     }
     postings {
-      account: "Assets:Crypto:Bitcoin"
-      spec {
-        units { number { exact: "-0.00082487" } currency: "BTC" }
-      }
+      account { name: "Assets:Crypto:Bitcoin" }
+      units { number { verbatim: "-0.00082487" resolved: "-0.00082487" } currency { name: "BTC" } }
     }
   }
 }
