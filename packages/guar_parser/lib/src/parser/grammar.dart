@@ -120,7 +120,15 @@ class BeancountGrammar {
           }
           final meta = _parseMetaEntry(trimmed);
           if (meta != null) {
-            if (seenMeta.add(meta.key)) {
+            if (lastPosting != null) {
+              final postingMeta = lastPosting.meta;
+              final keys = {for (final entry in postingMeta.entries) entry.key};
+              if (keys.add(meta.key)) {
+                final updated = lastPosting.copyWith(meta: Meta(entries: [...postingMeta.entries, meta]));
+                postings[postings.length - 1] = updated;
+                lastPosting = updated;
+              }
+            } else if (seenMeta.add(meta.key)) {
               metaEntries.add(meta);
             }
             endLine = postingLine;
