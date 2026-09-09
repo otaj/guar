@@ -1,0 +1,15 @@
+directives {
+  date { year: 2014 month: 4 day: 20 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    narration: "Busted!"
+    postings {
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
+    }
+    postings {
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "-99" resolved: "-99" } currency { name: "USD" } }
+    }
+  }
+}

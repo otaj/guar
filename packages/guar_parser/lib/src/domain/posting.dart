@@ -20,6 +20,6 @@ abstract class ParsedPosting with _$ParsedPosting {
     required Account account,
     IncompleteAmount? units,
     ParsedCost? cost,
-    IncompleteAmount? price,
+    ParsedPrice? price,
   }) = _ParsedPosting;
 }
