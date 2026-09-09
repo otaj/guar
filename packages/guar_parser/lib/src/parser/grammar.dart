@@ -1,0 +1,278 @@
+// Line-oriented Beancount document parser built on petitparser fragments.
+
+import 'package:petitparser/petitparser.dart';
+
+import '../domain/domain.dart';
+import 'tokens.dart';
+
+class BeancountGrammar {
+  BeancountGrammar({this.filename = ''});
+
+  final String filename;
+
+  ParsedLedger parse(String source) {
+    final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final lines = normalized.split('\n');
+    final directives = <ParsedDirective>[];
+    var index = 0;
+    while (index < lines.length) {
+      final raw = lines[index];
+      final lineNo = index + 1;
+      index += 1;
+      final code = _stripTrailingComment(raw).trimRight();
+      if (code.trim().isEmpty) {
+        continue;
+      }
+      if (code.trimLeft().startsWith(';')) {
+        continue;
+      }
+      if (code.startsWith(' ') || code.startsWith('\t')) {
+        return ParsedLedger.errors(
+          errors: [
+            ParseError(
+              message: _foundExpected(code.trimLeft(), 0),
+              location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+            ),
+          ],
+          info: _info(),
+        );
+      }
+      final header = _parseDirectiveHeader(code, lineNo);
+      if (header == null) {
+        return ParsedLedger.errors(
+          errors: [
+            ParseError(
+              message: _foundExpected(code, _directiveFailurePosition(code)),
+              location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+            ),
+          ],
+          info: _info(),
+        );
+      }
+      if (header.body is TransactionBody) {
+        final postings = <ParsedPosting>[];
+        var endLine = lineNo;
+        while (index < lines.length) {
+          final postingRaw = lines[index];
+          final postingCode = _stripTrailingComment(postingRaw).trimRight();
+          if (postingCode.trim().isEmpty) {
+            break;
+          }
+          if (postingCode.trimLeft().startsWith(';')) {
+            index += 1;
+            continue;
+          }
+          if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
+            break;
+          }
+          final postingLine = index + 1;
+          final posting = _parsePosting(postingCode.trimLeft(), postingLine);
+          if (posting == null) {
+            return ParsedLedger.errors(
+              errors: [
+                ParseError(
+                  message: _foundExpected(postingCode.trimLeft(), _postingFailurePosition(postingCode.trimLeft())),
+                  location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
+                ),
+              ],
+              info: _info(),
+            );
+          }
+          postings.add(posting);
+          endLine = postingLine;
+          index += 1;
+        }
+        final txn = (header.body as TransactionBody).value;
+        directives.add(
+          header.copyWith(
+            location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
+            body: DirectiveBody.transaction(txn.copyWith(postings: postings)),
+          ),
+        );
+      } else {
+        directives.add(header);
+      }
+    }
+    directives.sort(_compareDirectives);
+    return ParsedLedger.directives(directives: directives, info: _info());
+  }
+
+  ProcessingInfo _info() => ProcessingInfo(filename: filename.isEmpty ? null : filename);
+
+  String _stripTrailingComment(String line) {
+    final inString = false;
+    // Strings are rare on comment-bearing lines; strip ; outside quotes.
+    var quoted = inString;
+    for (var i = 0; i < line.length; i++) {
+      final ch = line[i];
+      if (ch == '"') {
+        quoted = !quoted;
+      } else if (ch == ';' && !quoted) {
+        return line.substring(0, i);
+      }
+    }
+    return line;
+  }
+
+  ParsedDirective? _parseDirectiveHeader(String line, int lineNo) {
+    final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
+    final open = (date() & spaces() & string('open') & spaces() & account() & _openCurrencies()).map((values) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.open(account: values[4] as Account, currencies: values[5] as List<Currency>),
+      );
+    });
+    final close = (date() & spaces() & string('close') & spaces() & account()).map((values) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.close(account: values[4] as Account),
+      );
+    });
+    final commodity = (date() & spaces() & string('commodity') & spaces() & currency()).map((values) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.commodity(currency: values[4] as Currency),
+      );
+    });
+    final transaction = (date() & spaces() & flag() & _txnTail()).map((values) {
+      final payeeNarration = values[3] as ({String? payee, String narration});
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.transaction(
+          ParsedTransaction(flag: values[2] as Flag, payee: payeeNarration.payee, narration: payeeNarration.narration),
+        ),
+      );
+    });
+    final parser = (open | close | commodity | transaction).cast<ParsedDirective>().end();
+    final result = parser.parse(line);
+    if (result is Failure) {
+      _lastFailurePosition = result.position;
+      return null;
+    }
+    return result.value;
+  }
+
+  Parser<List<Currency>> _openCurrencies() {
+    final currencies = (spaces() & currency() & (char(',') & spaces().optional() & currency()).star()).map((values) {
+      final list = <Currency>[values[1] as Currency];
+      for (final part in values[2] as List<dynamic>) {
+        list.add((part as List<dynamic>)[2] as Currency);
+      }
+      return list;
+    });
+    return currencies.optional().map((value) => value ?? <Currency>[]);
+  }
+
+  Parser<({String? payee, String narration})> _txnTail() {
+    final two = (spaces() & quotedString() & spaces() & quotedString()).map((values) {
+      return (payee: values[1] as String, narration: values[3] as String);
+    });
+    final one = (spaces() & quotedString()).map((values) {
+      return (payee: null, narration: values[1] as String);
+    });
+    final none = epsilon().map((_) => (payee: null, narration: ''));
+    return (two | one | none).cast<({String? payee, String narration})>();
+  }
+
+  ParsedPosting? _parsePosting(String line, int lineNo) {
+    final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
+    final parser = (account() & spaces() & units()).end().map((values) {
+      return ParsedPosting(location: location, account: values[0] as Account, units: values[2] as IncompleteAmount?);
+    });
+    final result = parser.parse(line);
+    if (result is Failure) {
+      _lastFailurePosition = result.position;
+      return null;
+    }
+    return result.value;
+  }
+
+  int _lastFailurePosition = 0;
+
+  int _directiveFailurePosition(String line) {
+    _parseDirectiveHeader(line, 1);
+    return _lastFailurePosition;
+  }
+
+  int _postingFailurePosition(String line) {
+    _parsePosting(line, 1);
+    return _lastFailurePosition;
+  }
+
+  String _foundExpected(String input, int position, {String expected = 'something else'}) {
+    final found = _foundLexeme(input, position);
+    return "found '$found' expected $expected";
+  }
+
+  String _foundLexeme(String input, int position) {
+    var i = position;
+    while (i < input.length && (input.codeUnitAt(i) == 0x20 || input.codeUnitAt(i) == 0x09)) {
+      i += 1;
+    }
+    if (i >= input.length) {
+      return '';
+    }
+    final ch = input[i];
+    if (ch == '"') {
+      var j = i + 1;
+      while (j < input.length && input[j] != '"') {
+        if (input[j] == '\\' && j + 1 < input.length) {
+          j += 2;
+          continue;
+        }
+        j += 1;
+      }
+      if (j < input.length) {
+        j += 1;
+      }
+      return input.substring(i, j);
+    }
+    if ('{}[]()@~,*/'.contains(ch)) {
+      return ch;
+    }
+    var j = i + 1;
+    while (j < input.length) {
+      final c = input[j];
+      if (c == ' ' || c == '\t' || '{}[]()@~,*/"'.contains(c)) {
+        break;
+      }
+      j += 1;
+    }
+    return input.substring(i, j);
+  }
+
+  int _compareDirectives(ParsedDirective a, ParsedDirective b) {
+    final byDate = _dateKey(a.date).compareTo(_dateKey(b.date));
+    if (byDate != 0) {
+      return byDate;
+    }
+    final byType = _typeOrder(a.body).compareTo(_typeOrder(b.body));
+    if (byType != 0) {
+      return byType;
+    }
+    return a.location.linenoBegin.compareTo(b.location.linenoBegin);
+  }
+
+  int _dateKey(BeanDate date) => date.year * 10000 + date.month * 100 + date.day;
+
+  int _typeOrder(DirectiveBody body) {
+    return switch (body) {
+      OpenBody() => 0,
+      CloseBody() => 1,
+      BalanceBody() => 2,
+      PadBody() => 3,
+      TransactionBody() => 4,
+      NoteBody() => 5,
+      DocumentBody() => 6,
+      PriceBody() => 7,
+      EventBody() => 8,
+      QueryBody() => 9,
+      CommodityBody() => 10,
+      CustomBody() => 11,
+    };
+  }
+}
