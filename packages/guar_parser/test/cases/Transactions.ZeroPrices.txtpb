@@ -1,22 +1,22 @@
 directives {
   date { year: 2014 month: 4 day: 20 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Like a conversion entry"
     postings {
-      account: "Equity:Conversions"
-      spec { units { number { exact: "100" } currency: "USD" }
-             price { number { exact: "0" } currency: "XFER" } }
+      account { name: "Equity:Conversions" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
+      price { number { verbatim: "0" resolved: "0" } currency { name: "XFER" } }
     }
     postings {
-      account: "Equity:Conversions"
-      spec { units { number { exact: "101" } currency: "CAD" }
-             price { number { exact: "0" } currency: "XFER" } }
+      account { name: "Equity:Conversions" }
+      units { number { verbatim: "101" resolved: "101" } currency { name: "CAD" } }
+      price { number { verbatim: "0" resolved: "0" } currency { name: "XFER" } }
     }
     postings {
-      account: "Equity:Conversions"
-      spec { units { number { exact: "102" } currency: "AUD" }
-             price { number { exact: "0" } currency: "XFER" } }
+      account { name: "Equity:Conversions" }
+      units { number { verbatim: "102" resolved: "102" } currency { name: "AUD" } }
+      price { number { verbatim: "0" resolved: "0" } currency { name: "XFER" } }
     }
   }
 }

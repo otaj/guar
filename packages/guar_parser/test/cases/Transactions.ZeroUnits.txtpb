@@ -1,16 +1,16 @@
 directives {
   date { year: 2014 month: 4 day: 20 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Zero number of units"
     postings {
-      account: "Assets:Investment"
-      spec { units { number { exact: "0" } currency: "HOOL" }
-             cost { per_unit { number { exact: "500.00" } } currency: "USD" } }
+      account { name: "Assets:Investment" }
+      units { number { verbatim: "0" resolved: "0" } currency { name: "HOOL" } }
+      cost { number_per { verbatim: "500.00" resolved: "500.00" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Cash"
-      spec { units { number { exact: "0" } currency: "USD" } }
+      account { name: "Assets:Cash" }
+      units { number { verbatim: "0" resolved: "0" } currency { name: "USD" } }
     }
   }
 }

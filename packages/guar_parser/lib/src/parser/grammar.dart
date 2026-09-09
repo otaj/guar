@@ -62,10 +62,12 @@ class BeancountGrammar {
       }
       final header = _parseDirectiveHeader(code, lineNo);
       if (header == null) {
+        final failurePos = _directiveFailurePosition(code);
+        final dated = date().parse(code) is Success;
         return ParsedLedger.errors(
           errors: [
             ParseError(
-              message: _foundExpected(code, _directiveFailurePosition(code)),
+              message: dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos),
               location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
             ),
           ],
@@ -75,6 +77,8 @@ class BeancountGrammar {
       final applied = _withPushedTags(header, tagStack);
       if (applied.body is TransactionBody) {
         final postings = <ParsedPosting>[];
+        final metaEntries = <MetaEntry>[];
+        final seenMeta = <String>{};
         final txn = (applied.body as TransactionBody).value;
         final tags = [...txn.tags];
         final links = [...txn.links];
@@ -114,6 +118,15 @@ class BeancountGrammar {
             index += 1;
             continue;
           }
+          final meta = _parseMetaEntry(trimmed);
+          if (meta != null) {
+            if (seenMeta.add(meta.key)) {
+              metaEntries.add(meta);
+            }
+            endLine = postingLine;
+            index += 1;
+            continue;
+          }
           final posting = _parsePosting(trimmed, postingLine);
           if (posting == null) {
             return ParsedLedger.errors(
@@ -134,11 +147,53 @@ class BeancountGrammar {
         directives.add(
           applied.copyWith(
             location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
+            meta: Meta(entries: metaEntries),
             body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
           ),
         );
       } else {
-        directives.add(applied);
+        final metaEntries = <MetaEntry>[];
+        final seenMeta = <String>{};
+        var endLine = lineNo;
+        while (index < lines.length) {
+          final raw = lines[index];
+          if (raw.trimLeft().startsWith(';')) {
+            index += 1;
+            continue;
+          }
+          final codeLine = _stripTrailingComment(raw).trimRight();
+          if (codeLine.trim().isEmpty) {
+            break;
+          }
+          if (!(codeLine.startsWith(' ') || codeLine.startsWith('\t'))) {
+            break;
+          }
+          final metaLine = index + 1;
+          final trimmed = codeLine.trimLeft();
+          final meta = _parseMetaEntry(trimmed);
+          if (meta == null) {
+            return ParsedLedger.errors(
+              errors: [
+                ParseError(
+                  message: _foundExpected(trimmed, 0),
+                  location: BeanLocation(filename: filename, linenoBegin: metaLine, linenoEnd: metaLine),
+                ),
+              ],
+              info: _info(),
+            );
+          }
+          if (seenMeta.add(meta.key)) {
+            metaEntries.add(meta);
+          }
+          endLine = metaLine;
+          index += 1;
+        }
+        directives.add(
+          applied.copyWith(
+            location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
+            meta: Meta(entries: metaEntries),
+          ),
+        );
       }
     }
     if (tagStack.isNotEmpty) {
@@ -373,13 +428,14 @@ class BeancountGrammar {
   }
 
   Parser<({Amount amount, BeanNumber? tolerance})> _balanceAmount() {
-    final withTolerance = (numberLiteral() & spaces() & char('~') & spaces() & numberLiteral() & spaces() & currency())
-        .map((values) {
-          return (
-            amount: Amount(number: values[0] as BeanNumber, currency: values[6] as Currency),
-            tolerance: values[4] as BeanNumber,
-          );
-        });
+    final withTolerance = (numberExpr() & spaces() & char('~') & spaces() & numberExpr() & spaces() & currency()).map((
+      values,
+    ) {
+      return (
+        amount: Amount(number: values[0] as BeanNumber, currency: values[6] as Currency),
+        tolerance: values[4] as BeanNumber,
+      );
+    });
     final plain = amount().map((value) => (amount: value, tolerance: null));
     return (withTolerance | plain).cast();
   }
@@ -413,7 +469,7 @@ class BeancountGrammar {
     final dateValue = date().map(CustomValue.date);
     final text = quotedString().map(CustomValue.text);
     final amountValue = amount().map(CustomValue.amount);
-    final number = numberLiteral().map(CustomValue.number);
+    final number = numberExpr().map(CustomValue.number);
     final accountValue = account().map(CustomValue.account);
     return (boolean | dateValue | text | amountValue | number | accountValue).cast<CustomValue>();
   }
@@ -502,17 +558,62 @@ class BeancountGrammar {
     return result is Success ? result.value : null;
   }
 
+  MetaEntry? _parseMetaEntry(String line) {
+    final result = metaEntry().end().parse(line);
+    return result is Success ? result.value : null;
+  }
+
   ParsedPosting? _parsePosting(String line, int lineNo) {
     final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
-    final parser = (account() & spaces() & units()).end().map((values) {
-      return ParsedPosting(location: location, account: values[0] as Account, units: values[2] as IncompleteAmount?);
-    });
-    final result = parser.parse(line);
-    if (result is Failure) {
-      _lastFailurePosition = result.position;
+    final accountResult = account().parse(line);
+    if (accountResult is! Success) {
+      _lastFailurePosition = accountResult is Failure ? accountResult.position : 0;
       return null;
     }
-    return result.value;
+    var position = accountResult.position;
+    IncompleteAmount? units;
+    ParsedCost? cost;
+    ParsedPrice? price;
+
+    final unitsAttempt = (spaces() & incompleteAmount()).parse(line.substring(position));
+    if (unitsAttempt is Success) {
+      units = unitsAttempt.value[1] as IncompleteAmount;
+      position += unitsAttempt.position;
+    }
+
+    final costWs = spaces().parse(line.substring(position));
+    final costPos = costWs is Success ? position + costWs.position : position;
+    if (costPos < line.length && line[costPos] == '{') {
+      final costResult = costSpec().parse(line.substring(costPos));
+      if (costResult is! Success) {
+        _lastFailurePosition = costPos + (costResult is Failure ? costResult.position : 0);
+        return null;
+      }
+      cost = costResult.value;
+      position = costPos + costResult.position;
+    }
+
+    final priceWs = spaces().parse(line.substring(position));
+    final pricePos = priceWs is Success ? position + priceWs.position : position;
+    if (pricePos < line.length && line[pricePos] == '@') {
+      final priceResult = priceSpec().parse(line.substring(pricePos));
+      if (priceResult is! Success) {
+        _lastFailurePosition = pricePos + (priceResult is Failure ? priceResult.position : 0);
+        return null;
+      }
+      price = priceResult.value;
+      position = pricePos + priceResult.position;
+    }
+
+    final trail = spaces().parse(line.substring(position));
+    if (trail is Success) {
+      position += trail.position;
+    }
+    if (position != line.length) {
+      _lastFailurePosition = position;
+      return null;
+    }
+    return ParsedPosting(location: location, account: accountResult.value, units: units, cost: cost, price: price);
   }
 
   int _lastFailurePosition = 0;
@@ -530,6 +631,12 @@ class BeancountGrammar {
   String _foundExpected(String input, int position, {String expected = 'something else'}) {
     final found = _foundLexeme(input, position);
     return "found '$found' expected $expected";
+  }
+
+  String _foundTopLevel(String input, int position) {
+    final found = _foundLexeme(input, position);
+    final ch = found.isEmpty ? '' : found[0];
+    return 'found $ch expected transaction, directive, or end of input';
   }
 
   String _foundLexeme(String input, int position) {
@@ -561,7 +668,7 @@ class BeancountGrammar {
     var j = i + 1;
     while (j < input.length) {
       final c = input[j];
-      if (c == ' ' || c == '\t' || '{}[]()@~,*/"'.contains(c)) {
+      if (c == ' ' || c == '\t' || c == ':' || '{}[]()@~,*/"'.contains(c)) {
         break;
       }
       j += 1;
