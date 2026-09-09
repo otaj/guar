@@ -1,5 +1,6 @@
 // Line-oriented Beancount document parser built on petitparser fragments.
 
+import 'package:decimal/decimal.dart';
 import 'package:petitparser/petitparser.dart';
 
 import '../domain/domain.dart';
@@ -16,6 +17,20 @@ class BeancountGrammar {
     final directives = <ParsedDirective>[];
     final tagStack = <String>[];
     final metaStack = <MetaEntry>[];
+    var options = const LedgerOptions();
+    final plugins = <Plugin>[];
+    ProcessingInfo info() =>
+        ProcessingInfo(filename: filename.isEmpty ? null : filename, plugin: List.unmodifiable(plugins));
+    ParsedLedger fail(String message, int lineNo) => ParsedLedger.errors(
+      errors: [
+        ParseError(
+          message: message,
+          location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+        ),
+      ],
+      options: options,
+      info: info(),
+    );
     var index = 0;
     while (index < lines.length) {
       final raw = lines[index];
@@ -29,19 +44,31 @@ class BeancountGrammar {
         continue;
       }
       if (code.startsWith(' ') || code.startsWith('\t')) {
-        return ParsedLedger.errors(
-          errors: [
-            ParseError(
-              message: _foundExpected(code.trimLeft(), 0),
-              location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
-            ),
-          ],
-          info: _info(),
-        );
+        return fail(_foundExpected(code.trimLeft(), 0), lineNo);
       }
       while (_hasUnclosedQuote(code) && index < lines.length) {
         code = '$code\n${lines[index]}';
         index += 1;
+      }
+      final optionPair = _parseOption(code);
+      if (optionPair != null) {
+        final applied = _applyOption(options, optionPair.$1, optionPair.$2);
+        if (applied.$2 != null) {
+          return fail(applied.$2!, lineNo);
+        }
+        options = applied.$1;
+        continue;
+      }
+      if (code.startsWith('option')) {
+        return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+      }
+      final plugin = _parsePlugin(code);
+      if (plugin != null) {
+        plugins.add(plugin);
+        continue;
+      }
+      if (code.startsWith('plugin')) {
+        return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
       }
       final pushMeta = _parsePushMeta(code);
       if (pushMeta != null) {
@@ -52,15 +79,7 @@ class BeancountGrammar {
       if (popMeta != null) {
         final at = metaStack.lastIndexWhere((entry) => entry.key == popMeta);
         if (at < 0) {
-          return ParsedLedger.errors(
-            errors: [
-              ParseError(
-                message: 'invalid popmeta',
-                location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
-              ),
-            ],
-            info: _info(),
-          );
+          return fail('invalid popmeta', lineNo);
         }
         metaStack.removeAt(at);
         continue;
@@ -74,15 +93,7 @@ class BeancountGrammar {
       if (pop != null) {
         final at = tagStack.lastIndexOf(pop);
         if (at < 0) {
-          return ParsedLedger.errors(
-            errors: [
-              ParseError(
-                message: 'invalid poptag',
-                location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
-              ),
-            ],
-            info: _info(),
-          );
+          return fail('invalid poptag', lineNo);
         }
         tagStack.removeAt(at);
         continue;
@@ -92,15 +103,7 @@ class BeancountGrammar {
         final dateError = _invalidDateMessage(code);
         final failurePos = _directiveFailurePosition(code);
         final dated = date().parse(code) is Success;
-        return ParsedLedger.errors(
-          errors: [
-            ParseError(
-              message: dateError ?? (dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos)),
-              location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
-            ),
-          ],
-          info: _info(),
-        );
+        return fail(dateError ?? (dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos)), lineNo);
       }
       final applied = _withPushedTags(header, tagStack);
       if (applied.body is TransactionBody) {
@@ -130,15 +133,7 @@ class BeancountGrammar {
           final tagsLinks = _parseTagsLinksLine(trimmed);
           if (tagsLinks != null) {
             if (lastPosting != null) {
-              return ParsedLedger.errors(
-                errors: [
-                  ParseError(
-                    message: _foundExpected(trimmed, 0),
-                    location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
-                  ),
-                ],
-                info: _info(),
-              );
+              return fail(_foundExpected(trimmed, 0), postingLine);
             }
             tags.addAll(tagsLinks.tags);
             links.addAll(tagsLinks.links);
@@ -165,15 +160,7 @@ class BeancountGrammar {
           }
           final posting = _parsePosting(trimmed, postingLine);
           if (posting == null) {
-            return ParsedLedger.errors(
-              errors: [
-                ParseError(
-                  message: _foundExpected(trimmed, _postingFailurePosition(trimmed)),
-                  location: BeanLocation(filename: filename, linenoBegin: postingLine, linenoEnd: postingLine),
-                ),
-              ],
-              info: _info(),
-            );
+            return fail(_foundExpected(trimmed, _postingFailurePosition(trimmed)), postingLine);
           }
           postings.add(posting);
           lastPosting = posting;
@@ -208,15 +195,7 @@ class BeancountGrammar {
           final trimmed = codeLine.trimLeft();
           final meta = _parseMetaEntry(trimmed);
           if (meta == null) {
-            return ParsedLedger.errors(
-              errors: [
-                ParseError(
-                  message: _foundExpected(trimmed, 0),
-                  location: BeanLocation(filename: filename, linenoBegin: metaLine, linenoEnd: metaLine),
-                ),
-              ],
-              info: _info(),
-            );
+            return fail(_foundExpected(trimmed, 0), metaLine);
           }
           if (seenMeta.add(meta.key)) {
             metaEntries.add(meta);
@@ -233,32 +212,136 @@ class BeancountGrammar {
       }
     }
     if (tagStack.isNotEmpty) {
-      return ParsedLedger.errors(
-        errors: [
-          ParseError(
-            message: 'invalid pushtag',
-            location: BeanLocation(filename: filename, linenoBegin: lines.length, linenoEnd: lines.length),
-          ),
-        ],
-        info: _info(),
-      );
+      return fail('invalid pushtag', lines.length);
     }
     if (metaStack.isNotEmpty) {
-      return ParsedLedger.errors(
-        errors: [
-          ParseError(
-            message: 'invalid pushmeta',
-            location: BeanLocation(filename: filename, linenoBegin: lines.length, linenoEnd: lines.length),
-          ),
-        ],
-        info: _info(),
-      );
+      return fail('invalid pushmeta', lines.length);
     }
     directives.sort(_compareDirectives);
-    return ParsedLedger.directives(directives: directives, info: _info());
+    return ParsedLedger.directives(directives: directives, options: options, info: info());
   }
 
-  ProcessingInfo _info() => ProcessingInfo(filename: filename.isEmpty ? null : filename);
+  (String, String)? _parseOption(String line) {
+    final result = (string('option') & spaces() & quotedString() & spaces() & quotedString()).end().parse(line);
+    if (result is! Success) {
+      return null;
+    }
+    return (result.value[2] as String, result.value[4] as String);
+  }
+
+  Plugin? _parsePlugin(String line) {
+    final withConfig = (string('plugin') & spaces() & quotedString() & spaces() & quotedString()).end().parse(line);
+    if (withConfig is Success) {
+      return Plugin(name: withConfig.value[2] as String, config: withConfig.value[4] as String);
+    }
+    final bare = (string('plugin') & spaces() & quotedString()).end().parse(line);
+    if (bare is Success) {
+      return Plugin(name: bare.value[2] as String);
+    }
+    return null;
+  }
+
+  (LedgerOptions, String?) _applyOption(LedgerOptions options, String key, String value) {
+    switch (key) {
+      case 'title':
+        return (options.copyWith(title: value), null);
+      case 'documents':
+        return (options.copyWith(documents: [...options.documents, value]), null);
+      case 'operating_currency':
+        return (
+          options.copyWith(
+            operatingCurrency: [
+              ...options.operatingCurrency,
+              Currency(name: value),
+            ],
+          ),
+          null,
+        );
+      case 'render_commas':
+        final parsed = _parseOptionBool(value);
+        if (parsed == null) {
+          return (options, 'unknown option');
+        }
+        return (options.copyWith(renderCommas: parsed), null);
+      case 'plugin_processing_mode':
+        final mode = switch (value) {
+          'DEFAULT' => PluginProcessingMode.defaultMode,
+          'RAW' => PluginProcessingMode.raw,
+          _ => null,
+        };
+        if (mode == null) {
+          return (options, 'Expected one of DEFAULT, RAW');
+        }
+        return (options.copyWith(pluginProcessingMode: mode), null);
+      case 'inferred_tolerance_default':
+        final tolerance = _parseInferredTolerance(value);
+        if (tolerance == null) {
+          return (options, 'unknown option');
+        }
+        final next = [...options.inferredToleranceDefault, tolerance]..sort(_compareInferredTolerance);
+        return (options.copyWith(inferredToleranceDefault: next), null);
+      case 'name_assets':
+        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(assets: value)), null);
+      case 'name_liabilities':
+        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(liabilities: value)), null);
+      case 'name_equity':
+        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(equity: value)), null);
+      case 'name_income':
+        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(income: value)), null);
+      case 'name_expenses':
+        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(expenses: value)), null);
+      default:
+        return (options, 'unknown option');
+    }
+  }
+
+  bool? _parseOptionBool(String value) {
+    switch (value.toLowerCase()) {
+      case 'true':
+      case '1':
+        return true;
+      case 'false':
+      case '0':
+        return false;
+      default:
+        return null;
+    }
+  }
+
+  InferredTolerance? _parseInferredTolerance(String value) {
+    final colon = value.indexOf(':');
+    if (colon <= 0 || colon == value.length - 1) {
+      return null;
+    }
+    final keyText = value.substring(0, colon);
+    final numberText = value.substring(colon + 1);
+    final number = numberExpr().parse(numberText);
+    if (number is! Success || number.position != numberText.length) {
+      try {
+        return InferredTolerance(
+          key: keyText == '*' ? const CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
+          value: BeanNumber(verbatim: numberText, resolved: Decimal.parse(numberText)),
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+    return InferredTolerance(
+      key: keyText == '*' ? const CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
+      value: number.value,
+    );
+  }
+
+  int _compareInferredTolerance(InferredTolerance a, InferredTolerance b) {
+    return _toleranceKeySort(a.key).compareTo(_toleranceKeySort(b.key));
+  }
+
+  String _toleranceKeySort(CurrencyKey key) {
+    return switch (key) {
+      CurrencyKeyAll() => '*',
+      CurrencyKeyCurrency(:final value) => value.name,
+    };
+  }
 
   String? _parsePushTag(String line) {
     final result = (string('pushtag') & spaces() & _tagOrLink()).end().parse(line);

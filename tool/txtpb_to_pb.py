@@ -8,8 +8,8 @@
 # ///
 
 # Converts a protobean text-format golden into tagged binary on stdout.
-# Goldens are ParsedDirectives or Errors (not ParsedLedger), so fixtures stay flat.
-# Wire format: one kind byte (0x01=ParsedDirectives, 0x02=Errors) then protobuf bytes.
+# Wire format: kind byte then protobuf bytes.
+# 0x01=ParsedDirectives, 0x02=Errors, 0x03=ParsedLedger (options/info cases).
 
 from __future__ import annotations
 
@@ -19,29 +19,34 @@ from typing import Annotated
 
 import typer
 from google.protobuf import text_format
-from protobean.beancount import directive_pb2, error_pb2
+from protobean.beancount import directive_pb2, error_pb2, ledger_pb2
 
 KIND_DIRECTIVES = 0x01
 KIND_ERRORS = 0x02
+KIND_LEDGER = 0x03
 
 app = typer.Typer(
     add_completion=False, help="Load protobean .txtpb goldens for Dart tests."
 )
 
 
-def _first_field(text: str) -> str | None:
+def _top_level_fields(text: str) -> list[str]:
+    fields: list[str] = []
     for line in text.splitlines():
+        if not line or line[0].isspace():
+            continue
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        token = []
+        token: list[str] = []
         for ch in stripped:
             if ch.isalnum() or ch == "_":
                 token.append(ch)
             else:
                 break
-        return "".join(token) or None
-    return None
+        if token:
+            fields.append("".join(token))
+    return fields
 
 
 @app.command()
@@ -54,13 +59,16 @@ def main(
     ],
 ) -> None:
     text = txtpb.read_text(encoding="utf-8")
-    field = _first_field(text)
-    if field == "errors":
+    fields = set(_top_level_fields(text))
+    if fields & {"options", "info"}:
+        message = ledger_pb2.ParsedLedger()
+        text_format.Parse(text, message)
+        kind = KIND_LEDGER
+    elif "errors" in fields:
         message = error_pb2.Errors()
         text_format.Parse(text, message)
         kind = KIND_ERRORS
     else:
-        # Empty files and directive lists are ParsedDirectives.
         message = directive_pb2.ParsedDirectives()
         text_format.Parse(text, message)
         kind = KIND_DIRECTIVES

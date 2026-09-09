@@ -1,6 +1,6 @@
 options {
-  account_types {
-    assets: 'Actifs'
-    liabilities: 'Passifs'
+  account_prefixes {
+    assets: "Actifs"
+    liabilities: "Passifs"
   }
 }

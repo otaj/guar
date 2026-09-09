@@ -1,7 +1,4 @@
 options {
-  account_types {
-    assets: 'Actifs'
-    liabilities: 'Passifs'
-  }
+  account_types { assets: 'Actifs' liabilities: 'Passifs' }
   inferred_tolerance_default { key: 'USD' value: '0.00001' }
 }

@@ -1,6 +1,3 @@
 info {
-  plugin {
-    name: "beancount.plugin.unrealized"
-    config: "Unrealized"
-  }
+  plugin { name: "beancount.plugin.unrealized" config: "Unrealized" }
 }

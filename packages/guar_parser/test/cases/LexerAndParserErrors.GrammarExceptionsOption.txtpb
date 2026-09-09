@@ -1,11 +1,13 @@
 directives {
-  date { year: 2000 month: 1 day: 1 }
-  open { account: "Assets:Before" }
-}
-directives {
-  date { year: 2010 month: 1 day: 1 }
-  close { account: "Assets:Before" }
+  directives {
+    date { year: 2000 month: 1 day: 1 }
+    open { account { name: "Assets:Before" } }
+  }
+  directives {
+    date { year: 2010 month: 1 day: 1 }
+    close { account { name: "Assets:Before" } }
+  }
 }
 options {
-  operating_currency: "CAD"
+  operating_currency { name: "CAD" }
 }

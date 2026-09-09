@@ -1,5 +1,5 @@
 options {
-  inferred_tolerance_default { key: "*" value: "0" }
-  inferred_tolerance_default { key: "JPY" value: "0.5" }
-  inferred_tolerance_default { key: "USD" value: "0.05" }
+  inferred_tolerance_default { key { all {} } value { verbatim: "0" resolved: "0" } }
+  inferred_tolerance_default { key { currency { name: "JPY" } } value { verbatim: "0.5" resolved: "0.5" } }
+  inferred_tolerance_default { key { currency { name: "USD" } } value { verbatim: "0.05" resolved: "0.05" } }
 }

@@ -13,6 +13,7 @@ import '../mapping/domain_to_proto.dart';
 
 const _kindDirectives = 0x01;
 const _kindErrors = 0x02;
+const _kindLedger = 0x03;
 
 void main() {
   final skips = _loadSkips(File('test/harness/unmigrated_skips.yaml'));
@@ -61,7 +62,58 @@ void _expectSameParseResult(pb.ParsedLedger actual, _ExpectedGolden expected) {
         equals(errors.writeToBuffer()),
         reason: 'actual:\n${actual.errors.toTextFormat()}\nexpected:\n${errors.toTextFormat()}',
       );
+    case _ExpectedLedger(:final ledger):
+      _expectOptions(actual, ledger);
+      _expectInfo(actual, ledger);
+      if (ledger.hasErrors()) {
+        if (!actual.hasErrors()) {
+          fail('actual is directives, expected errors:\n${actual.toTextFormat()}');
+        }
+        clearErrorLocations(actual.errors);
+        clearErrorLocations(ledger.errors);
+        expect(
+          actual.errors.writeToBuffer(),
+          equals(ledger.errors.writeToBuffer()),
+          reason: 'actual:\n${actual.errors.toTextFormat()}\nexpected:\n${ledger.errors.toTextFormat()}',
+        );
+      } else if (ledger.hasDirectives()) {
+        if (!actual.hasDirectives()) {
+          fail('actual is errors, expected directives:\n${actual.toTextFormat()}');
+        }
+        clearDirectiveLocations(actual.directives);
+        clearDirectiveLocations(ledger.directives);
+        expect(
+          actual.directives.writeToBuffer(),
+          equals(ledger.directives.writeToBuffer()),
+          reason: 'actual:\n${actual.directives.toTextFormat()}\nexpected:\n${ledger.directives.toTextFormat()}',
+        );
+      } else if (!actual.hasDirectives()) {
+        fail('actual is errors, expected options/info success:\n${actual.toTextFormat()}');
+      } else {
+        expect(actual.directives.directives, isEmpty);
+      }
   }
+}
+
+void _expectOptions(pb.ParsedLedger actual, pb.ParsedLedger expected) {
+  final merged = domainToProto(const ParsedLedger.directives(directives: [])).options
+    ..mergeFromMessage(expected.options);
+  expect(
+    actual.options.writeToBuffer(),
+    equals(merged.writeToBuffer()),
+    reason: 'actual options:\n${actual.options.toTextFormat()}\nexpected options:\n${merged.toTextFormat()}',
+  );
+}
+
+void _expectInfo(pb.ParsedLedger actual, pb.ParsedLedger expected) {
+  final merged = domainToProto(const ParsedLedger.directives(directives: [])).info..mergeFromMessage(expected.info);
+  merged.clearFilename();
+  actual.info.clearFilename();
+  expect(
+    actual.info.writeToBuffer(),
+    equals(merged.writeToBuffer()),
+    reason: 'actual info:\n${actual.info.toTextFormat()}\nexpected info:\n${merged.toTextFormat()}',
+  );
 }
 
 Map<String, String> _loadSkips(File file) {
@@ -107,6 +159,7 @@ Future<_ExpectedGolden> _loadExpected(File txtpbFile) async {
   return switch (kind) {
     _kindDirectives => _ExpectedDirectives(pb.ParsedDirectives.fromBuffer(payload)),
     _kindErrors => _ExpectedErrors(pb.Errors.fromBuffer(payload)),
+    _kindLedger => _ExpectedLedger(pb.ParsedLedger.fromBuffer(payload)),
     _ => fail('unknown golden kind 0x${kind.toRadixString(16)} for ${txtpbFile.path}'),
   };
 }
@@ -135,4 +188,9 @@ final class _ExpectedDirectives extends _ExpectedGolden {
 final class _ExpectedErrors extends _ExpectedGolden {
   _ExpectedErrors(this.errors);
   final pb.Errors errors;
+}
+
+final class _ExpectedLedger extends _ExpectedGolden {
+  _ExpectedLedger(this.ledger);
+  final pb.ParsedLedger ledger;
 }
