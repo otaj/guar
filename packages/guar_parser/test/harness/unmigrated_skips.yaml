@@ -3,7 +3,6 @@ unmigrated:
   - cases/Arithmetic.NumberExprDifferentPlaces
   - cases/Arithmetic.NumberExprDifferentPlaces2
   - cases/Arithmetic.NumberExprMultiply
-  - cases/Balance.TotalPrice
   - cases/Currencies.DifferentCostAndPriceCurrency
   - cases/DeprecatedOptions.DeprecatedOption
   - cases/DeprecatedOptions.DeprecatedPlugin
@@ -92,9 +91,6 @@ unmigrated:
   - cases/TotalsAndSigns.PriceNegative
   - cases/TotalsAndSigns.TotalCostInvalid
   - cases/TotalsAndSigns.TotalPriceInverted
-  - cases/TotalsAndSigns.TotalPriceNegative
-  - cases/TotalsAndSigns.TotalPricePositive
-  - cases/TotalsAndSigns.TotalPriceWithMissing
   - cases/TotalsAndSigns.TotalPriceWithMissing2
   - cases/Transactions.BlankLineNotAllowed
   - cases/Transactions.BlankLineWithSpacesNotAllowed
