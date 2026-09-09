@@ -29,7 +29,7 @@ Parser<Account> account() {
 }
 
 Parser<Currency> currency() {
-  return (pattern('A-Z') & pattern(r'A-Z0-9._-').star()).flatten().map((name) => Currency(name: name));
+  return (pattern(r'A-Z/') & pattern(r"A-Z0-9._'-").star()).flatten().map((name) => Currency(name: name));
 }
 
 Parser<BeanNumber> numberLiteral() {

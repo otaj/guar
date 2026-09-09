@@ -1,10 +1,10 @@
 directives { date { year: 2014 month: 1 day: 19 }
-  open { account: "Assets:Underscore" currencies: "DJ_EURO" } }
+  open { account { name: "Assets:Underscore" } currencies { name: "DJ_EURO" } } }
 directives { date { year: 2014 month: 1 day: 19 }
-  open { account: "Assets:Period" currencies: "DJ.EURO" } }
+  open { account { name: "Assets:Period" } currencies { name: "DJ.EURO" } } }
 directives { date { year: 2014 month: 1 day: 19 }
-  open { account: "Assets:Apostrophe" currencies: "DJ\'EURO" } }
+  open { account { name: "Assets:Apostrophe" } currencies { name: "DJ'EURO" } } }
 directives { date { year: 2014 month: 1 day: 19 }
-  open { account: "Assets:Numbers" currencies: "EURO123" } }
+  open { account { name: "Assets:Numbers" } currencies { name: "EURO123" } } }
 directives { date { year: 2014 month: 1 day: 19 }
-  open { account: "Assets:Futures" currencies: "/LOX21_211204_P100.25" } }
+  open { account { name: "Assets:Futures" } currencies { name: "/LOX21_211204_P100.25" } } }

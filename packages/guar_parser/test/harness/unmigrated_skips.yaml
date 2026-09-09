@@ -13,7 +13,6 @@ unmigrated:
   - cases/Balance.TotalCost
   - cases/Balance.TotalPrice
   - cases/Currencies.DifferentCostAndPriceCurrency
-  - cases/Currencies.ParseCurrencies
   - cases/DeprecatedOptions.DeprecatedOption
   - cases/DeprecatedOptions.DeprecatedPlugin
   - cases/DisplayContextOptions.RenderCommasError
