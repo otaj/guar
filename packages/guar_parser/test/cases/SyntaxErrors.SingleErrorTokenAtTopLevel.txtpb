@@ -1,0 +1,3 @@
+errors {
+  message: "found E expected transaction, directive, or end of input"
+}
