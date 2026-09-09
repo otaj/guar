@@ -9,19 +9,24 @@ Parser work is fixture-driven. Do not implement a construct before a golden expe
 
 ## Cycle
 
-1. Rewrite the fixture `.txtpb` to the protobean `ParsedLedger` schema.
-2. Remove that stem from `test/harness/unmigrated_skips.yaml` (same concern as the rewrite).
-3. Run the golden: prototxt load must succeed; the parser comparison may fail.
-4. Implement the smallest domain/parser/mapper change that turns that failure green.
-5. Commit often: typically `test:` then `feat(parser):` (or one commit if the change is tiny).
+1. Rewrite the fixture `.txtpb` to flat protobean `ParsedDirectives` or `Errors` (not `ParsedLedger`).
+2. Keep original `#` comments from the lima prototxt (EOF notes, etc.). If the file has `# ANOMALY`, leave it untouched and keep it on `unmigrated`.
+3. Prefer lima-like compact layout (`date { year: y month: m day: d }`, inline leaf messages); only expand when needed.
+4. Remove that stem from `test/harness/unmigrated_skips.yaml` (same concern as the rewrite).
+5. Run the golden: prototxt load must succeed; the parser comparison may fail.
+6. Implement the smallest domain/parser/mapper change that turns that failure green.
+7. Commit often: typically `test:` then `feat(parser):` (or one commit if the change is tiny).
 
 ## Skips
 
 - Only skip via the explicit skip list (`unmigrated` or `product` with a reason).
 - Prototxt load failure is a **test failure**, never an implicit skip.
 - Product skips need an explicit reason; ask before dropping a language feature.
+- Fixtures whose lima `.txtpb` contains `# ANOMALY` stay on `unmigrated` until the anomaly is resolved (leave those files untouched).
 
 ## Scope
 
-- One fixture group at a time. Do not try to green all goldens in one change.
 - Prefer migrating a small group and making it pass before starting the next.
+- Omit `location` from migrated `.txtpb` goldens; the harness clears locations on both sides so fixtures stay compact.
+- Prefer lima-like compact layout for migrated goldens; keep original `#` comments that are not anomalies.
+- Prefer lima `found '…' expected …` wording for parse-error goldens when the parser can emit that shape.

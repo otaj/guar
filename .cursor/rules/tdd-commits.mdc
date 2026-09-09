@@ -1,0 +1,13 @@
+---
+description: Commit after each golden migration and implementation
+alwaysApply: true
+---
+
+# Commit after TDD slices
+
+After migrating fixture(s) and making them pass, commit before starting the next group.
+
+- Prefer one commit when the same implementation greens several newly unskipped goldens (`test:` rewrite/unskip together with `feat(parser):` only if the diff stays one concern; otherwise `test:` then `feat(parser):`, still before the next group).
+- If one parser change knocks out multiple migrated cases in the same slice, commit once for that slice.
+- Do not leave a green migrated fixture uncommitted while moving on to another construct.
+- Push when the user asks, or when continuing after an explicit push request; local commit is the hard requirement per slice.
