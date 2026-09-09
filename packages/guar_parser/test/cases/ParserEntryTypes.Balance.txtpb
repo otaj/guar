@@ -1,15 +1,8 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
-  balance {
-    account: "Assets:US:BestBank:Checking"
-    amount { number { exact: "200" } currency: "USD" }
-  }
+  balance { account { name: "Assets:US:BestBank:Checking" } amount { number { verbatim: "200" resolved: "200" } currency { name: "USD" } } }
 }
 directives {
   date { year: 2013 month: 5 day: 18 }
-  balance {
-    account: "Assets:US:BestBank:Checking"
-    amount { number { exact: "200" } currency: "USD" }
-    tolerance { exact: "0.002" }
-  }
+  balance { account { name: "Assets:US:BestBank:Checking" } amount { number { verbatim: "200" resolved: "200" } currency { name: "USD" } } tolerance { verbatim: "0.002" resolved: "0.002" } }
 }

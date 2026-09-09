@@ -1,7 +1,4 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
-  pad {
-    account: "Assets:US:BestBank:Checking"
-    source_account: "Equity:Opening-Balances"
-  }
+  pad { account { name: "Assets:US:BestBank:Checking" } source_account { name: "Equity:Opening-Balances" } }
 }

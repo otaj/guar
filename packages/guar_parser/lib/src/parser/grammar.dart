@@ -154,13 +154,145 @@ class BeancountGrammar {
         ),
       );
     });
-    final parser = (open | close | commodity | transaction).cast<ParsedDirective>().end();
+    final balance = (date() & spaces() & string('balance') & spaces() & account() & spaces() & _balanceAmount()).map((
+      values,
+    ) {
+      final amountTol = values[6] as ({Amount amount, BeanNumber? tolerance});
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.balance(
+          account: values[4] as Account,
+          amount: amountTol.amount,
+          tolerance: amountTol.tolerance,
+        ),
+      );
+    });
+    final pad = (date() & spaces() & string('pad') & spaces() & account() & spaces() & account()).map((values) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.pad(account: values[4] as Account, sourceAccount: values[6] as Account),
+      );
+    });
+    final note = (date() & spaces() & string('note') & spaces() & account() & spaces() & quotedString() & _tagsLinks())
+        .map((values) {
+          final tl = values[7] as ({List<Tag> tags, List<Link> links});
+          return ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.note(
+              account: values[4] as Account,
+              comment: values[6] as String,
+              tags: tl.tags,
+              links: tl.links,
+            ),
+          );
+        });
+    final price = (date() & spaces() & string('price') & spaces() & currency() & spaces() & amount()).map((values) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.price(currency: values[4] as Currency, amount: values[6] as Amount),
+      );
+    });
+    final event = (date() & spaces() & string('event') & spaces() & quotedString() & spaces() & quotedString()).map((
+      values,
+    ) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.event(name: values[4] as String, description: values[6] as String),
+      );
+    });
+    final query = (date() & spaces() & string('query') & spaces() & quotedString() & spaces() & quotedString()).map((
+      values,
+    ) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.query(name: values[4] as String, queryString: values[6] as String),
+      );
+    });
+    final document =
+        (date() & spaces() & string('document') & spaces() & account() & spaces() & quotedString() & _tagsLinks()).map((
+          values,
+        ) {
+          final tl = values[7] as ({List<Tag> tags, List<Link> links});
+          return ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.document(
+              account: values[4] as Account,
+              filename: values[6] as String,
+              tags: tl.tags,
+              links: tl.links,
+            ),
+          );
+        });
+    final custom = (date() & spaces() & string('custom') & spaces() & quotedString() & _customValues()).map((values) {
+      return ParsedDirective(
+        location: location,
+        date: values[0] as BeanDate,
+        body: DirectiveBody.custom(type: values[4] as String, values: values[5] as List<CustomValue>),
+      );
+    });
+    final parser =
+        (open | close | commodity | balance | pad | note | price | event | query | document | custom | transaction)
+            .cast<ParsedDirective>()
+            .end();
     final result = parser.parse(line);
     if (result is Failure) {
       _lastFailurePosition = result.position;
       return null;
     }
     return result.value;
+  }
+
+  Parser<({Amount amount, BeanNumber? tolerance})> _balanceAmount() {
+    final withTolerance = (numberLiteral() & spaces() & char('~') & spaces() & numberLiteral() & spaces() & currency())
+        .map((values) {
+          return (
+            amount: Amount(number: values[0] as BeanNumber, currency: values[6] as Currency),
+            tolerance: values[4] as BeanNumber,
+          );
+        });
+    final plain = amount().map((value) => (amount: value, tolerance: null));
+    return (withTolerance | plain).cast();
+  }
+
+  Parser<({List<Tag> tags, List<Link> links})> _tagsLinks() {
+    return (spaces() & _tagOrLink()).star().map((values) {
+      final tags = <Tag>[];
+      final links = <Link>[];
+      for (final part in values) {
+        final item = part[1];
+        if (item is Tag) {
+          tags.add(item);
+        } else if (item is Link) {
+          links.add(item);
+        }
+      }
+      return (tags: tags, links: links);
+    });
+  }
+
+  Parser<List<CustomValue>> _customValues() {
+    return (spaces() & _customValue()).star().map((values) {
+      return [for (final part in values) part[1] as CustomValue];
+    });
+  }
+
+  Parser<CustomValue> _customValue() {
+    final boolean = (string('TRUE').map((_) => true) | string('FALSE').map((_) => false)).cast<bool>().map(
+      CustomValue.boolean,
+    );
+    final dateValue = date().map(CustomValue.date);
+    final text = quotedString().map(CustomValue.text);
+    final amountValue = amount().map(CustomValue.amount);
+    final number = numberLiteral().map(CustomValue.number);
+    final accountValue = account().map(CustomValue.account);
+    return (boolean | dateValue | text | amountValue | number | accountValue).cast<CustomValue>();
   }
 
   Parser<({List<Currency> currencies, BookingMethod? booking})> _openTail() {

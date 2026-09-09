@@ -29,7 +29,7 @@ Parser<Account> account() {
 }
 
 Parser<Currency> currency() {
-  return (pattern('A-Z') & pattern(r'A-Z0-9\._\-').star()).flatten().map((name) => Currency(name: name));
+  return (pattern('A-Z') & pattern(r'A-Z0-9._-').star()).flatten().map((name) => Currency(name: name));
 }
 
 Parser<BeanNumber> numberLiteral() {
@@ -39,6 +39,12 @@ Parser<BeanNumber> numberLiteral() {
   return (sign & intPart & frac).flatten().map((verbatim) {
     final normalized = verbatim.replaceAll(',', '');
     return BeanNumber(verbatim: verbatim, resolved: Decimal.parse(normalized));
+  });
+}
+
+Parser<Amount> amount() {
+  return (numberLiteral() & spaces() & currency()).map((values) {
+    return Amount(number: values[0] as BeanNumber, currency: values[2] as Currency);
   });
 }
 
