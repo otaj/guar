@@ -116,11 +116,12 @@ class BeancountGrammar {
 
   ParsedDirective? _parseDirectiveHeader(String line, int lineNo) {
     final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
-    final open = (date() & spaces() & string('open') & spaces() & account() & _openCurrencies()).map((values) {
+    final open = (date() & spaces() & string('open') & spaces() & account() & _openTail()).map((values) {
+      final tail = values[5] as ({List<Currency> currencies, BookingMethod? booking});
       return ParsedDirective(
         location: location,
         date: values[0] as BeanDate,
-        body: DirectiveBody.open(account: values[4] as Account, currencies: values[5] as List<Currency>),
+        body: DirectiveBody.open(account: values[4] as Account, currencies: tail.currencies, booking: tail.booking),
       );
     });
     final close = (date() & spaces() & string('close') & spaces() & account()).map((values) {
@@ -138,12 +139,18 @@ class BeancountGrammar {
       );
     });
     final transaction = (date() & spaces() & flag() & _txnTail()).map((values) {
-      final payeeNarration = values[3] as ({String? payee, String narration});
+      final tail = values[3] as ({String? payee, String narration, List<Tag> tags, List<Link> links});
       return ParsedDirective(
         location: location,
         date: values[0] as BeanDate,
         body: DirectiveBody.transaction(
-          ParsedTransaction(flag: values[2] as Flag, payee: payeeNarration.payee, narration: payeeNarration.narration),
+          ParsedTransaction(
+            flag: values[2] as Flag,
+            payee: tail.payee,
+            narration: tail.narration,
+            tags: tail.tags,
+            links: tail.links,
+          ),
         ),
       );
     });
@@ -156,7 +163,7 @@ class BeancountGrammar {
     return result.value;
   }
 
-  Parser<List<Currency>> _openCurrencies() {
+  Parser<({List<Currency> currencies, BookingMethod? booking})> _openTail() {
     final currencies = (spaces() & currency() & (char(',') & spaces().optional() & currency()).star()).map((values) {
       final list = <Currency>[values[1] as Currency];
       for (final part in values[2] as List<dynamic>) {
@@ -164,18 +171,58 @@ class BeancountGrammar {
       }
       return list;
     });
-    return currencies.optional().map((value) => value ?? <Currency>[]);
+    final booking = (spaces() & quotedString()).map((values) => _bookingMethod(values[1] as String));
+    return (currencies.optional().map((value) => value ?? <Currency>[]) & booking.optional()).map((values) {
+      return (currencies: values[0] as List<Currency>, booking: values[1] as BookingMethod?);
+    });
   }
 
-  Parser<({String? payee, String narration})> _txnTail() {
-    final two = (spaces() & quotedString() & spaces() & quotedString()).map((values) {
-      return (payee: values[1] as String, narration: values[3] as String);
+  BookingMethod? _bookingMethod(String value) {
+    return switch (value) {
+      'STRICT' => BookingMethod.strict,
+      'STRICT_WITH_SIZE' => BookingMethod.strictWithSize,
+      'NONE' => BookingMethod.none,
+      'AVERAGE' => BookingMethod.average,
+      'FIFO' => BookingMethod.fifo,
+      'LIFO' => BookingMethod.lifo,
+      'HIFO' => BookingMethod.hifo,
+      _ => null,
+    };
+  }
+
+  Parser<({String? payee, String narration, List<Tag> tags, List<Link> links})> _txnTail() {
+    final tagsLinks = (spaces() & _tagOrLink()).star().map((values) {
+      final tags = <Tag>[];
+      final links = <Link>[];
+      for (final part in values) {
+        final item = part[1];
+        if (item is Tag) {
+          tags.add(item);
+        } else if (item is Link) {
+          links.add(item);
+        }
+      }
+      return (tags: tags, links: links);
     });
-    final one = (spaces() & quotedString()).map((values) {
-      return (payee: null, narration: values[1] as String);
+    final two = (spaces() & quotedString() & spaces() & quotedString() & tagsLinks).map((values) {
+      final tl = values[4] as ({List<Tag> tags, List<Link> links});
+      return (payee: values[1] as String, narration: values[3] as String, tags: tl.tags, links: tl.links);
     });
-    final none = epsilon().map((_) => (payee: null, narration: ''));
-    return (two | one | none).cast<({String? payee, String narration})>();
+    final one = (spaces() & quotedString() & tagsLinks).map((values) {
+      final tl = values[2] as ({List<Tag> tags, List<Link> links});
+      return (payee: null, narration: values[1] as String, tags: tl.tags, links: tl.links);
+    });
+    final none = tagsLinks.map((tl) {
+      return (payee: null, narration: '', tags: tl.tags, links: tl.links);
+    });
+    return (two | one | none).cast();
+  }
+
+  Parser<Object> _tagOrLink() {
+    final name = pattern(r'A-Za-z0-9_./-').plus().flatten();
+    final tag = (char('#') & name).map((values) => Tag(name: values[1] as String));
+    final link = (char('^') & name).map((values) => Link(name: values[1] as String));
+    return (tag | link).cast<Object>();
   }
 
   ParsedPosting? _parsePosting(String line, int lineNo) {

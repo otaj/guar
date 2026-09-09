@@ -1,6 +1,4 @@
 directives {
   date { year: 2013 month: 5 day: 18 }
-  commodity {
-    currency: "MSFT"
-  }
+  commodity { currency { name: "MSFT" } }
 }
