@@ -123,7 +123,8 @@ class BeancountGrammar {
           }
           final postingCode = _stripTrailingComment(postingRaw).trimRight();
           if (postingCode.trim().isEmpty) {
-            break;
+            index += 1;
+            continue;
           }
           if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
             break;
@@ -167,13 +168,16 @@ class BeancountGrammar {
           endLine = postingLine;
           index += 1;
         }
-        directives.add(
-          applied.copyWith(
-            location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-            meta: _metaWithStack(metaStack, metaEntries),
-            body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
-          ),
+        final txnDirective = applied.copyWith(
+          location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
+          meta: _metaWithStack(metaStack, metaEntries),
+          body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
         );
+        final accountError = _accountTypeError(txnDirective, options);
+        if (accountError != null) {
+          return fail(accountError, lineNo);
+        }
+        directives.add(txnDirective);
       } else {
         final metaEntries = <MetaEntry>[];
         final seenMeta = <String>{};
@@ -186,7 +190,8 @@ class BeancountGrammar {
           }
           final codeLine = _stripTrailingComment(raw).trimRight();
           if (codeLine.trim().isEmpty) {
-            break;
+            index += 1;
+            continue;
           }
           if (!(codeLine.startsWith(' ') || codeLine.startsWith('\t'))) {
             break;
@@ -203,12 +208,15 @@ class BeancountGrammar {
           endLine = metaLine;
           index += 1;
         }
-        directives.add(
-          applied.copyWith(
-            location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-            meta: _metaWithStack(metaStack, metaEntries),
-          ),
+        final directive = applied.copyWith(
+          location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
+          meta: _metaWithStack(metaStack, metaEntries),
         );
+        final accountError = _accountTypeError(directive, options);
+        if (accountError != null) {
+          return fail(accountError, lineNo);
+        }
+        directives.add(directive);
       }
     }
     if (tagStack.isNotEmpty) {
@@ -341,6 +349,51 @@ class BeancountGrammar {
       CurrencyKeyAll() => '*',
       CurrencyKeyCurrency(:final value) => value.name,
     };
+  }
+
+  String? _accountTypeError(ParsedDirective directive, LedgerOptions options) {
+    final prefixes = [
+      options.accountPrefixes.assets,
+      options.accountPrefixes.liabilities,
+      options.accountPrefixes.equity,
+      options.accountPrefixes.income,
+      options.accountPrefixes.expenses,
+    ];
+    for (final account in _accountsIn(directive)) {
+      final root = account.name.split(':').first;
+      if (!prefixes.contains(root)) {
+        return 'unknown account type $root, must be one of ${prefixes.join(', ')}';
+      }
+    }
+    return null;
+  }
+
+  Iterable<Account> _accountsIn(ParsedDirective directive) sync* {
+    switch (directive.body) {
+      case OpenBody(:final account):
+        yield account;
+      case CloseBody(:final account):
+        yield account;
+      case BalanceBody(:final account):
+        yield account;
+      case PadBody(:final account, :final sourceAccount):
+        yield account;
+        yield sourceAccount;
+      case NoteBody(:final account):
+        yield account;
+      case DocumentBody(:final account):
+        yield account;
+      case TransactionBody(:final value):
+        for (final posting in value.postings) {
+          yield posting.account;
+        }
+      case PriceBody():
+      case CommodityBody():
+      case EventBody():
+      case QueryBody():
+      case CustomBody():
+        break;
+    }
   }
 
   String? _parsePushTag(String line) {
