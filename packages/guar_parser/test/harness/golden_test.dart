@@ -33,12 +33,12 @@ void main() {
       final expected = await _loadExpected(txtpbFile);
       final source = await beanFile.readAsString();
       final actual = domainToProto(const BeancountParser().parse(source, filename: beanFile.path));
-      _expectSameParseResult(actual, expected);
+      _expectSameParseResult(actual, expected, await txtpbFile.readAsString());
     }, skip: skipReason);
   }
 }
 
-void _expectSameParseResult(pb.ParsedLedger actual, _ExpectedGolden expected) {
+void _expectSameParseResult(pb.ParsedLedger actual, _ExpectedGolden expected, String txtpb) {
   switch (expected) {
     case _ExpectedDirectives(:final directives):
       if (!actual.hasDirectives()) {
@@ -63,7 +63,7 @@ void _expectSameParseResult(pb.ParsedLedger actual, _ExpectedGolden expected) {
         reason: 'actual:\n${actual.errors.toTextFormat()}\nexpected:\n${errors.toTextFormat()}',
       );
     case _ExpectedLedger(:final ledger):
-      _expectOptions(actual, ledger);
+      _expectOptions(actual, ledger, txtpb);
       _expectInfo(actual, ledger);
       if (ledger.hasErrors()) {
         if (!actual.hasErrors()) {
@@ -95,14 +95,36 @@ void _expectSameParseResult(pb.ParsedLedger actual, _ExpectedGolden expected) {
   }
 }
 
-void _expectOptions(pb.ParsedLedger actual, pb.ParsedLedger expected) {
-  final merged = domainToProto(const ParsedLedger.directives(directives: [])).options
-    ..mergeFromMessage(expected.options);
+void _expectOptions(pb.ParsedLedger actual, pb.ParsedLedger expected, String txtpb) {
+  _restoreProto3FalseBools(expected.options, txtpb);
   expect(
     actual.options.writeToBuffer(),
-    equals(merged.writeToBuffer()),
-    reason: 'actual options:\n${actual.options.toTextFormat()}\nexpected options:\n${merged.toTextFormat()}',
+    equals(expected.options.writeToBuffer()),
+    reason: 'actual options:\n${actual.options.toTextFormat()}\nexpected options:\n${expected.options.toTextFormat()}',
   );
+}
+
+void _restoreProto3FalseBools(pb.Options options, String txtpb) {
+  // Proto3 drops false bools from the Python golden binary; Dart keeps field presence.
+  bool listed(String field) => RegExp('$field:\\s*false').hasMatch(txtpb);
+  if (listed('render_commas')) {
+    options.renderCommas = false;
+  }
+  if (listed('infer_tolerance_from_cost')) {
+    options.inferToleranceFromCost = false;
+  }
+  if (listed('use_precise_interpolation')) {
+    options.usePreciseInterpolation = false;
+  }
+  if (listed('insert_pythonpath')) {
+    options.insertPythonpath = false;
+  }
+  if (listed('allow_pipe_separator')) {
+    options.allowPipeSeparator = false;
+  }
+  if (listed('allow_deprecated_none_for_tags_and_links')) {
+    options.allowDeprecatedNoneForTagsAndLinks = false;
+  }
 }
 
 void _expectInfo(pb.ParsedLedger actual, pb.ParsedLedger expected) {

@@ -47,10 +47,10 @@ void main() {
     expect(accounts(spliced), ['Assets:Cash']);
   });
 
-  test('removing an option line restores the default for that key', () {
+  test('removing an option line unsets that key', () {
     final base = parser.parse('option "title" "Named"\n2014-01-01 open Assets:Cash\n', filename: file);
     final spliced = parser.splice(base, '', filename: file, startLine: 1, endLine: 1);
-    expect(directives(spliced).options.title, 'Untitled Beancount file');
+    expect(directives(spliced).options.title, isNull);
     expect(accounts(spliced), ['Assets:Cash']);
     expect(directives(spliced).directives.single.location.linenoBegin, 1);
   });

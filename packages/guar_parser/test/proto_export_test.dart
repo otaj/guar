@@ -20,6 +20,22 @@ void main() {
     expect(proto.info.filename, 'ledger.beancount');
   });
 
+  test('does not populate Beancount option defaults when the source omitted them', () {
+    final ledger = parser.parse('2014-01-01 close Assets:Cash\n', filename: 'tiny.beancount');
+    final options = switch (ledger) {
+      ParsedLedgerDirectives(:final options) => options,
+      ParsedLedgerErrors(:final errors) => throw TestFailure(errors.map((e) => e.message).join('\n')),
+    };
+    expect(options.title, isNull);
+    expect(options.conversionCurrency, isNull);
+    expect(options.accountPrefixes.assets, isNull);
+    final text = parser.exportProtoText(ledger);
+    expect(text, isNot(contains('Untitled')));
+    expect(text, isNot(contains('Opening-Balances')));
+    expect(text, isNot(contains('conversion_currency')));
+    expect(text, isNot(contains('account_prefixes')));
+  });
+
   test('exportProto maps parse errors onto protobean Errors', () {
     final proto = parser.exportProto(parser.parse('not a directive\n', filename: 'ledger.beancount'));
     expect(proto.hasErrors(), isTrue);

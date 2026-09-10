@@ -256,39 +256,81 @@ pb.CustomValue _customValue(domain.CustomValue value) {
 
 pb.Options _options(domain.LedgerOptions options) {
   return pb.Options(
-    accountPrefixes: pb.AccountPrefixes(
-      assets: options.accountPrefixes.assets,
-      liabilities: options.accountPrefixes.liabilities,
-      equity: options.accountPrefixes.equity,
-      income: options.accountPrefixes.income,
-      expenses: options.accountPrefixes.expenses,
-    ),
+    accountPrefixes: _accountPrefixes(options.accountPrefixes),
     title: options.title,
-    accountPreviousBalances: _account(options.accountPreviousBalances),
-    accountPreviousEarnings: _account(options.accountPreviousEarnings),
-    accountPreviousConversions: _account(options.accountPreviousConversions),
-    accountCurrentEarnings: _account(options.accountCurrentEarnings),
-    accountCurrentConversions: _account(options.accountCurrentConversions),
-    accountUnrealizedGains: _account(options.accountUnrealizedGains),
-    accountRounding: options.accountRounding == null ? null : _account(options.accountRounding!),
-    conversionCurrency: _currency(options.conversionCurrency),
+    accountPreviousBalances: switch (options.accountPreviousBalances) {
+      null => null,
+      final account => _account(account),
+    },
+    accountPreviousEarnings: switch (options.accountPreviousEarnings) {
+      null => null,
+      final account => _account(account),
+    },
+    accountPreviousConversions: switch (options.accountPreviousConversions) {
+      null => null,
+      final account => _account(account),
+    },
+    accountCurrentEarnings: switch (options.accountCurrentEarnings) {
+      null => null,
+      final account => _account(account),
+    },
+    accountCurrentConversions: switch (options.accountCurrentConversions) {
+      null => null,
+      final account => _account(account),
+    },
+    accountUnrealizedGains: switch (options.accountUnrealizedGains) {
+      null => null,
+      final account => _account(account),
+    },
+    accountRounding: switch (options.accountRounding) {
+      null => null,
+      final account => _account(account),
+    },
+    conversionCurrency: switch (options.conversionCurrency) {
+      null => null,
+      final currency => _currency(currency),
+    },
     displayPrecision: options.displayPrecision.map(_displayPrecision).toList(),
     inferredToleranceDefault: options.inferredToleranceDefault.map(_inferredTolerance).toList(),
-    toleranceMultiplier: options.toleranceMultiplier == null ? null : _number(options.toleranceMultiplier!),
+    toleranceMultiplier: switch (options.toleranceMultiplier) {
+      null => null,
+      final number => _number(number),
+    },
     inferToleranceFromCost: options.inferToleranceFromCost,
     documents: options.documents,
     operatingCurrency: options.operatingCurrency.map(_currency).toList(),
     renderCommas: options.renderCommas,
     pluginProcessingMode: switch (options.pluginProcessingMode) {
+      null => null,
       domain.PluginProcessingMode.defaultMode => pb.PluginProcessingMode.PLUGIN_PROCESSING_MODE_DEFAULT,
       domain.PluginProcessingMode.raw => pb.PluginProcessingMode.PLUGIN_PROCESSING_MODE_RAW,
     },
     longStringMaxlines: options.longStringMaxlines,
-    bookingMethod: _booking(options.bookingMethod),
+    bookingMethod: switch (options.bookingMethod) {
+      null => null,
+      final method => _booking(method),
+    },
     usePreciseInterpolation: options.usePreciseInterpolation,
     insertPythonpath: options.insertPythonpath,
     allowPipeSeparator: options.allowPipeSeparator,
     allowDeprecatedNoneForTagsAndLinks: options.allowDeprecatedNoneForTagsAndLinks,
+  );
+}
+
+pb.AccountPrefixes? _accountPrefixes(domain.AccountPrefixes prefixes) {
+  if (prefixes.assets == null &&
+      prefixes.liabilities == null &&
+      prefixes.equity == null &&
+      prefixes.income == null &&
+      prefixes.expenses == null) {
+    return null;
+  }
+  return pb.AccountPrefixes(
+    assets: prefixes.assets,
+    liabilities: prefixes.liabilities,
+    equity: prefixes.equity,
+    income: prefixes.income,
+    expenses: prefixes.expenses,
   );
 }
 

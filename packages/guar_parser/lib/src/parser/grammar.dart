@@ -369,11 +369,11 @@ class BeancountGrammar {
 
   String? _accountTypeError(ParsedDirective directive, LedgerOptions options) {
     final prefixes = [
-      options.accountPrefixes.assets,
-      options.accountPrefixes.liabilities,
-      options.accountPrefixes.equity,
-      options.accountPrefixes.income,
-      options.accountPrefixes.expenses,
+      options.accountPrefixes.assets ?? 'Assets',
+      options.accountPrefixes.liabilities ?? 'Liabilities',
+      options.accountPrefixes.equity ?? 'Equity',
+      options.accountPrefixes.income ?? 'Income',
+      options.accountPrefixes.expenses ?? 'Expenses',
     ];
     for (final account in _accountsIn(directive)) {
       final root = account.name.split(':').first;

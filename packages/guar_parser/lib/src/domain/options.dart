@@ -14,11 +14,11 @@ enum PluginProcessingMode { defaultMode, raw }
 @freezed
 abstract class AccountPrefixes with _$AccountPrefixes {
   const factory AccountPrefixes({
-    @Default('Assets') String assets,
-    @Default('Liabilities') String liabilities,
-    @Default('Equity') String equity,
-    @Default('Income') String income,
-    @Default('Expenses') String expenses,
+    String? assets,
+    String? liabilities,
+    String? equity,
+    String? income,
+    String? expenses,
   }) = _AccountPrefixes;
 }
 
@@ -77,28 +77,28 @@ abstract class ProcessingInfo with _$ProcessingInfo {
 abstract class LedgerOptions with _$LedgerOptions {
   const factory LedgerOptions({
     @Default(AccountPrefixes()) AccountPrefixes accountPrefixes,
-    @Default('Untitled Beancount file') String title,
-    @Default(Account(name: 'Opening-Balances')) Account accountPreviousBalances,
-    @Default(Account(name: 'Earnings:Previous')) Account accountPreviousEarnings,
-    @Default(Account(name: 'Conversions:Previous')) Account accountPreviousConversions,
-    @Default(Account(name: 'Earnings:Current')) Account accountCurrentEarnings,
-    @Default(Account(name: 'Conversions:Current')) Account accountCurrentConversions,
-    @Default(Account(name: 'Earnings:Unrealized')) Account accountUnrealizedGains,
+    String? title,
+    Account? accountPreviousBalances,
+    Account? accountPreviousEarnings,
+    Account? accountPreviousConversions,
+    Account? accountCurrentEarnings,
+    Account? accountCurrentConversions,
+    Account? accountUnrealizedGains,
     Account? accountRounding,
-    @Default(Currency(name: 'INR')) Currency conversionCurrency,
+    Currency? conversionCurrency,
     @Default([]) List<DisplayPrecision> displayPrecision,
     @Default([]) List<InferredTolerance> inferredToleranceDefault,
     BeanNumber? toleranceMultiplier,
-    @Default(false) bool inferToleranceFromCost,
+    bool? inferToleranceFromCost,
     @Default([]) List<String> documents,
     @Default([]) List<Currency> operatingCurrency,
-    @Default(false) bool renderCommas,
-    @Default(PluginProcessingMode.defaultMode) PluginProcessingMode pluginProcessingMode,
-    @Default(64) int longStringMaxlines,
-    @Default(BookingMethod.strict) BookingMethod bookingMethod,
-    @Default(false) bool usePreciseInterpolation,
-    @Default(false) bool insertPythonpath,
-    @Default(false) bool allowPipeSeparator,
-    @Default(false) bool allowDeprecatedNoneForTagsAndLinks,
+    bool? renderCommas,
+    PluginProcessingMode? pluginProcessingMode,
+    int? longStringMaxlines,
+    BookingMethod? bookingMethod,
+    bool? usePreciseInterpolation,
+    bool? insertPythonpath,
+    bool? allowPipeSeparator,
+    bool? allowDeprecatedNoneForTagsAndLinks,
   }) = _LedgerOptions;
 }
