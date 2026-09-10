@@ -28,7 +28,6 @@ unmigrated:
   - cases/LexerAndParserErrors.GrammarSyntaxErrorMultiple
   - cases/LexerAndParserErrors.GrammarSyntaxErrorRecovery
   - cases/LexerAndParserErrors.GrammarSyntaxErrorRecovery2
-  - cases/LexerAndParserErrors.LexerErrorsInPostings
   - cases/LexerAndParserErrors.LexerExceptionRecovery
   - cases/LexerAndParserErrors.LexerInvalidTokenRecovery
   - cases/MetaData.MetadataOther

@@ -19,6 +19,7 @@ class BeancountGrammar {
     final metaStack = <MetaEntry>[];
     var options = const LedgerOptions();
     final plugins = <Plugin>[];
+    final errors = <ParseError>[];
     ProcessingInfo info() =>
         ProcessingInfo(filename: filename.isEmpty ? null : filename, plugin: List.unmodifiable(plugins));
     ParsedLedger fail(String message, int lineNo) => ParsedLedger.errors(
@@ -31,7 +32,35 @@ class BeancountGrammar {
       options: options,
       info: info(),
     );
+    void noteError(String message, int lineNo) {
+      errors.add(
+        ParseError(
+          message: message,
+          location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+        ),
+      );
+    }
+
     var index = 0;
+    void skipIndentedBlock() {
+      while (index < lines.length) {
+        final blockRaw = lines[index];
+        if (blockRaw.trimLeft().startsWith(';')) {
+          index += 1;
+          continue;
+        }
+        final blockCode = _stripTrailingComment(blockRaw).trimRight();
+        if (blockCode.trim().isEmpty) {
+          index += 1;
+          continue;
+        }
+        if (!(blockCode.startsWith(' ') || blockCode.startsWith('\t'))) {
+          break;
+        }
+        index += 1;
+      }
+    }
+
     while (index < lines.length) {
       final raw = lines[index];
       final lineNo = index + 1;
@@ -134,7 +163,11 @@ class BeancountGrammar {
           final tagsLinks = _parseTagsLinksLine(trimmed);
           if (tagsLinks != null) {
             if (lastPosting != null) {
-              return fail(_foundExpected(trimmed, 0), postingLine);
+              noteError(_foundExpected(trimmed, 0), postingLine);
+              index += 1;
+              skipIndentedBlock();
+              postings.clear();
+              break;
             }
             tags.addAll(tagsLinks.tags);
             links.addAll(tagsLinks.links);
@@ -161,12 +194,19 @@ class BeancountGrammar {
           }
           final posting = _parsePosting(trimmed, postingLine);
           if (posting == null) {
-            return fail(_foundExpected(trimmed, _postingFailurePosition(trimmed)), postingLine);
+            noteError(_foundPosting(trimmed, _postingFailurePosition(trimmed)), postingLine);
+            index += 1;
+            skipIndentedBlock();
+            postings.clear();
+            break;
           }
           postings.add(posting);
           lastPosting = posting;
           endLine = postingLine;
           index += 1;
+        }
+        if (postings.isEmpty && errors.isNotEmpty) {
+          continue;
         }
         final txnDirective = applied.copyWith(
           location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
@@ -218,6 +258,9 @@ class BeancountGrammar {
         }
         directives.add(directive);
       }
+    }
+    if (errors.isNotEmpty) {
+      return ParsedLedger.errors(errors: errors, options: options, info: info());
     }
     if (tagStack.isNotEmpty) {
       return fail('invalid pushtag', lines.length);
@@ -886,6 +929,11 @@ class BeancountGrammar {
     return "found '$found' expected $expected";
   }
 
+  String _foundPosting(String input, int position) {
+    final found = _foundLexeme(input, position);
+    return "found '$found'";
+  }
+
   String _foundTopLevel(String input, int position) {
     final found = _foundLexeme(input, position);
     final ch = found.isEmpty ? '' : found[0];
@@ -901,6 +949,9 @@ class BeancountGrammar {
       return '';
     }
     final ch = input[i];
+    if (!_isTokenStart(ch)) {
+      return 'ERROR unrecognized token';
+    }
     if (ch == '"') {
       var j = i + 1;
       while (j < input.length && input[j] != '"') {
@@ -927,6 +978,14 @@ class BeancountGrammar {
       j += 1;
     }
     return input.substring(i, j);
+  }
+
+  bool _isTokenStart(String ch) {
+    final code = ch.codeUnitAt(0);
+    if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)) {
+      return true;
+    }
+    return '{}[]()@~,*/#+^!&?%"\'.\\-_'.contains(ch);
   }
 
   int _compareDirectives(ParsedDirective a, ParsedDirective b) {

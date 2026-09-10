@@ -20,6 +20,9 @@ doc/api/
 
 .fvm/
 
+.cache/
+.pre-commit-home/
+
 .venv/
 __pycache__/
 *.py[cod]
