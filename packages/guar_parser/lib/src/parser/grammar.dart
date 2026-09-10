@@ -1,20 +1,27 @@
 // Line-oriented Beancount document parser built on petitparser fragments.
 
-import 'package:decimal/decimal.dart';
 import 'package:petitparser/petitparser.dart';
 
 import '../domain/domain.dart';
 import 'include.dart';
+import 'option_apply.dart';
 import 'tokens.dart';
 
 class BeancountGrammar {
-  BeancountGrammar({this.filename = '', IncludeController? includes})
+  BeancountGrammar({this.filename = '', this.firstLine = 1, IncludeController? includes})
     : includes = includes ?? IncludeController(readFile: (_) => null);
 
   final String filename;
+  final int firstLine;
   final IncludeController includes;
 
-  ParsedLedger parse(String source) => _parseInto(source, _ParseState(), isRoot: true);
+  ParsedLedger parse(String source, {LedgerOptions? initialOptions}) {
+    final state = _ParseState();
+    if (initialOptions != null) {
+      state.options = initialOptions;
+    }
+    return _parseInto(source, state, isRoot: true);
+  }
 
   ParsedLedger _parseInto(String source, _ParseState state, {required bool isRoot}) {
     final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -23,6 +30,7 @@ class BeancountGrammar {
       filename: filename.isEmpty ? null : filename,
       include: List.unmodifiable(includes.includeLog),
       plugin: List.unmodifiable(state.plugins),
+      optionSettings: List.unmodifiable(state.optionSettings),
     );
     ParsedLedger fail(String message, int lineNo) {
       final error = ParseError(
@@ -67,7 +75,7 @@ class BeancountGrammar {
 
     while (index < lines.length && !state.aborted) {
       final raw = lines[index];
-      final lineNo = index + 1;
+      final lineNo = index + firstLine;
       index += 1;
       var code = _stripTrailingComment(raw).trimRight();
       if (code.trim().isEmpty) {
@@ -115,17 +123,24 @@ class BeancountGrammar {
       }
       final optionPair = _parseOption(code);
       if (optionPair != null) {
-        final applied = _applyOption(state.options, optionPair.$1, optionPair.$2);
+        final applied = applyLedgerOption(state.options, optionPair.$1, optionPair.$2);
         if (applied.$2 != null) {
           return fail(applied.$2!, lineNo);
         }
+        state.optionSettings.add(
+          OptionSetting(
+            location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+            key: optionPair.$1,
+            value: optionPair.$2,
+          ),
+        );
         state.options = applied.$1;
         continue;
       }
       if (code.startsWith('option')) {
         return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
       }
-      final plugin = _parsePlugin(code);
+      final plugin = _parsePlugin(code, lineNo);
       if (plugin != null) {
         state.plugins.add(plugin);
         continue;
@@ -192,7 +207,7 @@ class BeancountGrammar {
           if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
             break;
           }
-          final postingLine = index + 1;
+          final postingLine = index + firstLine;
           final trimmed = postingCode.trimLeft();
           final tagsLinks = _parseTagsLinksLine(trimmed);
           if (tagsLinks != null) {
@@ -279,7 +294,7 @@ class BeancountGrammar {
           if (!(codeLine.startsWith(' ') || codeLine.startsWith('\t'))) {
             break;
           }
-          final metaLine = index + 1;
+          final metaLine = index + firstLine;
           final trimmed = codeLine.trimLeft();
           final meta = _parseMetaEntry(trimmed);
           if (meta == null) {
@@ -311,12 +326,12 @@ class BeancountGrammar {
       return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
     }
     if (state.tagStack.isNotEmpty) {
-      return fail('invalid pushtag', lines.length);
+      return fail('invalid pushtag', firstLine + lines.length - 1);
     }
     if (state.metaStack.isNotEmpty) {
-      return fail('invalid pushmeta', lines.length);
+      return fail('invalid pushmeta', firstLine + lines.length - 1);
     }
-    state.directives.sort(_compareDirectives);
+    state.directives.sort(compareParsedDirectives);
     return ParsedLedger.directives(directives: state.directives, options: state.options, info: info());
   }
 
@@ -339,118 +354,17 @@ class BeancountGrammar {
     return (result.value[2] as String, result.value[4] as String);
   }
 
-  Plugin? _parsePlugin(String line) {
+  Plugin? _parsePlugin(String line, int lineNo) {
+    final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
     final withConfig = (string('plugin') & spaces() & quotedString() & spaces() & quotedString()).end().parse(line);
     if (withConfig is Success) {
-      return Plugin(name: withConfig.value[2] as String, config: withConfig.value[4] as String);
+      return Plugin(name: withConfig.value[2] as String, config: withConfig.value[4] as String, location: location);
     }
     final bare = (string('plugin') & spaces() & quotedString()).end().parse(line);
     if (bare is Success) {
-      return Plugin(name: bare.value[2] as String);
+      return Plugin(name: bare.value[2] as String, location: location);
     }
     return null;
-  }
-
-  (LedgerOptions, String?) _applyOption(LedgerOptions options, String key, String value) {
-    switch (key) {
-      case 'title':
-        return (options.copyWith(title: value), null);
-      case 'documents':
-        return (options.copyWith(documents: [...options.documents, value]), null);
-      case 'operating_currency':
-        return (
-          options.copyWith(
-            operatingCurrency: [
-              ...options.operatingCurrency,
-              Currency(name: value),
-            ],
-          ),
-          null,
-        );
-      case 'render_commas':
-        final parsed = _parseOptionBool(value);
-        if (parsed == null) {
-          return (options, 'unknown option');
-        }
-        return (options.copyWith(renderCommas: parsed), null);
-      case 'plugin_processing_mode':
-        final mode = switch (value) {
-          'DEFAULT' => PluginProcessingMode.defaultMode,
-          'RAW' => PluginProcessingMode.raw,
-          _ => null,
-        };
-        if (mode == null) {
-          return (options, 'Expected one of DEFAULT, RAW');
-        }
-        return (options.copyWith(pluginProcessingMode: mode), null);
-      case 'inferred_tolerance_default':
-        final tolerance = _parseInferredTolerance(value);
-        if (tolerance == null) {
-          return (options, 'unknown option');
-        }
-        final next = [...options.inferredToleranceDefault, tolerance]..sort(_compareInferredTolerance);
-        return (options.copyWith(inferredToleranceDefault: next), null);
-      case 'name_assets':
-        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(assets: value)), null);
-      case 'name_liabilities':
-        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(liabilities: value)), null);
-      case 'name_equity':
-        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(equity: value)), null);
-      case 'name_income':
-        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(income: value)), null);
-      case 'name_expenses':
-        return (options.copyWith(accountPrefixes: options.accountPrefixes.copyWith(expenses: value)), null);
-      default:
-        return (options, 'unknown option');
-    }
-  }
-
-  bool? _parseOptionBool(String value) {
-    switch (value.toLowerCase()) {
-      case 'true':
-      case '1':
-        return true;
-      case 'false':
-      case '0':
-        return false;
-      default:
-        return null;
-    }
-  }
-
-  InferredTolerance? _parseInferredTolerance(String value) {
-    final colon = value.indexOf(':');
-    if (colon <= 0 || colon == value.length - 1) {
-      return null;
-    }
-    final keyText = value.substring(0, colon);
-    final numberText = value.substring(colon + 1);
-    final number = numberExpr().parse(numberText);
-    if (number is! Success || number.position != numberText.length) {
-      try {
-        return InferredTolerance(
-          key: keyText == '*' ? const CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
-          value: BeanNumber(verbatim: numberText, resolved: Decimal.parse(numberText)),
-        );
-      } catch (_) {
-        return null;
-      }
-    }
-    return InferredTolerance(
-      key: keyText == '*' ? const CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
-      value: number.value,
-    );
-  }
-
-  int _compareInferredTolerance(InferredTolerance a, InferredTolerance b) {
-    return _toleranceKeySort(a.key).compareTo(_toleranceKeySort(b.key));
-  }
-
-  String _toleranceKeySort(CurrencyKey key) {
-    return switch (key) {
-      CurrencyKeyAll() => '*',
-      CurrencyKeyCurrency(:final value) => value.name,
-    };
   }
 
   String? _accountTypeError(ParsedDirective directive, LedgerOptions options) {
@@ -1051,42 +965,43 @@ class BeancountGrammar {
     }
     return '{}[]()@~,*/#+^!&?%"\'.\\-_'.contains(ch);
   }
+}
 
-  int _compareDirectives(ParsedDirective a, ParsedDirective b) {
-    final byDate = _dateKey(a.date).compareTo(_dateKey(b.date));
-    if (byDate != 0) {
-      return byDate;
-    }
-    final byType = _typeOrder(a.body).compareTo(_typeOrder(b.body));
-    if (byType != 0) {
-      return byType;
-    }
-    return a.location.linenoBegin.compareTo(b.location.linenoBegin);
+int compareParsedDirectives(ParsedDirective a, ParsedDirective b) {
+  final byDate = _dateKey(a.date).compareTo(_dateKey(b.date));
+  if (byDate != 0) {
+    return byDate;
   }
-
-  int _dateKey(BeanDate date) => date.year * 10000 + date.month * 100 + date.day;
-
-  int _typeOrder(DirectiveBody body) {
-    return switch (body) {
-      OpenBody() => 0,
-      CloseBody() => 1,
-      BalanceBody() => 2,
-      PadBody() => 3,
-      TransactionBody() => 4,
-      NoteBody() => 5,
-      DocumentBody() => 6,
-      PriceBody() => 7,
-      EventBody() => 8,
-      QueryBody() => 9,
-      CommodityBody() => 10,
-      CustomBody() => 11,
-    };
+  final byType = _typeOrder(a.body).compareTo(_typeOrder(b.body));
+  if (byType != 0) {
+    return byType;
   }
+  return a.location.linenoBegin.compareTo(b.location.linenoBegin);
+}
+
+int _dateKey(BeanDate date) => date.year * 10000 + date.month * 100 + date.day;
+
+int _typeOrder(DirectiveBody body) {
+  return switch (body) {
+    OpenBody() => 0,
+    CloseBody() => 1,
+    BalanceBody() => 2,
+    PadBody() => 3,
+    TransactionBody() => 4,
+    NoteBody() => 5,
+    DocumentBody() => 6,
+    PriceBody() => 7,
+    EventBody() => 8,
+    QueryBody() => 9,
+    CommodityBody() => 10,
+    CustomBody() => 11,
+  };
 }
 
 class _ParseState {
   LedgerOptions options = const LedgerOptions();
   final List<Plugin> plugins = <Plugin>[];
+  final List<OptionSetting> optionSettings = <OptionSetting>[];
   final List<ParsedDirective> directives = <ParsedDirective>[];
   final List<ParseError> errors = <ParseError>[];
   final List<String> tagStack = <String>[];

@@ -4,6 +4,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'account.dart';
 import 'directive.dart';
+import 'location.dart';
 import 'number.dart';
 
 part 'options.freezed.dart';
@@ -23,7 +24,13 @@ abstract class AccountPrefixes with _$AccountPrefixes {
 
 @freezed
 abstract class Plugin with _$Plugin {
-  const factory Plugin({required String name, String? config}) = _Plugin;
+  const factory Plugin({required String name, String? config, required BeanLocation location}) = _Plugin;
+}
+
+@freezed
+abstract class OptionSetting with _$OptionSetting {
+  const factory OptionSetting({required BeanLocation location, required String key, required String value}) =
+      _OptionSetting;
 }
 
 @freezed
@@ -62,6 +69,7 @@ abstract class ProcessingInfo with _$ProcessingInfo {
     @Default([]) List<Currency> commodities,
     @Default([]) List<Plugin> plugin,
     @Default(DisplayContext()) DisplayContext displayContext,
+    @Default([]) List<OptionSetting> optionSettings,
   }) = _ProcessingInfo;
 }
 

@@ -50,6 +50,20 @@ switch (ledger) {
 
 `filename` is used for locations and as the base path for relative `include`s. `BeancountParser.parse` reads includes from the filesystem.
 
+To add or replace a region without reparsing the rest of the file, pass the already-parsed ledger, the snippet, and the inclusive 1-based span it occupies (`endLine < startLine` inserts before `startLine`):
+
+```dart
+final updated = const BeancountParser().splice(
+  ledger,
+  snippet,
+  filename: 'ledger.beancount',
+  startLine: 10,
+  endLine: 12,
+);
+```
+
+Constructs in that filename whose locations overlap `[startLine, endLine]` are dropped and replaced by whatever the snippet parses to (directives, options, plugins). Later line numbers in the same file shift if the snippet is a different length. A failing snippet yields `ParsedLedger.errors` (XOR).
+
 Notable domain choices:
 
 | Type | Notes |
