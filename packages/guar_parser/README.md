@@ -64,6 +64,16 @@ final updated = const BeancountParser().splice(
 
 Constructs in that filename whose locations overlap `[startLine, endLine]` are dropped and replaced by whatever the snippet parses to (directives, options, plugins). Later line numbers in the same file shift if the snippet is a different length. A failing snippet yields `ParsedLedger.errors` (XOR).
 
+`diff` compares two parsed ledgers. `onlyInLeft` / `onlyInRight` are directives present on one side only (`changed` is used instead when `considerLocations: true` and the same source span has different content). Options and processing info are compared field-by-field. `considerLocations` is required: when false, `BeanLocation` (and `info.filename`) is ignored so the same construct on different lines matches.
+
+```dart
+final diff = const BeancountParser().diff(
+  left,
+  right,
+  considerLocations: false,
+);
+```
+
 `export` rebuilds Beancount text from a successful `ParsedLedger`. Comments, org-mode titles, and `include` lines are not in the domain, so they become blank lines; dated constructs keep their original line numbers in the main file. Directives that came from included files are appended after the main file. `exportToFile` writes that text with `dart:io` `File` and requires `overwrite` (a non-empty existing file is left untouched unless `overwrite: true`).
 
 ```dart
