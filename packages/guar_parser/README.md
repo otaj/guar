@@ -20,7 +20,7 @@ BeancountParser  ──►  ParsedLedger   (XOR: directives or errors)
 
 - **Domain** (`lib/src/domain/`) is the parser's public type system. Align types with Beancount language meaning, not protobuf field numbers.
 - **Parser** (`lib/src/parser/`) is a line-oriented document parser. Petitparser fragments in `tokens.dart` parse dates, amounts, expressions, and similar; `grammar.dart` walks the file, applies `include` / `option` / `plugin` / push-pop stacks, and emits directives.
-- **`protobean` is test-only.** `lib/` must not import it. Golden tests map domain → proto in `test/mapping/domain_to_proto.dart`.
+- **Proto export** (`package:guar_parser/proto.dart`) maps domain → protobean. `lib/src/domain/` and `lib/src/parser/` do not import protobean.
 
 Successful parse vs errors is XOR, matching protobean `ParsedLedger`. `pushtag` / `poptag` / `pushmeta` / `popmeta` mutate parse state and are not directives.
 
@@ -75,6 +75,22 @@ const BeancountParser().exportToFile(
 );
 ```
 
+`package:guar_parser/proto.dart` maps the same ledger onto protobean `ParsedLedger` (binary or text). File writes take required `overwrite` and `format`:
+
+```dart
+import 'package:guar_parser/proto.dart';
+
+final proto = const BeancountParser().exportProto(ledger);
+final bytes = const BeancountParser().exportProtoBytes(ledger);
+final textProto = const BeancountParser().exportProtoText(ledger);
+const BeancountParser().exportProtoToFile(
+  ledger,
+  File('out.pb'),
+  overwrite: false,
+  format: ProtoExportFormat.binary,
+);
+```
+
 Notable domain choices:
 
 | Type | Notes |
@@ -89,13 +105,11 @@ Notable domain choices:
 
 ```
 lib/
-  guar_parser.dart          public exports
+  guar_parser.dart          public domain/parser API
+  proto.dart                protobean export (binary and text)
   src/domain/               Freezed models
-  src/parser/
-    beancount_parser.dart   entry point
-    grammar.dart            document walk
-    tokens.dart             petitparser fragments
-    include.dart            path/glob/duplicate include
+  src/parser/               petitparser grammar
+  src/proto/                domain → protobean mapper
 test/
   cases/                    lima fixtures (.beancount + .txtpb)
   cases_unsupported/        lima-unsupported fixtures

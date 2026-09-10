@@ -7,7 +7,7 @@ alwaysApply: true
 
 - Freezed models in `packages/guar_parser/lib/src/domain/` are the parser's domain and public shape.
 - Align types with Beancount language meaning, not protobuf field numbers.
-- `protobean` is **test-only**: map domain → proto for goldens; do not depend on it from `lib/`.
+- `protobean` is interchange only: import it from `package:guar_parser/proto.dart` / `lib/src/proto/`, never from `lib/src/domain/` or `lib/src/parser/`.
 - Prefer sealed Freezed unions for directive bodies, flags, meta values, and similar alternatives.
 - Use civil `BeanDate` (y/m/d), not `DateTime`. Numbers keep `verbatim` plus a resolved `Decimal`.
 - Successful parse vs errors is XOR (same as protobean `ParsedLedger`).
