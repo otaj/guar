@@ -1,31 +1,30 @@
 # ANOMALY: Lima parser is robust to varying levels of indentation,
 # so succeeds in parsing this input
+# guar: same decision (indentation depth is not enforced strictly)
 directives {
   date { year: 2013 month: 5 day: 18 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Investments:MSFT"
-      spec {
-        units { number { exact: "10" } currency: "MSFT" }
-        price { number { exact: "2000" } currency: "USD" is_total: true }
-      }
       meta {
-        kv { key: "test2" value { text: "has" } }
-        kv { key: "test3" value { text: "to" } }
+        entries { key: "test2" value { text: "has" } }
+        entries { key: "test3" value { text: "to" } }
       }
+      account { name: "Assets:Investments:MSFT" }
+      units { number { verbatim: "10" resolved: "10" } currency { name: "MSFT" } }
+      price { number { verbatim: "2000" resolved: "2000" } currency { name: "USD" } is_total: true }
     }
     postings {
-      account: "Assets:Investments:Cash"
-      spec { units { number { exact: "-20000" } currency: "USD" } }
       meta {
-        kv { key: "test4" value { text: "come" } }
-        kv { key: "test5" value { text: "from" } }
-        kv { key: "test6" value { text: "this" } }
+        entries { key: "test4" value { text: "come" } }
+        entries { key: "test5" value { text: "from" } }
+        entries { key: "test6" value { text: "this" } }
       }
+      account { name: "Assets:Investments:Cash" }
+      units { number { verbatim: "-20000" resolved: "-20000" } currency { name: "USD" } }
     }
   }
 }

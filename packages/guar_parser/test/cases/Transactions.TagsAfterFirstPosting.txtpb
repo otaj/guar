@@ -1,24 +1,24 @@
 # ANOMALY: Lima counts any metadata after a posting as associated with that posting
 # which seems to match what is described at
 # https://beancount.github.io/docs/beancount_language_syntax.html#metadata_1
-# which also bears the comment
-# (the additional indentation from the posting is not strictly necessary but it helps with readability).
-# Futhermore, wherever a line of metadata is accepted, so too is a tag or a link.
+# guar: same decision (tag/link lines after a posting attach as posting metadata)
 directives {
   date { year: 2014 month: 4 day: 20 }
-  tags: "basetag"
-  links: "baselink"
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Links and tags on subsequent lines"
+    tags { name: "basetag" }
+    links { name: "baselink" }
     postings {
-      account: "Assets:Checking"
-      spec { units { number { exact: "100" } currency: "USD" } }
-      meta { kv { value { tag: "tag1" } } }
+      meta {
+        entries { value { tag { name: "tag1" } } }
+      }
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Checking"
-      spec { units { number { exact: "-99" } currency: "USD" } }
+      account { name: "Assets:Checking" }
+      units { number { verbatim: "-99" resolved: "-99" } currency { name: "USD" } }
     }
   }
 }

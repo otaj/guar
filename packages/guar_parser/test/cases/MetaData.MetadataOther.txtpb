@@ -1,86 +1,63 @@
+# ANOMALY: Lima returns directives in date order
+# guar: same decision (directives are sorted by date)
 directives {
   date { year: 2013 month: 1 day: 1 }
-  open {
-    account: "Equity:Other"
-  }
+  open { account { name: "Equity:Other" } }
 }
 directives {
   date { year: 2013 month: 1 day: 1 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
-    kv { key: "test2" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
+    entries { key: "test2" value { text: "Something" } }
   }
-  open {
-    account: "Assets:Investments"
-  }
+  open { account { name: "Assets:Investments" } }
 }
 directives {
   date { year: 2013 month: 1 day: 10 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  note {
-    account: "Assets:Investments"
-    comment: "Bla"
-  }
+  note { account { name: "Assets:Investments" } comment: "Bla" }
 }
 directives {
   date { year: 2013 month: 1 day: 31 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  pad {
-    account: "Assets:Investments"
-    source_account: "Equity:Other"
-  }
+  pad { account { name: "Assets:Investments" } source_account { name: "Equity:Other" } }
 }
 directives {
   date { year: 2013 month: 2 day: 1 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  balance {
-    account: "Assets:Investments"
-    amount { number { exact: "111.00" } currency: "USD" }
-  }
+  balance { account { name: "Assets:Investments" } amount { number { verbatim: "111.00" resolved: "111.00" } currency { name: "USD" } } }
 }
 directives {
   date { year: 2013 month: 3 day: 1 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  event {
-    type: "location"
-    description: "Nowhere"
-  }
+  document { account { name: "Assets:Investments" } filename: "/path/to/something.pdf" }
 }
 directives {
   date { year: 2013 month: 3 day: 1 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  document {
-    account: "Assets:Investments"
-    filename: "/path/to/something.pdf"
-  }
+  price { currency { name: "HOOL" } amount { number { verbatim: "500" resolved: "500" } currency { name: "USD" } } }
 }
 directives {
   date { year: 2013 month: 3 day: 1 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  price {
-    currency: "HOOL"
-    amount { number { exact: "500" } currency: "USD" }
-  }
+  event { name: "location" description: "Nowhere" }
 }
-# ANOMALY: Lima parser returns directives in date order
 directives {
   date { year: 2014 month: 1 day: 1 }
   meta {
-    kv { key: "test1" value { text: "Something" } }
+    entries { key: "test1" value { text: "Something" } }
   }
-  close {
-    account: "Assets:Investments"
-  }
+  close { account { name: "Assets:Investments" } }
 }

@@ -1,4 +1,5 @@
 # ANOMALY: Lima parses this successfully
+# guar: same decision (boolean options are case-insensitive)
 options {
   render_commas: true
 }

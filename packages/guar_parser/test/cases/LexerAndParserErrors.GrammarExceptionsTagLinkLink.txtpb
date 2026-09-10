@@ -1,30 +1,27 @@
 # ANOMALY: Lima returns directives in date order
+# guar: same decision (directives are sorted by date)
 directives {
   date { year: 2000 month: 1 day: 1 }
-  open { account: "Assets:Before" }
+  open { account { name: "Assets:Before" } }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  close { account: "Assets:Before" }
+  close { account { name: "Assets:Before" } }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  links: "somelink"
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     payee: "Payee"
     narration: "Narration"
+    links { name: "somelink" }
     postings {
-      account: "Assets:Before"
-      spec {
-        units { number { exact: "100.00" } currency: "USD" }
-      }
+      account { name: "Assets:Before" }
+      units { number { verbatim: "100.00" resolved: "100.00" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:After"
-      spec {
-        units { number { exact: "-100.00" } currency: "USD" }
-      }
+      account { name: "Assets:After" }
+      units { number { verbatim: "-100.00" resolved: "-100.00" } currency { name: "USD" } }
     }
   }
 }

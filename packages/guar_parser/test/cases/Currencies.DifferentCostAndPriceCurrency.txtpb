@@ -1,21 +1,20 @@
 # ANOMALY: Lima parser doesn't check for matching currencies
 # Should be done in post-processing
+# guar: same decision (currency consistency is deferred past parse)
 directives {
   date { year: 2018 month: 3 day: 21 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Convert MR to KrisFlyer"
     postings {
-      account: "Assets:Test"
-      spec {
-        units { number { exact: "-100" } currency: "MR" }
-        cost { per_unit { number { exact: "0.0075" } } currency: "USD" }
-        price { number { exact: "1" } currency: "KRISFLYER" }
-      }
+      account { name: "Assets:Test" }
+      units { number { verbatim: "-100" resolved: "-100" } currency { name: "MR" } }
+      cost { number_per { verbatim: "0.0075" resolved: "0.0075" } currency { name: "USD" } }
+      price { number { verbatim: "1" resolved: "1" } currency { name: "KRISFLYER" } }
     }
     postings {
-      account: "Assets:Krisflyer"
-      spec { units { number { exact: "100" } currency: "KRISFLYER" } }
+      account { name: "Assets:Krisflyer" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "KRISFLYER" } }
     }
   }
 }

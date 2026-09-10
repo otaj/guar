@@ -1,8 +1,6 @@
 # ANOMALY: Lima parser has no trouble with final indented comment line
+# guar: same decision (trailing indented comments are allowed)
 directives {
   date { year: 2013 month: 7 day: 11 }
-  note {
-    account: "Assets:Cash"
-    comment: "test"
-  }
+  note { account { name: "Assets:Cash" } comment: "test" }
 }

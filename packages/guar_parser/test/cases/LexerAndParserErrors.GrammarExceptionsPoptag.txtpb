@@ -1,4 +1,5 @@
 # ANOMALY: if there are parse errors, Lima only returns the errors
+# guar: same decision (successful parse vs errors is XOR)
 errors {
   message: "invalid poptag"
 }

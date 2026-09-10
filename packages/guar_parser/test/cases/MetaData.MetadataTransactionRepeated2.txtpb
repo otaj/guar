@@ -1,4 +1,5 @@
 # ANOMALY: duplicated metadata keys is a parse error for Lima
+# guar: same decision (duplicate metadata keys are parse errors)
 errors {
   message: "duplicate key test"
 }

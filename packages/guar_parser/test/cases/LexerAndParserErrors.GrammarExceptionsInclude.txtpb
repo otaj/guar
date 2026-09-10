@@ -1,24 +1,26 @@
+# ANOMALY: Lima resolves includes in the core parser, so we add something here
+# ANOMALY: Lima returns directives in date order
+# guar: same decision (includes at parse time; directives sorted by date)
 directives {
   date { year: 2000 month: 1 day: 1 }
-  open { account: "Assets:Before" }
+  open { account { name: "Assets:Before" } }
 }
-# ANOMALY: Lima resolves includes in the core parser, so we add something here
 directives {
   date { year: 2005 month: 1 day: 1 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Another Nice dinner at Mermaid Inn"
     postings {
-      account: "Expenses:Restaurant"
-      spec { units { number { exact: "100" } currency: "USD" } }
+      account { name: "Expenses:Restaurant" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:US:Cash"
-      spec { units { number { exact: "-100" } currency: "USD" } }
+      account { name: "Assets:US:Cash" }
+      units { number { verbatim: "-100" resolved: "-100" } currency { name: "USD" } }
     }
   }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  close { account: "Assets:Before" }
+  close { account { name: "Assets:Before" } }
 }

@@ -1,8 +1,7 @@
+# ANOMALY on precision as per Arithmetic.NumberExprDifferentPlaces
+# guar: if the result has a finite decimal expansion, use it exactly;
+# otherwise round to the max fractional digits seen in the expression.
 directives {
   date { year: 2021 month: 9 day: 19 }
-  balance {
-    account: "Assets:US:Checking"
-    # ANOMALY on precision as per Arithmetic.NumberExprDifferentPlaces
-    amount { number { exact: "2.9" } currency: "USD" }
-  }
+  balance { account { name: "Assets:US:Checking" } amount { number { verbatim: "(1 + 5) / 2.1" resolved: "2.9" } currency { name: "USD" } } }
 }

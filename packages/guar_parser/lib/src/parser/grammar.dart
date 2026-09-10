@@ -194,11 +194,16 @@ class BeancountGrammar {
           final tagsLinks = _parseTagsLinksLine(trimmed);
           if (tagsLinks != null) {
             if (lastPosting != null) {
-              noteError(_foundExpected(trimmed, 0), postingLine);
+              final entries = [...lastPosting.meta.entries];
+              for (final tag in tagsLinks.tags) {
+                entries.add(MetaEntry(key: '', value: MetaValue.tag(tag)));
+              }
+              final updated = lastPosting.copyWith(meta: Meta(entries: entries));
+              postings[postings.length - 1] = updated;
+              lastPosting = updated;
+              endLine = postingLine;
               index += 1;
-              skipIndentedBlock();
-              postings.clear();
-              break;
+              continue;
             }
             tags.addAll(tagsLinks.tags);
             links.addAll(tagsLinks.links);
@@ -211,12 +216,16 @@ class BeancountGrammar {
             if (lastPosting != null) {
               final postingMeta = lastPosting.meta;
               final keys = {for (final entry in postingMeta.entries) entry.key};
-              if (keys.add(meta.key)) {
+              if (!keys.add(meta.key)) {
+                noteError('duplicate key ${meta.key}', postingLine);
+              } else {
                 final updated = lastPosting.copyWith(meta: Meta(entries: [...postingMeta.entries, meta]));
                 postings[postings.length - 1] = updated;
                 lastPosting = updated;
               }
-            } else if (seenMeta.add(meta.key)) {
+            } else if (!seenMeta.add(meta.key)) {
+              noteError('duplicate key ${meta.key}', postingLine);
+            } else {
               metaEntries.add(meta);
             }
             endLine = postingLine;
@@ -273,7 +282,9 @@ class BeancountGrammar {
           if (meta == null) {
             return fail(_foundExpected(trimmed, 0), metaLine);
           }
-          if (seenMeta.add(meta.key)) {
+          if (!seenMeta.add(meta.key)) {
+            noteError('duplicate key ${meta.key}', metaLine);
+          } else {
             metaEntries.add(meta);
           }
           endLine = metaLine;

@@ -1,21 +1,18 @@
+# ANOMALY on precision as per Arithmetic.NumberExprDifferentPlaces
+# guar: if the result has a finite decimal expansion, use it exactly;
+# otherwise round to the max fractional digits seen in the expression.
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Test"
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "36" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "12 * 3" resolved: "36" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec {
-        # ANOMALY on precision as per Arithmetic.NumberExprDifferentPlaces
-        # see discussion in that test
-        units { number { exact: "23.3" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "7.5 * 3.1" resolved: "23.25" } currency { name: "USD" } }
     }
   }
 }

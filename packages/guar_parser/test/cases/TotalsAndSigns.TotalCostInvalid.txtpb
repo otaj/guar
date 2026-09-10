@@ -1,19 +1,17 @@
-# ANOMALY:
+# ANOMALY: Lima accepts both per-unit and total
+# guar: same decision (cost-shape checks are deferred past parse)
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Investments:MSFT"
-      spec {
-        units { number { exact: "10" } currency: "MSFT" }
-        # ANOMALY: Lima accepts both per-unit and total
-        cost { per_unit { number { exact: "100" } } total { number { exact: "2000" } } currency: "USD" }
-      }
+      account { name: "Assets:Investments:MSFT" }
+      units { number { verbatim: "10" resolved: "10" } currency { name: "MSFT" } }
+      cost { number_per { verbatim: "100" resolved: "100" } number_total { verbatim: "2,000" resolved: "2000" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Investments:Cash"
-      spec { units { number { exact: "-20000" } currency: "USD" } }
+      account { name: "Assets:Investments:Cash" }
+      units { number { verbatim: "-20000" resolved: "-20000" } currency { name: "USD" } }
     }
   }
 }

@@ -1,20 +1,17 @@
+# ANOMALY: Lima allows negative prices
+# guar: same decision (sign checks are deferred past parse)
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     postings {
-      account: "Assets:Investments:MSFT"
-      spec {
-        units { number { exact: "-10" } currency: "MSFT" }
-        # ANOMALY: Lima allows negative prices
-        price { number { exact: "-200.00" } currency: "USD" }
-      }
+      account { name: "Assets:Investments:MSFT" }
+      units { number { verbatim: "-10" resolved: "-10" } currency { name: "MSFT" } }
+      price { number { verbatim: "-200.00" resolved: "-200.00" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Investments:Cash"
-      spec {
-        units { number { exact: "2000.00" } currency: "USD" }
-      }
+      account { name: "Assets:Investments:Cash" }
+      units { number { verbatim: "2000.00" resolved: "2000.00" } currency { name: "USD" } }
     }
   }
 }

@@ -1,16 +1,14 @@
 # ANOMALY: Lima returns directives in date order
+# guar: same decision (directives are sorted by date)
 directives {
   date { year: 2000 month: 1 day: 1 }
-  open { account: "Assets:Before" }
+  open { account { name: "Assets:Before" } }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  close { account: "Assets:Before" }
+  close { account { name: "Assets:Before" } }
 }
 directives {
   date { year: 2010 month: 1 day: 1 }
-  price {
-    currency: "HOOL"
-    amount { number { exact: "20" } currency: "USD" }
-  }
+  price { currency { name: "HOOL" } amount { number { verbatim: "20" resolved: "20" } currency { name: "USD" } } }
 }

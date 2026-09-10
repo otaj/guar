@@ -1,37 +1,31 @@
+# ANOMALY: Lima calculates the values of expressions using scaled decimals
+# which retain accuracy to the number of decimal places given.
+# So here it results in a rounded value of 252.02, rather than 252.021
+# See some discussion here:
+# https://beancount.github.io/docs/rounding_precision_in_beancount.html#automatically-inferring-tolerance
+# guar: if the result has a finite decimal expansion, use it exactly;
+# otherwise round to the max fractional digits seen in the expression.
 directives {
   date { year: 2013 month: 5 day: 18 }
   transaction {
-    flag: "*"
+    flag { special: SPECIAL_FLAG_ASTERISK }
     narration: "Test"
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "-12" } currency: "HOOL" }
-        # ANOMALY: Lima calculates the values of expressions using scaled decimals
-        # which retain accuracy to the number of decimal places given.
-        # So here it results in a rounded value of 252.02, rather than 252.021
-        # See some discussion here:
-        # https://beancount.github.io/docs/rounding_precision_in_beancount.html#automatically-inferring-tolerance
-        cost { per_unit { number { exact: "252.02" } } currency: "USD" }
-        price { number { exact: "281.44" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "-(3 * 4)" resolved: "-12" } currency { name: "HOOL" } }
+      cost { number_per { verbatim: "120.01 * 2.1" resolved: "252.021" } currency { name: "USD" } }
+      price { number { verbatim: "134.02 * 2.1" resolved: "281.442" } currency { name: "USD" } }
     }
     postings {
-      account: "Assets:Something"
-      spec {
-        units { number { exact: "1000000" } currency: "USD" }
-      }
+      account { name: "Assets:Something" }
+      units { number { verbatim: "1000000" resolved: "1000000" } currency { name: "USD" } }
     }
   }
 }
 directives {
   date { year: 2014 month: 1 day: 1 }
   meta {
-    kv { key: "number" value { number { exact: "-5684.53" } } }
+    entries { key: "number" value { number { verbatim: "-(5662.23 + 22.3)" resolved: "-5684.53" } } }
   }
-  balance {
-    account: "Assets:Something"
-    # ANOMALY: as above
-    amount { number { exact: "3024.25" } currency: "USD" }
-  }
+  balance { account { name: "Assets:Something" } amount { number { verbatim: "3 * 4 * 120.01 * 2.1" resolved: "3024.252" } currency { name: "USD" } } }
 }

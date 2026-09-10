@@ -2,6 +2,7 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:petitparser/petitparser.dart';
+import 'package:rational/rational.dart';
 
 import '../domain/domain.dart';
 
@@ -44,37 +45,71 @@ Parser<BeanNumber> numberLiteral() {
   });
 }
 
-Parser<Decimal> _unsignedNumber() {
+Decimal _divide(Decimal left, Decimal right, int maxScale) {
+  // Finite expansions keep exact decimals; repeating ones round to maxScale from the expression.
+  final quotient = left / right;
+  if (_hasFiniteDecimalExpansion(quotient)) {
+    return quotient.toDecimal();
+  }
+  final wide = quotient.toDecimal(scaleOnInfinitePrecision: maxScale + 16);
+  return wide.round(scale: maxScale);
+}
+
+bool _hasFiniteDecimalExpansion(Rational value) {
+  var denominator = value.denominator.abs();
+  while (denominator.isEven) {
+    denominator >>= 1;
+  }
+  final five = BigInt.from(5);
+  while (denominator % five == BigInt.zero) {
+    denominator ~/= five;
+  }
+  return denominator == BigInt.one;
+}
+
+class _ExprNum {
+  const _ExprNum(this.value, this.maxScale);
+  final Decimal value;
+  final int maxScale;
+}
+
+Parser<_ExprNum> _unsignedExprNumber() {
   final intPart = digit().plus() & (char(',') & digit().times(3)).star();
   final frac = (char('.') & digit().plus()).optional();
-  return (intPart & frac).flatten().map((verbatim) => Decimal.parse(verbatim.replaceAll(',', '')));
+  return (intPart & frac).flatten().map((verbatim) {
+    final cleaned = verbatim.replaceAll(',', '');
+    final scale = cleaned.contains('.') ? cleaned.length - cleaned.indexOf('.') - 1 : 0;
+    return _ExprNum(Decimal.parse(cleaned), scale);
+  });
 }
 
-Decimal _divide(Decimal left, Decimal right) {
-  return (left / right).toDecimal(scaleOnInfinitePrecision: 28);
-}
-
-Parser<Decimal> _numberExprValue() {
-  final factor = undefined<Decimal>();
-  final term = undefined<Decimal>();
-  final expr = undefined<Decimal>();
+Parser<_ExprNum> _numberExprValue() {
+  final factor = undefined<_ExprNum>();
+  final term = undefined<_ExprNum>();
+  final expr = undefined<_ExprNum>();
 
   factor.set(
-    ((char('+') & spaces() & factor).map((values) => values[2] as Decimal) |
-            (char('-') & spaces() & factor).map((values) => -(values[2] as Decimal)) |
-            (char('(') & spaces() & expr & spaces() & char(')')).map((values) => values[2] as Decimal) |
-            _unsignedNumber())
-        .cast<Decimal>(),
+    ((char('+') & spaces() & factor).map((values) => values[2] as _ExprNum) |
+            (char('-') & spaces() & factor).map((values) {
+              final inner = values[2] as _ExprNum;
+              return _ExprNum(-inner.value, inner.maxScale);
+            }) |
+            (char('(') & spaces() & expr & spaces() & char(')')).map((values) => values[2] as _ExprNum) |
+            _unsignedExprNumber())
+        .cast<_ExprNum>(),
   );
 
   term.set(
     (factor & (spaces() & (char('*') | char('/')) & spaces() & factor).star()).map((values) {
-      var result = values[0] as Decimal;
+      var result = values[0] as _ExprNum;
       for (final part in values[1] as List<dynamic>) {
         final items = part as List<dynamic>;
         final op = items[1] as String;
-        final right = items[3] as Decimal;
-        result = op == '*' ? result * right : _divide(result, right);
+        final right = items[3] as _ExprNum;
+        final scale = result.maxScale > right.maxScale ? result.maxScale : right.maxScale;
+        result = op == '*'
+            ? _ExprNum(result.value * right.value, scale)
+            : _ExprNum(_divide(result.value, right.value, scale), scale);
       }
       return result;
     }),
@@ -82,12 +117,13 @@ Parser<Decimal> _numberExprValue() {
 
   expr.set(
     (term & (spaces() & (char('+') | char('-')) & spaces() & term).star()).map((values) {
-      var result = values[0] as Decimal;
+      var result = values[0] as _ExprNum;
       for (final part in values[1] as List<dynamic>) {
         final items = part as List<dynamic>;
         final op = items[1] as String;
-        final right = items[3] as Decimal;
-        result = op == '+' ? result + right : result - right;
+        final right = items[3] as _ExprNum;
+        final scale = result.maxScale > right.maxScale ? result.maxScale : right.maxScale;
+        result = _ExprNum(op == '+' ? result.value + right.value : result.value - right.value, scale);
       }
       return result;
     }),
@@ -97,7 +133,7 @@ Parser<Decimal> _numberExprValue() {
 }
 
 final Parser<BeanNumber> _numberExpr = _numberExprValue().token().map((token) {
-  return BeanNumber(verbatim: token.buffer.substring(token.start, token.stop), resolved: token.value);
+  return BeanNumber(verbatim: token.buffer.substring(token.start, token.stop), resolved: token.value.value);
 });
 
 Parser<BeanNumber> numberExpr() => _numberExpr;
