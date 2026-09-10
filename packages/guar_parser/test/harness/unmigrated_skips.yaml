@@ -36,15 +36,6 @@ unmigrated:
   - cases/Misc.CommentInPostingsInvalid
   - cases/ParserComplete.ExtraWhitespaceNote
   - cases/ParserEntryTypes.Custom
-  - cases/ParserInclude.IncludeAbsolute
-  - cases/ParserInclude.IncludeChain
-  - cases/ParserInclude.IncludeCycle
-  - cases/ParserInclude.IncludeDuplicateDifferentContext
-  - cases/ParserInclude.IncludeDuplicateSameContext
-  - cases/ParserInclude.IncludeGlob
-  - cases/ParserInclude.IncludeMultiple
-  - cases/ParserInclude.IncludeRelative
-  - cases/ParserInclude.IncludeRelativeFromString
   - cases/PushPopMeta.PushmetaShadow
   - cases/TotalsAndSigns.PriceNegative
   - cases/TotalsAndSigns.TotalCostInvalid
@@ -54,4 +45,7 @@ unmigrated:
   - cases/Transactions.TagsAfterFirstPosting
   - cases/Whitespace.IndentError0
   - cases/Whitespace.IndentError1
-  - cases_unsupported/ParserOptions.UnaryOption
+
+product:
+  - case: cases_unsupported/ParserOptions.UnaryOption
+    reason: unary options "…" form is not Beancount syntax

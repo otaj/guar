@@ -4,36 +4,40 @@ import 'package:decimal/decimal.dart';
 import 'package:petitparser/petitparser.dart';
 
 import '../domain/domain.dart';
+import 'include.dart';
 import 'tokens.dart';
 
 class BeancountGrammar {
-  BeancountGrammar({this.filename = ''});
+  BeancountGrammar({this.filename = '', IncludeController? includes})
+    : includes = includes ?? IncludeController(readFile: (_) => null);
 
   final String filename;
+  final IncludeController includes;
 
-  ParsedLedger parse(String source) {
+  ParsedLedger parse(String source) => _parseInto(source, _ParseState(), isRoot: true);
+
+  ParsedLedger _parseInto(String source, _ParseState state, {required bool isRoot}) {
     final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     final lines = normalized.split('\n');
-    final directives = <ParsedDirective>[];
-    final tagStack = <String>[];
-    final metaStack = <MetaEntry>[];
-    var options = const LedgerOptions();
-    final plugins = <Plugin>[];
-    final errors = <ParseError>[];
-    ProcessingInfo info() =>
-        ProcessingInfo(filename: filename.isEmpty ? null : filename, plugin: List.unmodifiable(plugins));
-    ParsedLedger fail(String message, int lineNo) => ParsedLedger.errors(
-      errors: [
-        ParseError(
-          message: message,
-          location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
-        ),
-      ],
-      options: options,
-      info: info(),
+    ProcessingInfo info() => ProcessingInfo(
+      filename: filename.isEmpty ? null : filename,
+      include: List.unmodifiable(includes.includeLog),
+      plugin: List.unmodifiable(state.plugins),
     );
+    ParsedLedger fail(String message, int lineNo) {
+      final error = ParseError(
+        message: message,
+        location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+      );
+      state.aborted = true;
+      state.errors
+        ..clear()
+        ..add(error);
+      return ParsedLedger.errors(errors: [error], options: state.options, info: info());
+    }
+
     void noteError(String message, int lineNo) {
-      errors.add(
+      state.errors.add(
         ParseError(
           message: message,
           location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
@@ -61,7 +65,7 @@ class BeancountGrammar {
       }
     }
 
-    while (index < lines.length) {
+    while (index < lines.length && !state.aborted) {
       final raw = lines[index];
       final lineNo = index + 1;
       index += 1;
@@ -79,13 +83,40 @@ class BeancountGrammar {
         code = '$code\n${lines[index]}';
         index += 1;
       }
+      final includePattern = _parseInclude(code);
+      if (includePattern != null) {
+        final outcome = includes.open(
+          pattern: includePattern,
+          fromFilename: filename,
+          contextKey: _includeContextKey(state.tagStack, state.metaStack),
+        );
+        switch (outcome) {
+          case IncludeSkip():
+            continue;
+          case IncludeDuplicate():
+            return fail('duplicate include', lineNo);
+          case IncludeFailed():
+            return fail('include failed', lineNo);
+          case IncludeLoaded(:final files):
+            for (final hit in files) {
+              BeancountGrammar(filename: hit.path, includes: includes)._parseInto(hit.source, state, isRoot: false);
+              if (state.aborted) {
+                return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
+              }
+            }
+            continue;
+        }
+      }
+      if (code.startsWith('include')) {
+        return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+      }
       final optionPair = _parseOption(code);
       if (optionPair != null) {
-        final applied = _applyOption(options, optionPair.$1, optionPair.$2);
+        final applied = _applyOption(state.options, optionPair.$1, optionPair.$2);
         if (applied.$2 != null) {
           return fail(applied.$2!, lineNo);
         }
-        options = applied.$1;
+        state.options = applied.$1;
         continue;
       }
       if (code.startsWith('option')) {
@@ -93,7 +124,7 @@ class BeancountGrammar {
       }
       final plugin = _parsePlugin(code);
       if (plugin != null) {
-        plugins.add(plugin);
+        state.plugins.add(plugin);
         continue;
       }
       if (code.startsWith('plugin')) {
@@ -101,30 +132,30 @@ class BeancountGrammar {
       }
       final pushMeta = _parsePushMeta(code);
       if (pushMeta != null) {
-        metaStack.add(pushMeta);
+        state.metaStack.add(pushMeta);
         continue;
       }
       final popMeta = _parsePopMeta(code);
       if (popMeta != null) {
-        final at = metaStack.lastIndexWhere((entry) => entry.key == popMeta);
+        final at = state.metaStack.lastIndexWhere((entry) => entry.key == popMeta);
         if (at < 0) {
           return fail('invalid popmeta', lineNo);
         }
-        metaStack.removeAt(at);
+        state.metaStack.removeAt(at);
         continue;
       }
       final push = _parsePushTag(code);
       if (push != null) {
-        tagStack.add(push);
+        state.tagStack.add(push);
         continue;
       }
       final pop = _parsePopTag(code);
       if (pop != null) {
-        final at = tagStack.lastIndexOf(pop);
+        final at = state.tagStack.lastIndexOf(pop);
         if (at < 0) {
           return fail('invalid poptag', lineNo);
         }
-        tagStack.removeAt(at);
+        state.tagStack.removeAt(at);
         continue;
       }
       final header = _parseDirectiveHeader(code, lineNo);
@@ -134,7 +165,7 @@ class BeancountGrammar {
         final dated = date().parse(code) is Success;
         return fail(dateError ?? (dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos)), lineNo);
       }
-      final applied = _withPushedTags(header, tagStack);
+      final applied = _withPushedTags(header, state.tagStack);
       if (applied.body is TransactionBody) {
         final postings = <ParsedPosting>[];
         final metaEntries = <MetaEntry>[];
@@ -205,19 +236,19 @@ class BeancountGrammar {
           endLine = postingLine;
           index += 1;
         }
-        if (postings.isEmpty && errors.isNotEmpty) {
+        if (postings.isEmpty && state.errors.isNotEmpty) {
           continue;
         }
         final txnDirective = applied.copyWith(
           location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-          meta: _metaWithStack(metaStack, metaEntries),
+          meta: _metaWithStack(state.metaStack, metaEntries),
           body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
         );
-        final accountError = _accountTypeError(txnDirective, options);
+        final accountError = _accountTypeError(txnDirective, state.options);
         if (accountError != null) {
           return fail(accountError, lineNo);
         }
-        directives.add(txnDirective);
+        state.directives.add(txnDirective);
       } else {
         final metaEntries = <MetaEntry>[];
         final seenMeta = <String>{};
@@ -250,26 +281,40 @@ class BeancountGrammar {
         }
         final directive = applied.copyWith(
           location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
-          meta: _metaWithStack(metaStack, metaEntries),
+          meta: _metaWithStack(state.metaStack, metaEntries),
         );
-        final accountError = _accountTypeError(directive, options);
+        final accountError = _accountTypeError(directive, state.options);
         if (accountError != null) {
           return fail(accountError, lineNo);
         }
-        directives.add(directive);
+        state.directives.add(directive);
       }
     }
-    if (errors.isNotEmpty) {
-      return ParsedLedger.errors(errors: errors, options: options, info: info());
+    if (!isRoot) {
+      return ParsedLedger.directives(directives: const [], options: state.options, info: info());
     }
-    if (tagStack.isNotEmpty) {
+    if (state.errors.isNotEmpty) {
+      return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
+    }
+    if (state.tagStack.isNotEmpty) {
       return fail('invalid pushtag', lines.length);
     }
-    if (metaStack.isNotEmpty) {
+    if (state.metaStack.isNotEmpty) {
       return fail('invalid pushmeta', lines.length);
     }
-    directives.sort(_compareDirectives);
-    return ParsedLedger.directives(directives: directives, options: options, info: info());
+    state.directives.sort(_compareDirectives);
+    return ParsedLedger.directives(directives: state.directives, options: state.options, info: info());
+  }
+
+  String? _parseInclude(String line) {
+    final result = (string('include') & spaces() & quotedString()).end().parse(line);
+    return result is Success ? result.value[2] as String : null;
+  }
+
+  String _includeContextKey(List<String> tags, List<MetaEntry> meta) {
+    final tagPart = [...tags]..sort();
+    final metaPart = [for (final entry in meta) '${entry.key}=${entry.value}']..sort();
+    return '${tagPart.join('\u{1e}')}\u{1f}${metaPart.join('\u{1e}')}';
   }
 
   (String, String)? _parseOption(String line) {
@@ -1018,4 +1063,14 @@ class BeancountGrammar {
       CustomBody() => 11,
     };
   }
+}
+
+class _ParseState {
+  LedgerOptions options = const LedgerOptions();
+  final List<Plugin> plugins = <Plugin>[];
+  final List<ParsedDirective> directives = <ParsedDirective>[];
+  final List<ParseError> errors = <ParseError>[];
+  final List<String> tagStack = <String>[];
+  final List<MetaEntry> metaStack = <MetaEntry>[];
+  bool aborted = false;
 }

@@ -1,5 +1,6 @@
 # ANOMALY: Lima resolves includes within the core parser
 # and we cannot write a portable test with an absolute path, alas
+# guar: same decision (missing include target is an error)
 errors {
   message: "include failed"
 }
