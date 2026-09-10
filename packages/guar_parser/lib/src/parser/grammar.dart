@@ -76,6 +76,9 @@ class BeancountGrammar {
       if (code.trimLeft().startsWith(';')) {
         continue;
       }
+      if (_isOrgModeTitle(raw)) {
+        continue;
+      }
       if (code.startsWith(' ') || code.startsWith('\t')) {
         return fail(_foundExpected(code.trimLeft(), 0), lineNo);
       }
@@ -586,6 +589,11 @@ class BeancountGrammar {
       ),
       _ => directive,
     };
+  }
+
+  bool _isOrgModeTitle(String line) {
+    // Beancount ignores '*' at column 0 when more text follows (`* Heading`, `** Nested`).
+    return line.startsWith('*') && line.length > 1;
   }
 
   String _stripTrailingComment(String line) {

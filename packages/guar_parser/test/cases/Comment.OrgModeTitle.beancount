@@ -1,0 +1,10 @@
+;; -*- mode: org; mode: beancount; -*-
+* Banking
+** Bank of America
+
+2015-06-07 *
+  Assets:Cash   1 USD
+  Assets:Cash   -1 USD
+
+* Taxes
+** Tax Year 2024

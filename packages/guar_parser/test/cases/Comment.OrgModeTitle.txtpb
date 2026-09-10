@@ -1,0 +1,14 @@
+directives {
+  date { year: 2015 month: 6 day: 7 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    postings {
+      account { name: "Assets:Cash" }
+      units { number { verbatim: "1" resolved: "1" } currency { name: "USD" } }
+    }
+    postings {
+      account { name: "Assets:Cash" }
+      units { number { verbatim: "-1" resolved: "-1" } currency { name: "USD" } }
+    }
+  }
+}
