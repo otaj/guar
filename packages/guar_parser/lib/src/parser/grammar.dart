@@ -4,6 +4,7 @@ import 'package:petitparser/petitparser.dart';
 
 import '../domain/domain.dart';
 import 'include.dart';
+import 'observation.dart';
 import 'option_apply.dart';
 import 'tokens.dart';
 
@@ -26,12 +27,18 @@ class BeancountGrammar {
   ParsedLedger _parseInto(String source, _ParseState state, {required bool isRoot}) {
     final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     final lines = normalized.split('\n');
-    ProcessingInfo info() => ProcessingInfo(
-      filename: filename.isEmpty ? null : filename,
-      include: List.unmodifiable(includes.includeLog),
-      plugin: List.unmodifiable(state.plugins),
-      optionSettings: List.unmodifiable(state.optionSettings),
-    );
+    ProcessingInfo info() {
+      final observed = observeDirectives(state.directives);
+      return ProcessingInfo(
+        filename: filename.isEmpty ? null : filename,
+        include: List.unmodifiable(includes.includeLog),
+        commodities: observed.commodities,
+        plugin: List.unmodifiable(state.plugins),
+        displayContext: observed.displayContext,
+        optionSettings: List.unmodifiable(state.optionSettings),
+      );
+    }
+
     ParsedLedger fail(String message, int lineNo) {
       final error = ParseError(
         message: message,

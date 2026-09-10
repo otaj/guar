@@ -3,6 +3,7 @@
 import '../domain/domain.dart';
 import 'grammar.dart';
 import 'include.dart';
+import 'observation.dart';
 import 'option_apply.dart';
 
 ParsedLedger spliceLedger(
@@ -24,7 +25,23 @@ ParsedLedger spliceLedger(
     (_, ParsedLedgerErrors(:final errors, :final info)) => ParsedLedger.errors(
       errors: [..._keptErrors(ledger, filename, startLine, oldEnd, delta), ...errors],
       options: replayLedgerOptions(_mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta)),
-      info: _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, info),
+      info: _mergedInfo(
+        ledger,
+        parsed,
+        filename,
+        startLine,
+        oldEnd,
+        delta,
+        info,
+        directives: switch (ledger) {
+          ParsedLedgerDirectives(:final directives) => [
+            for (final directive in directives)
+              if (!directive.location.overlapsFileRange(filename, startLine, oldEnd))
+                _shiftDirective(directive, filename, oldEnd, delta),
+          ],
+          ParsedLedgerErrors() => const [],
+        },
+      ),
     ),
     (ParsedLedgerErrors(:final errors), ParsedLedgerDirectives()) => _errorsOrDirectives(
       errors: _shiftedErrors(_withoutOverlappingErrors(errors, filename, startLine, oldEnd), filename, oldEnd, delta),
@@ -36,12 +53,32 @@ ParsedLedger spliceLedger(
       oldEnd: oldEnd,
       delta: delta,
     ),
-    (ParsedLedgerDirectives(:final directives), ParsedLedgerDirectives()) => ParsedLedger.directives(
+    (ParsedLedgerDirectives(:final directives), ParsedLedgerDirectives()) => _splicedDirectives(
       directives: _mergedDirectives(directives, parsed, filename, startLine, oldEnd, delta),
-      options: replayLedgerOptions(_mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta)),
-      info: _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, parsed.info),
+      ledger: ledger,
+      parsed: parsed,
+      filename: filename,
+      startLine: startLine,
+      oldEnd: oldEnd,
+      delta: delta,
     ),
   };
+}
+
+ParsedLedger _splicedDirectives({
+  required List<ParsedDirective> directives,
+  required ParsedLedger ledger,
+  required ParsedLedger parsed,
+  required String filename,
+  required int startLine,
+  required int oldEnd,
+  required int delta,
+}) {
+  return ParsedLedger.directives(
+    directives: directives,
+    options: replayLedgerOptions(_mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta)),
+    info: _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, parsed.info, directives: directives),
+  );
 }
 
 ParsedLedger _errorsOrDirectives({
@@ -56,7 +93,7 @@ ParsedLedger _errorsOrDirectives({
 }) {
   final settings = _mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta);
   final options = replayLedgerOptions(settings);
-  final info = _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, parsed.info);
+  final info = _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, parsed.info, directives: directives);
   if (errors.isNotEmpty) {
     return ParsedLedger.errors(errors: errors, options: options, info: info);
   }
@@ -156,8 +193,9 @@ ProcessingInfo _mergedInfo(
   int startLine,
   int oldEnd,
   int delta,
-  ProcessingInfo snippetInfo,
-) {
+  ProcessingInfo snippetInfo, {
+  required List<ParsedDirective> directives,
+}) {
   final keptPlugins = [
     for (final plugin in ledger.info.plugin)
       if (!plugin.location.overlapsFileRange(filename, startLine, oldEnd))
@@ -171,12 +209,13 @@ ProcessingInfo _mergedInfo(
       includes.add(path);
     }
   }
+  final observed = observeDirectives(directives);
   return ProcessingInfo(
     filename: ledger.info.filename ?? snippetInfo.filename,
     include: includes,
-    commodities: ledger.info.commodities,
+    commodities: observed.commodities,
     plugin: [...keptPlugins, ...snippetInfo.plugin],
-    displayContext: ledger.info.displayContext,
+    displayContext: observed.displayContext,
     optionSettings: _mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta),
   );
 }
