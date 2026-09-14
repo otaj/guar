@@ -1,9 +1,11 @@
 ---
-description: Domain modelling for the Beancount parser
+description: Domain modelling for Beancount parse and booked types
 alwaysApply: true
 ---
 
 # Domain design
+
+## Parser (`guar_parser`)
 
 - Freezed models in `packages/guar_parser/lib/src/domain/` are the parser's domain and public shape.
 - Align types with Beancount language meaning, not protobuf field numbers.
@@ -12,4 +14,13 @@ alwaysApply: true
 - Use civil `BeanDate` (y/m/d), not `DateTime`. Numbers keep `verbatim` plus a resolved `Decimal`.
 - Successful parse vs errors is XOR (same as protobean `ParsedLedger`).
 - `pushtag` / `poptag` / `pushmeta` / `popmeta` apply at parse time and are not directives.
-- Ask when a modelling choice is ambiguous; do not invent booking/interpolation semantics in the parser domain (`ProcessedLedger` is out of scope).
+- Ask when a modelling choice is ambiguous; do not invent booking/interpolation semantics in the parser domain (`ProcessedLedger` / `guar_domain` is out of scope here).
+
+## Booked (`guar_domain`)
+
+- Freezed models in `packages/guar_domain/lib/src/` are the booked ledger shape after booking and interpolation.
+- Amounts are complete (`Decimal` + currency); lots use resolved per-unit `Cost` with a date.
+- Successful ledger vs errors is XOR (same as protobean `ProcessedLedger`).
+- Do not depend on `guar_parser` or import `protobean` from `lib/`.
+- Prefer sealed Freezed unions for directive bodies, origins, flags, and meta values.
+- Do not invent booking/interpolation/plugin behavior here; that belongs to a later `guar_book` package.

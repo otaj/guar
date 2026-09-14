@@ -23,7 +23,7 @@ repos:
         types: [dart]
       - id: dart-analyze
         name: dart analyze
-        entry: bash -c 'cd packages/guar_parser && fvm dart analyze --fatal-infos'
+        entry: bash -c 'for pkg in packages/guar_parser packages/guar_domain; do (cd "$pkg" && fvm dart analyze --fatal-infos) || exit 1; done'
         language: system
         types: [dart]
         pass_filenames: false
