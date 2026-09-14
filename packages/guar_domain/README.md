@@ -14,4 +14,4 @@ guar_parser  ──►  ParsedLedger
                    guar_book   ──►  guar_domain (Ledger, Inventory, PriceMap)
 ```
 
-Developed against beancount.core unit tests and limabean inventory goldens.
+Developed against beancount.core unit tests and booked inventory fixtures.
