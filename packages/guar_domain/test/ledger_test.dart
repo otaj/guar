@@ -1,0 +1,36 @@
+// Ledger XOR between booked directives and processing errors.
+
+import 'package:guar_domain/guar_domain.dart';
+import 'package:test/test.dart';
+
+import 'helpers/amounts.dart';
+
+void main() {
+  test('successful ledger holds directives only', () {
+    const origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final ledger = Ledger.directives(
+      directives: [
+        Directive(
+          origin: origin,
+          date: const BeanDate(year: 2025, month: 1, day: 1),
+          body: DirectiveBody.open(account: account('Assets:Cash', AccountType.assets)),
+        ),
+      ],
+    );
+    expect(ledger, isA<LedgerDirectives>());
+    expect((ledger as LedgerDirectives).directives, hasLength(1));
+  });
+
+  test('failed ledger holds errors only', () {
+    final ledger = Ledger.errors(
+      errors: [
+        const ProcessingError(
+          message: 'Invalid reference to unknown account',
+          location: BeanLocation(linenoBegin: 10, linenoEnd: 10),
+        ),
+      ],
+    );
+    expect(ledger, isA<LedgerErrors>());
+    expect((ledger as LedgerErrors).errors.single.message, contains('unknown account'));
+  });
+}
