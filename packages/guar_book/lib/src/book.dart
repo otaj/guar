@@ -4,6 +4,7 @@ import 'package:guar_domain/guar_domain.dart';
 import 'package:guar_parser/guar_parser.dart' as p;
 
 import 'booking/book_directives.dart';
+import 'diff.dart';
 import 'options_defaults.dart';
 import 'plugin.dart';
 import 'stages/balance.dart';
@@ -33,6 +34,25 @@ class Book {
         return _processDirectives(directives, options, info);
     }
   }
+
+  Ledger splice(
+    p.ParsedLedger ledger,
+    String snippet, {
+    required String filename,
+    required int startLine,
+    required int endLine,
+  }) {
+    final spliced = const p.BeancountParser().splice(
+      ledger,
+      snippet,
+      filename: filename,
+      startLine: startLine,
+      endLine: endLine,
+    );
+    return process(spliced);
+  }
+
+  LedgerDiff diff(Ledger left, Ledger right) => diffLedgers(left, right);
 
   Ledger _processDirectives(List<p.ParsedDirective> parsed, LedgerOptions options, ProcessingInfo info) {
     final booked = bookDirectives(parsed: parsed, options: options);

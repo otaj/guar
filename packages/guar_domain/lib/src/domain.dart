@@ -8,6 +8,7 @@ export 'directive.dart';
 export 'flag.dart';
 export 'inventory.dart';
 export 'ledger.dart';
+export 'ledger_diff.dart';
 export 'location.dart';
 export 'meta.dart';
 export 'options.dart';
