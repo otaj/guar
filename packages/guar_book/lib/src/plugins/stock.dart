@@ -3,6 +3,7 @@
 import '../plugin.dart';
 import 'auto.dart';
 import 'auto_accounts.dart';
+import 'check_closing.dart';
 import 'close_tree.dart';
 import 'coherent_cost.dart';
 import 'implicit_prices.dart';
@@ -15,6 +16,7 @@ import 'unique_prices.dart';
 final Map<String, BookPlugin> stockPlugins = {
   'beancount.plugins.auto': autoPlugin,
   'beancount.plugins.auto_accounts': autoInsertOpen,
+  'beancount.plugins.check_closing': checkClosing,
   'beancount.plugins.close_tree': closeTree,
   'beancount.plugins.coherent_cost': validateCoherentCost,
   'beancount.plugins.implicit_prices': addImplicitPrices,
