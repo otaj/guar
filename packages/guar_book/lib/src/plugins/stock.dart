@@ -16,6 +16,7 @@ import 'leafonly.dart';
 import 'noduplicates.dart';
 import 'nounused.dart';
 import 'onecommodity.dart';
+import 'pedantic.dart';
 import 'sellgains.dart';
 import 'unique_prices.dart';
 
@@ -35,6 +36,7 @@ final Map<String, BookPlugin> stockPlugins = {
   'beancount.plugins.noduplicates': validateNoDuplicates,
   'beancount.plugins.nounused': validateUnusedAccounts,
   'beancount.plugins.onecommodity': validateOneCommodity,
+  'beancount.plugins.pedantic': pedanticPlugin,
   'beancount.plugins.sellgains': validateSellGains,
   'beancount.plugins.unique_prices': validateUniquePrices,
 };
