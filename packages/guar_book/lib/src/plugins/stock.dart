@@ -6,6 +6,7 @@ import 'auto_accounts.dart';
 import 'implicit_prices.dart';
 import 'noduplicates.dart';
 import 'nounused.dart';
+import 'onecommodity.dart';
 import 'unique_prices.dart';
 
 final Map<String, BookPlugin> stockPlugins = {
@@ -14,5 +15,6 @@ final Map<String, BookPlugin> stockPlugins = {
   'beancount.plugins.implicit_prices': addImplicitPrices,
   'beancount.plugins.noduplicates': validateNoDuplicates,
   'beancount.plugins.nounused': validateUnusedAccounts,
+  'beancount.plugins.onecommodity': validateOneCommodity,
   'beancount.plugins.unique_prices': validateUniquePrices,
 };
