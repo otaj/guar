@@ -1,3 +1,0 @@
-errors {
-  message: "plugin not registered: beancount.plugins.auto"
-}
