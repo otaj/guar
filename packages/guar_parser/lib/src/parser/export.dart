@@ -352,10 +352,6 @@ String _booking(BookingMethod method) {
   };
 }
 
-String _date(BeanDate date) {
-  final month = date.month.toString().padLeft(2, '0');
-  final day = date.day.toString().padLeft(2, '0');
-  return '${date.year}-$month-$day';
-}
+String _date(BeanDate date) => '$date';
 
 String _quote(String value) => '"$value"';
