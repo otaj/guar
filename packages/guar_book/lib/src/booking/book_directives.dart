@@ -313,11 +313,148 @@ List<d.Position> _matchLots(d.Inventory balance, d.Amount units, d.Cost? costHin
     case d.BookingMethod.none:
       return (postings: [posting], errors: const []);
     case d.BookingMethod.average:
+      return _applyAverage(posting, matches, location);
+  }
+}
+
+({List<MutablePosting> postings, List<d.ProcessingError> errors}) _applyAverage(
+  MutablePosting posting,
+  List<d.Position> matches,
+  d.BeanLocation location,
+) {
+  final units = posting.units!;
+  final hasExplicitCost =
+      posting.cost != null ||
+      (posting.pendingCost != null &&
+          (posting.pendingCost!.numberPer != null || posting.pendingCost!.numberTotal != null));
+
+  if (matches.length == 1 && !hasExplicitCost) {
+    final match = matches.single;
+    final sign = units.number < Decimal.zero ? Decimal.fromInt(-1) : Decimal.one;
+    final take = match.units.number.abs() < units.number.abs() ? match.units.number.abs() : units.number.abs();
+    if (take != units.number.abs()) {
       return (
         postings: const [],
-        errors: [d.ProcessingError(message: 'AVERAGE method is not supported', location: location)],
+        errors: [d.ProcessingError(message: 'Not enough lots to reduce', location: location)],
       );
+    }
+    return (
+      postings: [
+        MutablePosting(
+          origin: posting.origin,
+          meta: posting.meta,
+          flag: posting.flag,
+          account: posting.account,
+          units: d.Amount(number: take * sign, currency: units.currency),
+          cost: match.cost,
+          price: posting.price,
+        ),
+      ],
+      errors: const [],
+    );
   }
+
+  var totalUnits = Decimal.zero;
+  var totalCost = Decimal.zero;
+  final unitCurrencies = <String>{};
+  final costCurrencies = <String>{};
+  for (final match in matches) {
+    unitCurrencies.add(match.units.currency.name);
+    costCurrencies.add(match.cost!.currency.name);
+    totalUnits += match.units.number;
+    totalCost += match.units.number * match.cost!.number;
+  }
+  if (unitCurrencies.length != 1 || costCurrencies.length != 1) {
+    final detail = matches.map(_positionString).join(', ');
+    return (
+      postings: const [],
+      errors: [
+        d.ProcessingError(message: 'Cannot merge positions in multiple currencies: $detail', location: location),
+      ],
+    );
+  }
+  if (hasExplicitCost) {
+    return (
+      postings: const [],
+      errors: [
+        d.ProcessingError(
+          message: 'Explicit cost reductions aren\'t supported yet: ${_postingString(posting)}',
+          location: location,
+        ),
+      ],
+    );
+  }
+  if (units.number.abs() > totalUnits.abs()) {
+    return (postings: const [], errors: [d.ProcessingError(message: 'Not enough lots to reduce', location: location)]);
+  }
+
+  const mergeFlag = d.Flag.letter('M');
+  final avgCost = d.Cost(
+    number: (totalCost / totalUnits).toDecimal(scaleOnInfinitePrecision: 28),
+    currency: matches.first.cost!.currency,
+    date: matches.first.cost!.date,
+    label: null,
+  );
+  final out = <MutablePosting>[
+    for (final match in matches)
+      MutablePosting(
+        origin: posting.origin,
+        meta: posting.meta,
+        flag: mergeFlag,
+        account: posting.account,
+        units: d.Amount(number: -match.units.number, currency: match.units.currency),
+        cost: match.cost,
+        price: posting.price,
+      ),
+    MutablePosting(
+      origin: posting.origin,
+      meta: posting.meta,
+      flag: mergeFlag,
+      account: posting.account,
+      units: d.Amount(number: totalUnits, currency: units.currency),
+      cost: avgCost,
+      price: posting.price,
+    ),
+    MutablePosting(
+      origin: posting.origin,
+      meta: posting.meta,
+      flag: posting.flag,
+      account: posting.account,
+      units: units,
+      cost: avgCost,
+      price: posting.price,
+    ),
+  ];
+  return (postings: out, errors: const []);
+}
+
+String _positionString(d.Position position) {
+  final cost = position.cost;
+  if (cost == null) {
+    return '${position.units.number} ${position.units.currency.name}';
+  }
+  final date =
+      '${cost.date.year.toString().padLeft(4, '0')}-'
+      '${cost.date.month.toString().padLeft(2, '0')}-'
+      '${cost.date.day.toString().padLeft(2, '0')}';
+  final label = cost.label == null ? '' : ' "${cost.label}"';
+  return '${position.units.number} ${position.units.currency.name} {${cost.number} ${cost.currency.name}, $date$label}';
+}
+
+String _postingString(MutablePosting posting) {
+  final units = posting.units;
+  if (units == null) {
+    return posting.account.name;
+  }
+  final cost = posting.cost ?? posting.pendingCost?.toCost(units.number.abs());
+  if (cost == null) {
+    final pending = posting.pendingCost;
+    if (pending == null) {
+      return '${units.number} ${units.currency.name}';
+    }
+    return '${units.number} ${units.currency.name} {}';
+  }
+  return _positionString(d.Position(units: units, cost: cost));
 }
 
 ({List<MutablePosting> postings, List<d.ProcessingError> errors}) _applyStrict(
