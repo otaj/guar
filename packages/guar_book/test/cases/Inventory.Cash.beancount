@@ -1,0 +1,11 @@
+2020-01-01 open Assets:Cash
+2020-01-01 open Expenses:Food
+2020-01-01 open Expenses:Transport
+
+2020-02-01 * "lunch"
+  Expenses:Food             12.50 USD
+  Assets:Cash
+
+2020-02-02 * "bus"
+  Expenses:Transport         2.50 USD
+  Assets:Cash
