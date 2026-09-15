@@ -32,7 +32,7 @@ void main() {
       }
       final expected = await _loadExpected(txtpbFile);
       final source = await beanFile.readAsString();
-      final actual = domainToProto(const BeancountParser().parse(source, filename: beanFile.path));
+      final actual = domainToProto(BeancountParser().parse(source, filename: beanFile.path));
       _expectSameParseResult(actual, expected, await txtpbFile.readAsString());
     }, skip: skipReason);
   }
@@ -128,7 +128,7 @@ void _restoreProto3FalseBools(pb.Options options, String txtpb) {
 }
 
 void _expectInfo(pb.ParsedLedger actual, pb.ParsedLedger expected) {
-  final merged = domainToProto(const ParsedLedger.directives(directives: [])).info..mergeFromMessage(expected.info);
+  final merged = domainToProto(ParsedLedger.directives(directives: [])).info..mergeFromMessage(expected.info);
   merged.clearFilename();
   actual.info.clearFilename();
   expect(
@@ -164,7 +164,7 @@ Future<_ExpectedGolden> _loadExpected(File txtpbFile) async {
     ['run', 'tool/txtpb_to_pb.py', txtpbFile.absolute.path],
     workingDirectory: _workspaceRoot().path,
     stdoutEncoding: null,
-    stderrEncoding: const SystemEncoding(),
+    stderrEncoding: SystemEncoding(),
   );
   if (result.exitCode != 0) {
     fail('failed to load ${txtpbFile.path}: ${result.stderr}');

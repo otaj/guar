@@ -2,7 +2,7 @@
 
 import '../domain/domain.dart';
 
-const _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
+final _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
 
 LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool considerLocations}) {
   final options = _diffOptions(left.options, right.options);

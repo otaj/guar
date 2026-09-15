@@ -61,7 +61,7 @@ import 'tokens.dart';
 }
 
 LedgerOptions replayLedgerOptions(Iterable<OptionSetting> settings) {
-  var options = const LedgerOptions();
+  var options = LedgerOptions();
   for (final setting in settings) {
     final applied = applyLedgerOption(options, setting.key, setting.value);
     if (applied.$2 != null) {
@@ -96,7 +96,7 @@ InferredTolerance? _parseInferredTolerance(String value) {
   if (number is! Success || number.position != numberText.length) {
     try {
       return InferredTolerance(
-        key: keyText == '*' ? const CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
+        key: keyText == '*' ? CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
         value: BeanNumber(verbatim: numberText, resolved: Decimal.parse(numberText)),
       );
     } catch (_) {
@@ -104,7 +104,7 @@ InferredTolerance? _parseInferredTolerance(String value) {
     }
   }
   return InferredTolerance(
-    key: keyText == '*' ? const CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
+    key: keyText == '*' ? CurrencyKey.all() : CurrencyKey.currency(Currency(name: keyText)),
     value: number.value,
   );
 }

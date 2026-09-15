@@ -16,10 +16,10 @@ Parser<BeanDate> date() {
   final day = digit().times(2).flatten().map(int.parse);
   final sep = char('-') | char('/');
   return (year & sep & month & sep & day)
+      .where((values) => isValidBeanDate(values[0] as int, values[2] as int, values[4] as int))
       .map((values) {
         return BeanDate(year: values[0] as int, month: values[2] as int, day: values[4] as int);
-      })
-      .where((date) => date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 31);
+      });
 }
 
 Parser<String> quotedString() {
@@ -28,11 +28,17 @@ Parser<String> quotedString() {
 
 Parser<Account> account() {
   final segment = (uppercase() & (word() | char('-')).star()).flatten();
-  return (segment & (char(':') & segment).plus()).flatten().map((name) => Account(name: name));
+  return (segment & (char(':') & segment).plus())
+      .flatten()
+      .where(isValidAccountName)
+      .map((name) => Account(name: name));
 }
 
 Parser<Currency> currency() {
-  return (pattern(r'A-Z/') & pattern(r"A-Z0-9._'-").star()).flatten().map((name) => Currency(name: name));
+  return (pattern(r'A-Z/') & pattern(r"A-Z0-9._'-").star())
+      .flatten()
+      .where(isValidCurrencyName)
+      .map((name) => Currency(name: name));
 }
 
 Parser<BeanNumber> numberLiteral() {
@@ -68,7 +74,7 @@ bool _hasFiniteDecimalExpansion(Rational value) {
 }
 
 class _ExprNum {
-  const _ExprNum(this.value, this.maxScale);
+  _ExprNum(this.value, this.maxScale);
   final Decimal value;
   final int maxScale;
 }
@@ -168,7 +174,7 @@ Parser<IncompleteAmount> incompleteAmount({bool allowEmpty = false}) {
   final numberOnly = numberExpr().map((number) => IncompleteAmount(number: number));
   final currencyOnly = currency().map((currency) => IncompleteAmount(currency: currency));
   if (allowEmpty) {
-    return (both | numberOnly | currencyOnly | epsilon().map((_) => const IncompleteAmount())).cast();
+    return (both | numberOnly | currencyOnly | epsilon().map((_) => IncompleteAmount())).cast();
   }
   return (both | numberOnly | currencyOnly).cast();
 }

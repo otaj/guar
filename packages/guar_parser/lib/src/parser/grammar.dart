@@ -1006,7 +1006,7 @@ int _typeOrder(DirectiveBody body) {
 }
 
 class _ParseState {
-  LedgerOptions options = const LedgerOptions();
+  LedgerOptions options = LedgerOptions();
   final List<Plugin> plugins = <Plugin>[];
   final List<OptionSetting> optionSettings = <OptionSetting>[];
   final List<ParsedDirective> directives = <ParsedDirective>[];

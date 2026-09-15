@@ -2,13 +2,20 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'validation.dart';
+
 part 'location.freezed.dart';
 
-@freezed
+@Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class BeanLocation with _$BeanLocation {
   const BeanLocation._();
 
-  const factory BeanLocation({@Default('') String filename, required int linenoBegin, required int linenoEnd}) =
+  factory BeanLocation({String filename = '', required int linenoBegin, required int linenoEnd}) {
+    ensureLocationLines(linenoBegin, linenoEnd);
+    return BeanLocation._create(filename: filename, linenoBegin: linenoBegin, linenoEnd: linenoEnd);
+  }
+
+  const factory BeanLocation._create({@Default('') String filename, required int linenoBegin, required int linenoEnd}) =
       _BeanLocation;
 
   bool overlapsFileRange(String filename, int startLine, int endLine) {
@@ -22,6 +29,6 @@ abstract class BeanLocation with _$BeanLocation {
     if (delta == 0) {
       return this;
     }
-    return copyWith(linenoBegin: linenoBegin + delta, linenoEnd: linenoEnd + delta);
+    return BeanLocation(filename: filename, linenoBegin: linenoBegin + delta, linenoEnd: linenoEnd + delta);
   }
 }

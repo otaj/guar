@@ -99,8 +99,8 @@ void main() {
     final diff = parser.diff(left, right, considerLocations: false);
     expect(diff.info.commodities.onlyInLeft.single.name, 'USD');
     expect(diff.info.commodities.onlyInRight.single.name, 'JPY');
-    expect(diff.info.displayContext.onlyInLeft.single.key, DisplayPrecisionKey.currency(const Currency(name: 'USD')));
-    expect(diff.info.displayContext.onlyInRight.single.key, DisplayPrecisionKey.currency(const Currency(name: 'JPY')));
+    expect(diff.info.displayContext.onlyInLeft.single.key, DisplayPrecisionKey.currency(Currency(name: 'USD')));
+    expect(diff.info.displayContext.onlyInRight.single.key, DisplayPrecisionKey.currency(Currency(name: 'JPY')));
   });
 
   test('diffs parse errors and mixed success versus failure', () {
