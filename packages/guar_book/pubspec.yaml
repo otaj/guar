@@ -1,0 +1,23 @@
+name: guar_book
+description: Book and validate parsed Beancount ledgers into guar_domain types.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+dependencies:
+  decimal: ^3.2.4
+  guar_domain:
+    path: ../guar_domain
+  guar_parser:
+    path: ../guar_parser
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  protobuf: ^6.0.0
+  protobean: ^0.3.0
+  test: ^1.26.3
+  yaml: ^3.1.3

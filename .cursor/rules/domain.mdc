@@ -23,4 +23,12 @@ alwaysApply: true
 - Successful ledger vs errors is XOR (same as protobean `ProcessedLedger`).
 - Do not depend on `guar_parser` or import `protobean` from `lib/`.
 - Prefer sealed Freezed unions for directive bodies, origins, flags, and meta values.
-- Do not invent booking/interpolation/plugin behavior here; that belongs to a later `guar_book` package.
+- Do not invent booking/interpolation/plugin behavior here; that belongs to `guar_book`.
+
+## Booking (`guar_book`)
+
+- Consumes `guar_parser` `ParsedLedger` and produces `guar_domain` `Ledger`.
+- Pipeline: default unset options → book/interpolate → documents/pad/balance → injected plugins → validations.
+- Successful ledger vs errors is XOR (drop directives when any processing error occurs).
+- Stock Beancount plugins are not implemented here; callers register plugins by name on `Book`.
+- Do not import `protobean` from `lib/` (tests may map to Processed* for goldens).
