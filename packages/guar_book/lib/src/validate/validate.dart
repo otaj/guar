@@ -140,8 +140,7 @@ List<ProcessingError> validateDuplicateBalances(List<Directive> directives) {
   for (final directive in directives) {
     final body = directive.body;
     if (body is! BalanceBody) continue;
-    final key =
-        '${directive.date.year}-${directive.date.month}-${directive.date.day}:${body.account.name}:${body.amount.currency.name}';
+    final key = '${directive.date}:${body.account.name}:${body.amount.currency.name}';
     if (!seen.add(key)) {
       errors.add(
         ProcessingError(

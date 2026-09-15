@@ -28,7 +28,7 @@ void main() {
       final source = await beanFile.readAsString();
       final expected = (await inventoryFile.readAsString()).trimRight();
       final parsed = const BeancountParser().parse(source, filename: beanFile.path);
-      final booked = const Book().process(parsed);
+      final booked = Book().process(parsed);
       expect(booked, isA<LedgerDirectives>(), reason: booked.toString());
       final actual = formatLedgerInventory(inventoryFromLedger(booked));
       expect(actual, expected);

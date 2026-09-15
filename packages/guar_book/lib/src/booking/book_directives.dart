@@ -433,10 +433,7 @@ String _positionString(d.Position position) {
   if (cost == null) {
     return '${position.units.number} ${position.units.currency.name}';
   }
-  final date =
-      '${cost.date.year.toString().padLeft(4, '0')}-'
-      '${cost.date.month.toString().padLeft(2, '0')}-'
-      '${cost.date.day.toString().padLeft(2, '0')}';
+  final date = '${cost.date}';
   final label = cost.label == null ? '' : ' "${cost.label}"';
   return '${position.units.number} ${position.units.currency.name} {${cost.number} ${cost.currency.name}, $date$label}';
 }

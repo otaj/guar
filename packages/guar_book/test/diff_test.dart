@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 void main() {
   const parser = p.BeancountParser();
-  const book = Book();
+  final book = Book();
 
   LedgerDirectives ok(Ledger ledger) {
     return switch (ledger) {

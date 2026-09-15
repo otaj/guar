@@ -48,9 +48,6 @@ String _formatPosition(Position position) {
     return '${position.units.number} ${position.units.currency.name}';
   }
   final cost = position.cost!;
-  final date =
-      '${cost.date.year.toString().padLeft(4, '0')}-'
-      '${cost.date.month.toString().padLeft(2, '0')}-'
-      '${cost.date.day.toString().padLeft(2, '0')}';
+  final date = '${cost.date}';
   return '${position.units.number} ${position.units.currency.name} {$date ${cost.currency.name} ${cost.number}}';
 }

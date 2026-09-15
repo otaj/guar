@@ -45,7 +45,7 @@ void main() {
   });
 
   test('Book.process applies defaults on an empty successful ledger', () {
-    final ledger = const Book().process(const p.ParsedLedger.directives(directives: []));
+    final ledger = Book().process(const p.ParsedLedger.directives(directives: []));
     expect(ledger, isA<LedgerDirectives>());
     final options = (ledger as LedgerDirectives).options;
     expect(options.bookingMethod, BookingMethod.strict);

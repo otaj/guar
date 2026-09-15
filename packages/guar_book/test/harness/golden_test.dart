@@ -34,7 +34,7 @@ void main() {
       final expected = await _loadExpected(txtpbFile);
       final source = await beanFile.readAsString();
       final parsed = const BeancountParser().parse(source, filename: beanFile.path);
-      final booked = const Book().process(parsed);
+      final booked = Book().process(parsed);
       final actual = ledgerToProto(booked);
       _expectSame(actual, expected);
     }, skip: skipReason);

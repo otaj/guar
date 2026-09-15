@@ -10,12 +10,10 @@ void main() {
     final parsed = p.ParsedLedger.directives(
       directives: const [],
       info: p.ProcessingInfo(
-        plugin: [
-          p.Plugin(name: 'beancount.plugins.auto', location: const p.BeanLocation(linenoBegin: 1, linenoEnd: 1)),
-        ],
+        plugin: [p.Plugin(name: 'custom.unknown.plugin', location: const p.BeanLocation(linenoBegin: 1, linenoEnd: 1))],
       ),
     );
-    final ledger = const Book().process(parsed);
+    final ledger = Book().process(parsed);
     expect(ledger, isA<LedgerErrors>());
     final errors = (ledger as LedgerErrors).errors;
     expect(errors.single.message, contains('plugin not registered'));

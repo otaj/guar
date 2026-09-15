@@ -7,13 +7,14 @@ import 'booking/book_directives.dart';
 import 'diff.dart';
 import 'options_defaults.dart';
 import 'plugin.dart';
+import 'plugins/stock.dart';
 import 'stages/balance.dart';
 import 'stages/documents.dart';
 import 'stages/pad.dart';
 import 'validate/validate.dart';
 
 class Book {
-  const Book({this.plugins = const {}});
+  Book({Map<String, BookPlugin> plugins = const {}}) : plugins = {...stockPlugins, ...plugins};
 
   final Map<String, BookPlugin> plugins;
 

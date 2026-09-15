@@ -19,9 +19,7 @@ void main() {
 option "documents" "${root.path}"
 2020-01-01 open Assets:Cash
 ''';
-    final ledger = const Book().process(
-      const p.BeancountParser().parse(source, filename: '${root.path}/ledger.beancount'),
-    );
+    final ledger = Book().process(const p.BeancountParser().parse(source, filename: '${root.path}/ledger.beancount'));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
     final docs = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<DocumentBody>();
     expect(docs, isNotEmpty);

@@ -49,7 +49,7 @@ void main() {
       ],
     );
 
-    final ledger = const Book().process(parsed);
+    final ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
     final directives = (ledger as LedgerDirectives).directives;
     final txn = directives.whereType<Directive>().map((d) => d.body).whereType<TransactionBody>().single.value;
@@ -90,7 +90,7 @@ void main() {
       ],
     );
 
-    final ledger = const Book().process(parsed);
+    final ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
     final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
     expect(txn.postings.last.units.number, Decimal.parse('-12.50'));
@@ -137,7 +137,7 @@ void main() {
       ],
     );
 
-    final ledger = const Book().process(parsed);
+    final ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
     final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
     expect(txn.postings.first.cost!.number, Decimal.parse('100.00'));
