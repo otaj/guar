@@ -19,11 +19,7 @@ abstract class Cost with _$Cost {
   String toString({bool detail = true}) {
     final parts = <String>['$number ${currency.name}'];
     if (detail) {
-      parts.add(
-        '${date.year.toString().padLeft(4, '0')}-'
-        '${date.month.toString().padLeft(2, '0')}-'
-        '${date.day.toString().padLeft(2, '0')}',
-      );
+      parts.add('$date');
       if (label != null) {
         parts.add('"$label"');
       }
