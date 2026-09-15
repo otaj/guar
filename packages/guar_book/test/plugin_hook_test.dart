@@ -63,4 +63,21 @@ void main() {
     expect(directives.single.meta.entries.single.key, 'cfg');
     expect(directives.single.meta.entries.single.value, const MetaValue.text('hello'));
   });
+
+  test('stock plugin name resolves without manual registration', () {
+    final parsed = const p.BeancountParser().parse(
+      'plugin "beancount.plugins.auto_accounts"\n'
+      '2014-02-01 *\n'
+      '  Assets:Cash  10 USD\n'
+      '  Equity:Opening  -10 USD\n',
+      filename: 'ledger.beancount',
+    );
+    final ledger = Book().process(parsed);
+    expect(ledger, isA<LedgerDirectives>());
+    final opens = [
+      for (final d in (ledger as LedgerDirectives).directives)
+        if (d.body is OpenBody) (d.body as OpenBody).account.name,
+    ];
+    expect(opens, containsAll(['Assets:Cash', 'Equity:Opening']));
+  });
 }
