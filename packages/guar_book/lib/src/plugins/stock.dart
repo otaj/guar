@@ -5,6 +5,7 @@ import 'auto.dart';
 import 'auto_accounts.dart';
 import 'coherent_cost.dart';
 import 'implicit_prices.dart';
+import 'leafonly.dart';
 import 'noduplicates.dart';
 import 'nounused.dart';
 import 'onecommodity.dart';
@@ -15,6 +16,7 @@ final Map<String, BookPlugin> stockPlugins = {
   'beancount.plugins.auto_accounts': autoInsertOpen,
   'beancount.plugins.coherent_cost': validateCoherentCost,
   'beancount.plugins.implicit_prices': addImplicitPrices,
+  'beancount.plugins.leafonly': validateLeafOnly,
   'beancount.plugins.noduplicates': validateNoDuplicates,
   'beancount.plugins.nounused': validateUnusedAccounts,
   'beancount.plugins.onecommodity': validateOneCommodity,
