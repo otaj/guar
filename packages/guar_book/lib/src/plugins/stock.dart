@@ -10,6 +10,7 @@ import 'check_drained.dart';
 import 'close_tree.dart';
 import 'coherent_cost.dart';
 import 'commodity_attr.dart';
+import 'currency_accounts.dart';
 import 'implicit_prices.dart';
 import 'leafonly.dart';
 import 'noduplicates.dart';
@@ -27,6 +28,7 @@ final Map<String, BookPlugin> stockPlugins = {
   'beancount.plugins.close_tree': closeTree,
   'beancount.plugins.coherent_cost': validateCoherentCost,
   'beancount.plugins.commodity_attr': validateCommodityAttr,
+  'beancount.plugins.currency_accounts': insertCurrencyTradingPostings,
   'beancount.plugins.implicit_prices': addImplicitPrices,
   'beancount.plugins.leafonly': validateLeafOnly,
   'beancount.plugins.noduplicates': validateNoDuplicates,
