@@ -1,0 +1,3 @@
+errors {
+  message: "AVERAGE method is not supported"
+}

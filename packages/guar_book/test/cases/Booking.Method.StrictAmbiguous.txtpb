@@ -1,0 +1,3 @@
+errors {
+  message: "Ambiguous matches for inventory reduction: 2 matching lots"
+}
