@@ -1,0 +1,3 @@
+errors {
+  message: "Duplicate open directive for Assets:US:Bank:Checking2"
+}

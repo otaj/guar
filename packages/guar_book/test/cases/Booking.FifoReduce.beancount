@@ -1,0 +1,12 @@
+2014-02-01 open Assets:Investments:MSFT "FIFO"
+2014-02-01 open Assets:Cash
+2014-02-01 open Income:Gains
+
+2014-02-10 * "buy"
+  Assets:Investments:MSFT    10 MSFT {100.00 USD}
+  Assets:Cash            -1000.00 USD
+
+2014-02-20 * "sell fifo"
+  Assets:Investments:MSFT   -5 MSFT {}
+  Assets:Cash              550.00 USD
+  Income:Gains

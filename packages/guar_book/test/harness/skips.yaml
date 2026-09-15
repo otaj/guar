@@ -1,0 +1,4 @@
+# Explicit skip list for booked golden fixtures.
+# Product skips need an explicit reason; use for stock-plugin fixtures that cannot succeed yet.
+unmigrated: []
+product: []
