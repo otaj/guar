@@ -11,7 +11,7 @@ void main() {
 2014-02-11 open Assets:US:Bank:Checking2
 2014-02-11 open Assets:US:Bank:Checking2
 ''';
-    final ledger = Book().process(const p.BeancountParser().parse(source));
+    final ledger = Book().process(p.BeancountParser().parse(source));
     expect(ledger, isA<LedgerErrors>());
     expect((ledger as LedgerErrors).errors.any((e) => e.message.contains('Duplicate open')), isTrue);
   });
@@ -24,7 +24,7 @@ void main() {
   Expenses:Food   10.00 USD
   Assets:Cash    -9.00 USD
 ''';
-    final ledger = Book().process(const p.BeancountParser().parse(source));
+    final ledger = Book().process(p.BeancountParser().parse(source));
     expect(ledger, isA<LedgerErrors>());
     expect((ledger as LedgerErrors).errors.any((e) => e.message.contains('does not balance')), isTrue);
   });
@@ -36,7 +36,7 @@ void main() {
   Expenses:Food   10.00 USD
   Assets:Cash    -10.00 USD
 ''';
-    final ledger = Book().process(const p.BeancountParser().parse(source));
+    final ledger = Book().process(p.BeancountParser().parse(source));
     expect(ledger, isA<LedgerErrors>());
     expect((ledger as LedgerErrors).errors.any((e) => e.message.contains('unknown account')), isTrue);
   });

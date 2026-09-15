@@ -20,9 +20,9 @@ StageResult applyBalance(List<Directive> directives, LedgerOptions options) {
               .addPosition(Position(units: posting.units, cost: posting.cost))
               .inventory;
           // Parent accounts accumulate child postings for parent balance checks.
-          for (final parent in _parents(posting.account)) {
-            final parentInv = balances[parent.name] ?? const Inventory();
-            balances[parent.name] = parentInv.addPosition(Position(units: posting.units, cost: posting.cost)).inventory;
+          for (final parentName in _parentNames(posting.account)) {
+            final parentInv = balances[parentName] ?? const Inventory();
+            balances[parentName] = parentInv.addPosition(Position(units: posting.units, cost: posting.cost)).inventory;
           }
         }
       case BalanceBody(:final account, :final amount, :final tolerance):
@@ -32,7 +32,7 @@ StageResult applyBalance(List<Directive> directives, LedgerOptions options) {
         if (diff > allowed) {
           final location = switch (directive.origin) {
             SourceOrigin(:final location) => location,
-            GeneratedOrigin() => const BeanLocation(linenoBegin: 0, linenoEnd: 0),
+            GeneratedOrigin() => BeanLocation(linenoBegin: 0, linenoEnd: 0),
           };
           errors.add(
             ProcessingError(
@@ -58,9 +58,9 @@ Decimal _inferredTolerance(Decimal number, Decimal multiplier) {
   return quantum * multiplier * Decimal.fromInt(2);
 }
 
-Iterable<Account> _parents(Account account) sync* {
+Iterable<String> _parentNames(Account account) sync* {
   final parts = account.name.split(':');
   for (var i = 1; i < parts.length; i++) {
-    yield Account(name: parts.sublist(0, i).join(':'), type: account.type);
+    yield parts.sublist(0, i).join(':');
   }
 }

@@ -8,7 +8,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('defaultOptions fills beancount OPTIONS_DEFAULTS', () {
-    final options = defaultOptions(const p.LedgerOptions());
+    final options = defaultOptions(p.LedgerOptions());
     expect(options.title, 'Beancount');
     expect(options.accountPrefixes.assets, 'Assets');
     expect(options.accountPrefixes.liabilities, 'Liabilities');
@@ -18,7 +18,7 @@ void main() {
     expect(options.bookingMethod, BookingMethod.strict);
     expect(options.pluginProcessingMode, PluginProcessingMode.defaultMode);
     expect(options.toleranceMultiplier, Decimal.parse('0.5'));
-    expect(options.conversionCurrency, const Currency(name: 'NOTHING'));
+    expect(options.conversionCurrency, Currency(name: 'NOTHING'));
     expect(options.accountPreviousBalances?.name, 'Equity:Opening-Balances');
     expect(options.accountPreviousEarnings?.name, 'Equity:Earnings:Previous');
     expect(options.accountCurrentEarnings?.name, 'Equity:Earnings:Current');
@@ -30,7 +30,7 @@ void main() {
 
   test('defaultOptions keeps explicit file options', () {
     final options = defaultOptions(
-      const p.LedgerOptions(
+      p.LedgerOptions(
         title: 'My Books',
         accountPrefixes: p.AccountPrefixes(assets: 'Actifs', equity: 'Capitaux'),
         bookingMethod: p.BookingMethod.fifo,

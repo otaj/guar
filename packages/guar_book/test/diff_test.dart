@@ -6,7 +6,7 @@ import 'package:guar_parser/guar_parser.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
-  const parser = p.BeancountParser();
+  final parser = p.BeancountParser();
   final book = Book();
 
   LedgerDirectives ok(Ledger ledger) {
@@ -36,7 +36,7 @@ void main() {
   });
 
   test('same content at different locations is equal', () {
-    const source = '2014-01-01 open Assets:Cash\n';
+    final source = '2014-01-01 open Assets:Cash\n';
     final left = bookSource(source, filename: 'a.beancount');
     final right = bookSource(source, filename: 'b.beancount');
     expect(book.diff(left, right).isEmpty, isTrue);

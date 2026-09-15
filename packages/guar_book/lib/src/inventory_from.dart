@@ -4,13 +4,13 @@ import 'package:guar_domain/guar_domain.dart';
 
 LedgerInventory inventoryFromLedger(Ledger ledger) {
   return switch (ledger) {
-    LedgerErrors() => const LedgerInventory(),
+    LedgerErrors() => LedgerInventory(),
     LedgerDirectives(:final directives) => inventoryFromDirectives(directives),
   };
 }
 
 LedgerInventory inventoryFromDirectives(Iterable<Directive> directives) {
-  var inventory = const LedgerInventory();
+  var inventory = LedgerInventory();
   for (final directive in directives) {
     final body = directive.body;
     if (body is! TransactionBody) {

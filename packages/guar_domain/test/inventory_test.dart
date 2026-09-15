@@ -19,22 +19,22 @@ void main() {
       var add = inv.addAmount(amount('100', 'USD'));
       expect(add.result, MatchResult.created);
       inv = add.inventory;
-      expect(inv.currencyUnits(const Currency(name: 'USD')), amount('100', 'USD'));
+      expect(inv.currencyUnits(Currency(name: 'USD')), amount('100', 'USD'));
 
       add = inv.addAmount(amount('25.01', 'USD'));
       expect(add.result, MatchResult.augmented);
       inv = add.inventory;
-      expect(inv.currencyUnits(const Currency(name: 'USD')), amount('125.01', 'USD'));
+      expect(inv.currencyUnits(Currency(name: 'USD')), amount('125.01', 'USD'));
 
       add = inv.addAmount(amount('-12.73', 'USD'));
       expect(add.result, MatchResult.reduced);
       inv = add.inventory;
-      expect(inv.currencyUnits(const Currency(name: 'USD')), amount('112.28', 'USD'));
+      expect(inv.currencyUnits(Currency(name: 'USD')), amount('112.28', 'USD'));
 
       add = inv.addAmount(amount('-120', 'USD'));
       expect(add.result, MatchResult.reduced);
       inv = add.inventory;
-      expect(inv.currencyUnits(const Currency(name: 'USD')), amount('-7.72', 'USD'));
+      expect(inv.currencyUnits(Currency(name: 'USD')), amount('-7.72', 'USD'));
     });
 
     test('addAmount removes a lot that reaches zero', () {
@@ -45,15 +45,15 @@ void main() {
     });
 
     test('lots with different costs stay distinct', () {
-      const date1 = BeanDate(year: 2014, month: 6, day: 15);
-      const date2 = BeanDate(year: 2015, month: 7, day: 14);
+      final date1 = BeanDate(year: 2014, month: 6, day: 15);
+      final date2 = BeanDate(year: 2015, month: 7, day: 14);
       var inv = const Inventory();
       inv = inv.addAmount(amount('2.2', 'HOOL'), cost: cost('532.43', 'USD', date1)).inventory;
       inv = inv.addAmount(amount('2.3', 'HOOL'), cost: cost('564.00', 'USD', date2)).inventory;
       inv = inv.addAmount(amount('3.413', 'EUR')).inventory;
       expect(inv.length, 3);
-      expect(inv.currencyUnits(const Currency(name: 'HOOL')), amount('4.5', 'HOOL'));
-      expect(inv.currencyUnits(const Currency(name: 'EUR')), amount('3.413', 'EUR'));
+      expect(inv.currencyUnits(Currency(name: 'HOOL')), amount('4.5', 'HOOL'));
+      expect(inv.currencyUnits(Currency(name: 'EUR')), amount('3.413', 'EUR'));
     });
 
     test('equality ignores position order', () {
@@ -64,12 +64,12 @@ void main() {
 
     test('neg and mul', () {
       final inv = Inventory().addAmount(amount('10', 'USD')).inventory.addAmount(amount('1.5', 'JPY')).inventory;
-      expect((-inv).currencyUnits(const Currency(name: 'USD')), amount('-10', 'USD'));
-      expect((inv * Decimal.parse('3')).currencyUnits(const Currency(name: 'USD')), amount('30', 'USD'));
+      expect((-inv).currencyUnits(Currency(name: 'USD')), amount('-10', 'USD'));
+      expect((inv * Decimal.parse('3')).currencyUnits(Currency(name: 'USD')), amount('30', 'USD'));
     });
 
     test('isMixed detects opposite signs in one currency', () {
-      const date = BeanDate(year: 2014, month: 1, day: 1);
+      final date = BeanDate(year: 2014, month: 1, day: 1);
       final long = Inventory()
           .addAmount(amount('100', 'HOOL'), cost: cost('250', 'USD', date))
           .inventory

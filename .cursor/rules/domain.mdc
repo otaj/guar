@@ -12,6 +12,7 @@ alwaysApply: true
 - `protobean` is interchange only: import it from `package:guar_parser/proto.dart` / `lib/src/proto/`, never from `lib/src/domain/` or `lib/src/parser/`.
 - Prefer sealed Freezed unions for directive bodies, flags, meta values, and similar alternatives.
 - Use civil `BeanDate` (y/m/d), not `DateTime`. Numbers keep `verbatim` plus a resolved `Decimal`.
+- Factories reject invalid shapes at construction (calendar dates, account/currency/tag/link names, letter flags, location line ranges).
 - Successful parse vs errors is XOR (same as protobean `ParsedLedger`).
 - `pushtag` / `poptag` / `pushmeta` / `popmeta` apply at parse time and are not directives.
 - Ask when a modelling choice is ambiguous; do not invent booking/interpolation semantics in the parser domain (`ProcessedLedger` / `guar_domain` is out of scope here).
@@ -20,6 +21,7 @@ alwaysApply: true
 
 - Freezed models in `packages/guar_domain/lib/src/` are the booked ledger shape after booking and interpolation.
 - Amounts are complete (`Decimal` + currency); lots use resolved per-unit `Cost` with a date.
+- Factories reject invalid shapes at construction (same calendar/name/flag/location rules as the parser domain).
 - Successful ledger vs errors is XOR (same as protobean `ProcessedLedger`).
 - Do not depend on `guar_parser` or import `protobean` from `lib/`.
 - Prefer sealed Freezed unions for directive bodies, origins, flags, and meta values.

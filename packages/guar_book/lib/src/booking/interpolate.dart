@@ -42,17 +42,21 @@ class MutablePosting {
 }
 
 class PendingCost {
-  PendingCost({this.numberPer, this.numberTotal, required this.currency, required this.date, this.label});
+  PendingCost({this.numberPer, this.numberTotal, this.currency, required this.date, this.label});
 
   Decimal? numberPer;
   Decimal? numberTotal;
-  final Currency currency;
+  Currency? currency;
   final BeanDate date;
   final String? label;
 
   bool get isComplete => numberPer != null || numberTotal != null;
 
   Cost? toCost(Decimal unitsAbs) {
+    final resolvedCurrency = currency;
+    if (resolvedCurrency == null) {
+      return null;
+    }
     if (numberTotal != null) {
       var total = numberTotal!;
       if (numberPer != null) {
@@ -63,7 +67,7 @@ class PendingCost {
       }
       return Cost(
         number: (total / unitsAbs).toDecimal(scaleOnInfinitePrecision: 28),
-        currency: currency,
+        currency: resolvedCurrency,
         date: date,
         label: label,
       );
@@ -71,7 +75,7 @@ class PendingCost {
     if (numberPer == null) {
       return null;
     }
-    return Cost(number: numberPer!, currency: currency, date: date, label: label);
+    return Cost(number: numberPer!, currency: resolvedCurrency, date: date, label: label);
   }
 }
 
@@ -80,8 +84,8 @@ Amount postingWeight(MutablePosting posting) {
   if (posting.cost != null) {
     return Amount(number: units.number * posting.cost!.number, currency: posting.cost!.currency);
   }
-  if (posting.pendingCost != null && posting.pendingCost!.numberPer != null) {
-    return Amount(number: units.number * posting.pendingCost!.numberPer!, currency: posting.pendingCost!.currency);
+  if (posting.pendingCost != null && posting.pendingCost!.numberPer != null && posting.pendingCost!.currency != null) {
+    return Amount(number: units.number * posting.pendingCost!.numberPer!, currency: posting.pendingCost!.currency!);
   }
   if (posting.price != null) {
     return Amount(number: units.number * posting.price!.number, currency: posting.price!.currency);
@@ -144,6 +148,7 @@ Amount postingWeight(MutablePosting posting) {
         );
       }
       target.pendingCost!.numberPer = (fill.abs() / unitsAbs).toDecimal(scaleOnInfinitePrecision: 28);
+      target.pendingCost!.currency ??= weightCurrency;
     }
   }
 

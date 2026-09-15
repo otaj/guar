@@ -7,12 +7,12 @@ import 'helpers/amounts.dart';
 
 void main() {
   test('successful ledger holds directives only', () {
-    const origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
     final ledger = Ledger.directives(
       directives: [
         Directive(
           origin: origin,
-          date: const BeanDate(year: 2025, month: 1, day: 1),
+          date: BeanDate(year: 2025, month: 1, day: 1),
           body: DirectiveBody.open(account: account('Assets:Cash', AccountType.assets)),
         ),
       ],
@@ -24,7 +24,7 @@ void main() {
   test('failed ledger holds errors only', () {
     final ledger = Ledger.errors(
       errors: [
-        const ProcessingError(
+        ProcessingError(
           message: 'Invalid reference to unknown account',
           location: BeanLocation(linenoBegin: 10, linenoEnd: 10),
         ),

@@ -122,9 +122,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
       pending = PendingCost(
         numberPer: posting.cost!.numberPer?.resolved,
         numberTotal: posting.cost!.numberTotal?.resolved,
-        currency: posting.cost!.currency == null
-            ? const d.Currency(name: '')
-            : d.Currency(name: posting.cost!.currency!.name),
+        currency: posting.cost!.currency == null ? null : d.Currency(name: posting.cost!.currency!.name),
         date: posting.cost!.date == null
             ? date
             : d.BeanDate(
@@ -156,7 +154,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   for (final posting in mutable) {
     final units = posting.units;
     final method = methods[posting.account.name] ?? defaultMethod;
-    final balance = balances[posting.account.name] ?? const d.Inventory();
+    final balance = balances[posting.account.name] ?? d.Inventory();
     final isReduction =
         units != null &&
         (posting.cost != null || posting.pendingCost != null) &&
@@ -203,7 +201,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
       }
     }
   }
-  weightCurrency ??= const d.Currency(name: 'USD');
+  weightCurrency ??= d.Currency(name: 'USD');
 
   final interpolated = interpolateGroup(booked, weightCurrency, location);
   if (interpolated.errors.isNotEmpty) {
@@ -231,7 +229,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   }
 
   for (final posting in postings) {
-    final current = balances[posting.account.name] ?? const d.Inventory();
+    final current = balances[posting.account.name] ?? d.Inventory();
     balances[posting.account.name] = current
         .addPosition(d.Position(units: posting.units, cost: posting.cost))
         .inventory;
@@ -275,12 +273,10 @@ List<d.Position> _matchLots(d.Inventory balance, d.Amount units, d.Cost? costHin
   for (final position in balance.positions) {
     if (position.units.currency != units.currency) continue;
     if (position.cost == null) continue;
-    if (costHint != null && costHint.currency.name.isNotEmpty) {
+    if (costHint != null) {
       if (position.cost!.currency != costHint.currency) continue;
       if (position.cost!.number != costHint.number) continue;
       if (costHint.label != null && position.cost!.label != costHint.label) continue;
-    } else if (costHint != null && costHint.label != null) {
-      if (position.cost!.label != costHint.label) continue;
     }
     matches.add(position);
   }
@@ -388,7 +384,7 @@ List<d.Position> _matchLots(d.Inventory balance, d.Amount units, d.Cost? costHin
     return (postings: const [], errors: [d.ProcessingError(message: 'Not enough lots to reduce', location: location)]);
   }
 
-  const mergeFlag = d.Flag.letter('M');
+  final mergeFlag = d.Flag.letter('M');
   final avgCost = d.Cost(
     number: (totalCost / totalUnits).toDecimal(scaleOnInfinitePrecision: 28),
     currency: matches.first.cost!.currency,

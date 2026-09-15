@@ -233,7 +233,7 @@ Decimal _toleranceFor(String currency, List<Posting> postings, Decimal multiplie
 
 BeanLocation _location(Directive directive) => switch (directive.origin) {
   SourceOrigin(:final location) => location,
-  GeneratedOrigin() => const BeanLocation(linenoBegin: 0, linenoEnd: 0),
+  GeneratedOrigin() => BeanLocation(linenoBegin: 0, linenoEnd: 0),
 };
 
 int _compareDate(BeanDate a, BeanDate b) {

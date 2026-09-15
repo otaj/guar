@@ -14,7 +14,7 @@ void main() {
 2020-01-01 pad Assets:Checking Equity:Opening-Balances
 2020-01-02 balance Assets:Checking 100.00 USD
 ''';
-    final ledger = Book().process(const p.BeancountParser().parse(source, filename: 'pad.beancount'));
+    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'pad.beancount'));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
     final directives = (ledger as LedgerDirectives).directives;
     final txns = directives.map((d) => d.body).whereType<TransactionBody>().toList();
@@ -32,7 +32,7 @@ void main() {
   Equity:Opening-Balances  -50.00 USD
 2020-01-02 balance Assets:Checking 100.00 USD
 ''';
-    final ledger = Book().process(const p.BeancountParser().parse(source, filename: 'bal.beancount'));
+    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'bal.beancount'));
     expect(ledger, isA<LedgerErrors>());
     final errors = (ledger as LedgerErrors).errors;
     expect(errors.any((e) => e.message.contains('Balance failed')), isTrue);

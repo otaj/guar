@@ -2,13 +2,20 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'validation.dart';
+
 part 'date.freezed.dart';
 
-@freezed
+@Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class BeanDate with _$BeanDate {
   const BeanDate._();
 
-  const factory BeanDate({required int year, required int month, required int day}) = _BeanDate;
+  factory BeanDate({required int year, required int month, required int day}) {
+    ensureBeanDate(year, month, day);
+    return BeanDate._create(year: year, month: month, day: day);
+  }
+
+  const factory BeanDate._create({required int year, required int month, required int day}) = _BeanDate;
 
   @override
   String toString() =>

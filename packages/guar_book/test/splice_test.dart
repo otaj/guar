@@ -6,9 +6,9 @@ import 'package:guar_parser/guar_parser.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
-  const parser = p.BeancountParser();
+  final parser = p.BeancountParser();
   final book = Book();
-  const file = 'ledger.beancount';
+  final file = 'ledger.beancount';
 
   LedgerDirectives ok(Ledger ledger) {
     return switch (ledger) {

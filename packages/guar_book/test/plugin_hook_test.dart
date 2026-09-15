@@ -10,7 +10,7 @@ void main() {
     final parsed = p.ParsedLedger.directives(
       directives: const [],
       info: p.ProcessingInfo(
-        plugin: [p.Plugin(name: 'custom.unknown.plugin', location: const p.BeanLocation(linenoBegin: 1, linenoEnd: 1))],
+        plugin: [p.Plugin(name: 'custom.unknown.plugin', location: p.BeanLocation(linenoBegin: 1, linenoEnd: 1))],
       ),
     );
     final ledger = Book().process(parsed);
@@ -23,9 +23,9 @@ void main() {
     final parsed = p.ParsedLedger.directives(
       directives: [
         p.ParsedDirective(
-          location: const p.BeanLocation(linenoBegin: 1, linenoEnd: 1),
-          date: const p.BeanDate(year: 2020, month: 1, day: 1),
-          body: p.DirectiveBody.open(account: const p.Account(name: 'Assets:Cash')),
+          location: p.BeanLocation(linenoBegin: 1, linenoEnd: 1),
+          date: p.BeanDate(year: 2020, month: 1, day: 1),
+          body: p.DirectiveBody.open(account: p.Account(name: 'Assets:Cash')),
         ),
       ],
       info: p.ProcessingInfo(
@@ -33,7 +33,7 @@ void main() {
           p.Plugin(
             name: 'test.set_title_meta',
             config: 'hello',
-            location: const p.BeanLocation(linenoBegin: 2, linenoEnd: 2),
+            location: p.BeanLocation(linenoBegin: 2, linenoEnd: 2),
           ),
         ],
       ),
@@ -61,11 +61,11 @@ void main() {
     expect(ledger, isA<LedgerDirectives>());
     final directives = (ledger as LedgerDirectives).directives;
     expect(directives.single.meta.entries.single.key, 'cfg');
-    expect(directives.single.meta.entries.single.value, const MetaValue.text('hello'));
+    expect(directives.single.meta.entries.single.value, MetaValue.text('hello'));
   });
 
   test('stock plugin name resolves without manual registration', () {
-    final parsed = const p.BeancountParser().parse(
+    final parsed = p.BeancountParser().parse(
       'plugin "beancount.plugins.auto_accounts"\n'
       '2014-02-01 *\n'
       '  Assets:Cash  10 USD\n'

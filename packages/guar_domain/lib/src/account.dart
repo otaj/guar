@@ -2,30 +2,52 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'validation.dart';
+
 part 'account.freezed.dart';
 
 enum AccountType { assets, liabilities, equity, income, expenses }
 
-@freezed
+@Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Account with _$Account {
   const Account._();
 
-  const factory Account({required String name, required AccountType type}) = _Account;
+  factory Account({required String name, required AccountType type}) {
+    ensureAccountName(name);
+    return Account._create(name: name, type: type);
+  }
+
+  const factory Account._create({required String name, required AccountType type}) = _Account;
 
   bool isSubaccountOf(Account other) => name.startsWith('${other.name}:');
 }
 
-@freezed
+@Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Currency with _$Currency {
-  const factory Currency({required String name}) = _Currency;
+  factory Currency({required String name}) {
+    ensureCurrencyName(name);
+    return Currency._create(name: name);
+  }
+
+  const factory Currency._create({required String name}) = _Currency;
 }
 
-@freezed
+@Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Tag with _$Tag {
-  const factory Tag({required String name}) = _Tag;
+  factory Tag({required String name}) {
+    ensureTagOrLinkName(name, 'Tag.name');
+    return Tag._create(name: name);
+  }
+
+  const factory Tag._create({required String name}) = _Tag;
 }
 
-@freezed
+@Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Link with _$Link {
-  const factory Link({required String name}) = _Link;
+  factory Link({required String name}) {
+    ensureTagOrLinkName(name, 'Link.name');
+    return Link._create(name: name);
+  }
+
+  const factory Link._create({required String name}) = _Link;
 }

@@ -33,7 +33,7 @@ BookPluginResult insertCurrencyTradingPostings(
             meta: Meta(
               entries: [
                 ...directive.meta.entries,
-                const MetaEntry(key: _metaProcessed, value: MetaValue.boolean(true)),
+                MetaEntry(key: _metaProcessed, value: MetaValue.boolean(true)),
               ],
             ),
             body: DirectiveBody.transaction(

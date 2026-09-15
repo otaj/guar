@@ -33,7 +33,7 @@ void main() {
       }
       final expected = await _loadExpected(txtpbFile);
       final source = await beanFile.readAsString();
-      final parsed = const BeancountParser().parse(source, filename: beanFile.path);
+      final parsed = BeancountParser().parse(source, filename: beanFile.path);
       final booked = Book().process(parsed);
       final actual = ledgerToProto(booked);
       _expectSame(actual, expected);
@@ -113,7 +113,7 @@ Future<_ExpectedGolden> _loadExpected(File txtpbFile) async {
     ['run', 'tool/txtpb_to_pb.py', '--processed', txtpbFile.absolute.path],
     workingDirectory: _workspaceRoot().path,
     stdoutEncoding: null,
-    stderrEncoding: const SystemEncoding(),
+    stderrEncoding: SystemEncoding(),
   );
   if (result.exitCode != 0) {
     fail('failed to load ${txtpbFile.path}: ${result.stderr}');

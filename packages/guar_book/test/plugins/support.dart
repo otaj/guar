@@ -6,7 +6,7 @@ import 'package:guar_parser/guar_parser.dart' as p;
 import 'package:test/test.dart';
 
 Ledger process(String source, {String filename = 'plugin_test.beancount'}) =>
-    Book().process(const p.BeancountParser().parse(source, filename: filename));
+    Book().process(p.BeancountParser().parse(source, filename: filename));
 
 List<Directive> booked(String source) {
   final ledger = process(source);

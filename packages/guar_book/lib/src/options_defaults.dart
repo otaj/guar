@@ -49,7 +49,7 @@ d.LedgerOptions defaultOptions(p.LedgerOptions options) {
     ),
     accountRounding: options.accountRounding == null ? null : domainAccount(options.accountRounding!.name, prefixes),
     conversionCurrency: options.conversionCurrency == null
-        ? const d.Currency(name: 'NOTHING')
+        ? d.Currency(name: 'NOTHING')
         : d.Currency(name: options.conversionCurrency!.name),
     displayPrecision: [
       for (final precision in options.displayPrecision)

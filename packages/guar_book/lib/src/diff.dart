@@ -2,7 +2,7 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-const _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
+final _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
 
 LedgerDiff diffLedgers(Ledger left, Ledger right) {
   final options = _diffOptions(left.options, right.options);
@@ -111,7 +111,7 @@ bool _samePlugin(Plugin left, Plugin right) => left.name == right.name && left.c
 bool _sameSetting(OptionSetting left, OptionSetting right) => left.key == right.key && left.value == right.value;
 
 Origin _clearedOrigin(Origin origin) => switch (origin) {
-  SourceOrigin() => const Origin.source(_nowhere),
+  SourceOrigin() => Origin.source(_nowhere),
   GeneratedOrigin() => const Origin.generated(),
 };
 
