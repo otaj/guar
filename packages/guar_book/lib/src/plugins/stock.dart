@@ -3,6 +3,7 @@
 import '../plugin.dart';
 import 'auto.dart';
 import 'auto_accounts.dart';
+import 'check_average_cost.dart';
 import 'check_closing.dart';
 import 'check_drained.dart';
 import 'close_tree.dart';
@@ -18,6 +19,7 @@ import 'unique_prices.dart';
 final Map<String, BookPlugin> stockPlugins = {
   'beancount.plugins.auto': autoPlugin,
   'beancount.plugins.auto_accounts': autoInsertOpen,
+  'beancount.plugins.check_average_cost': validateAverageCost,
   'beancount.plugins.check_closing': checkClosing,
   'beancount.plugins.check_drained': checkDrained,
   'beancount.plugins.close_tree': closeTree,
