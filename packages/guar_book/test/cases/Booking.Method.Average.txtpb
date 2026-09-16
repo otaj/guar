@@ -282,7 +282,7 @@ directives {
       }
       units {
         number {
-          value: "-83.333333333333333333333333333"
+          value: "-83.33"
         }
         currency {
           name: "USD"

@@ -169,7 +169,7 @@ InferredTolerances inferTolerances(
   for (final posting in postings) {
     final units = posting.units;
     if (units == null) continue;
-    final scale = units.number.scale;
+    final scale = units.scale;
     if (scale <= 0) continue;
     final tolerance = Decimal.one.shift(-scale) * multiplier;
     final currency = units.currency.name;

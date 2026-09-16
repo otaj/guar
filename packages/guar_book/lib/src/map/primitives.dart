@@ -9,6 +9,7 @@ import '../options_defaults.dart';
 d.Amount mapAmount(p.Amount amount) => d.Amount(
   number: amount.number.resolved,
   currency: d.Currency(name: amount.currency.name),
+  scale: amount.number.places,
 );
 
 d.Amount? mapCompleteUnits(p.IncompleteAmount? units) {
@@ -18,6 +19,7 @@ d.Amount? mapCompleteUnits(p.IncompleteAmount? units) {
   return d.Amount(
     number: units.number!.resolved,
     currency: d.Currency(name: units.currency!.name),
+    scale: units.number!.places,
   );
 }
 
@@ -68,6 +70,7 @@ d.Amount? mapPrice(p.ParsedPrice? price, Decimal? unitsAbs) {
   return d.Amount(
     number: number,
     currency: d.Currency(name: price.currency!.name),
+    scale: price.number!.places,
   );
 }
 

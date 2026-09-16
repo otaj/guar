@@ -23,6 +23,19 @@ void main() {
     expect(txns.single.value.origin, const Origin.generated());
   });
 
+  test('balance assertion infers tolerance from written decimal places', () {
+    final source = '''
+2024-01-01 open Assets:Bank
+2024-01-01 open Equity:Opening-Balances
+2024-01-15 * "Deposit"
+  Assets:Bank  1000.004 USD
+  Equity:Opening-Balances
+2024-01-31 balance Assets:Bank 1000.00 USD
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'bal-tol.beancount'));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+  });
+
   test('failed balance assertion yields errors', () {
     final source = '''
 2020-01-01 open Assets:Checking

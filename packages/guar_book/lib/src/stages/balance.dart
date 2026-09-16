@@ -28,7 +28,7 @@ StageResult applyBalance(List<Directive> directives, LedgerOptions options) {
       case BalanceBody(:final account, :final amount, :final tolerance):
         final have = (balances[account.name] ?? const Inventory()).currencyUnits(amount.currency).number;
         final diff = (have - amount.number).abs();
-        final allowed = tolerance ?? _inferredTolerance(amount.number, multiplier);
+        final allowed = tolerance ?? _inferredTolerance(amount.scale, multiplier);
         if (diff > allowed) {
           final location = switch (directive.origin) {
             SourceOrigin(:final location) => location,
@@ -49,13 +49,11 @@ StageResult applyBalance(List<Directive> directives, LedgerOptions options) {
   return StageResult(directives: directives, errors: errors);
 }
 
-Decimal _inferredTolerance(Decimal number, Decimal multiplier) {
-  final expo = number.scale;
-  if (expo <= 0) {
+Decimal _inferredTolerance(int scale, Decimal multiplier) {
+  if (scale <= 0) {
     return Decimal.zero;
   }
-  final quantum = Decimal.parse('1e-$expo');
-  return quantum * multiplier * Decimal.fromInt(2);
+  return Decimal.one.shift(-scale) * multiplier;
 }
 
 Iterable<String> _parentNames(Account account) sync* {

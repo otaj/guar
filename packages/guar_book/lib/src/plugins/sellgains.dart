@@ -108,7 +108,7 @@ Map<String, Decimal> _inferTolerances(List<Posting> postings, LedgerOptions opti
   }
 
   for (final posting in postings) {
-    final scale = posting.units.number.scale;
+    final scale = posting.units.scale;
     if (scale <= 0) continue;
     final tolerance = Decimal.parse('1e-$scale') * multiplier;
     final currency = posting.units.currency.name;
