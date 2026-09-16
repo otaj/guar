@@ -93,10 +93,143 @@ Amount postingWeight(MutablePosting posting) {
   return units;
 }
 
+enum ToleranceMode { max, min }
+
+class InferredTolerances {
+  InferredTolerances(this._values, {Decimal? fallback}) : fallback = fallback ?? Decimal.zero;
+
+  final Map<String, Decimal> _values;
+  final Decimal fallback;
+
+  Decimal operator [](String currency) => _values[currency] ?? fallback;
+}
+
+final Decimal _maximumTolerance = Decimal.parse('0.5');
+const _maxToleranceDigits = 5;
+
+InferredTolerances inferPostingTolerances(
+  List<Posting> postings,
+  LedgerOptions options, {
+  ToleranceMode mode = ToleranceMode.max,
+}) {
+  return inferTolerances(
+    [
+      for (final posting in postings)
+        MutablePosting(
+          origin: posting.origin,
+          meta: posting.meta,
+          account: posting.account,
+          units: posting.units,
+          cost: posting.cost,
+          price: posting.price,
+        ),
+    ],
+    options,
+    mode: mode,
+  );
+}
+
+InferredTolerances inferTolerances(
+  List<MutablePosting> postings,
+  LedgerOptions options, {
+  ToleranceMode mode = ToleranceMode.max,
+}) {
+  final useCost = options.inferToleranceFromCost ?? false;
+  final multiplier = options.toleranceMultiplier ?? Decimal.parse('0.5');
+  Decimal agg(Decimal left, Decimal right) => switch (mode) {
+    ToleranceMode.max => left > right ? left : right,
+    ToleranceMode.min => left < right ? left : right,
+  };
+
+  final seen = <String>{};
+  for (final posting in postings) {
+    final units = posting.units;
+    if (units != null) seen.add(units.currency.name);
+    final cost = posting.cost;
+    if (cost != null) seen.add(cost.currency.name);
+    final pending = posting.pendingCost;
+    if (pending?.currency != null) seen.add(pending!.currency!.name);
+    final price = posting.price;
+    if (price != null) seen.add(price.currency.name);
+  }
+
+  final tolerances = <String, Decimal>{};
+  for (final preset in options.inferredToleranceDefault) {
+    switch (preset.key) {
+      case CurrencyKeyAll():
+        tolerances['*'] = preset.value;
+      case CurrencyKeyCurrency(:final value):
+        if (seen.contains(value.name)) {
+          tolerances[value.name] = preset.value;
+        }
+    }
+  }
+
+  final costTolerances = <String, Decimal>{};
+  for (final posting in postings) {
+    final units = posting.units;
+    if (units == null) continue;
+    final scale = units.number.scale;
+    if (scale <= 0) continue;
+    final tolerance = Decimal.one.shift(-scale) * multiplier;
+    final currency = units.currency.name;
+    final existing = tolerances[currency];
+    tolerances[currency] = existing == null ? tolerance : agg(tolerance, existing);
+
+    if (!useCost) continue;
+
+    final cost = posting.cost;
+    final pending = posting.pendingCost;
+    if (cost != null) {
+      final costTolerance = _minDecimal(tolerance * cost.number.abs(), _maximumTolerance);
+      costTolerances.update(cost.currency.name, (value) => value + costTolerance, ifAbsent: () => costTolerance);
+    } else if (pending != null && pending.currency != null) {
+      var costTolerance = _maximumTolerance;
+      for (final number in [pending.numberTotal, pending.numberPer]) {
+        if (number == null) continue;
+        costTolerance = _minDecimal(tolerance * number.abs(), costTolerance);
+      }
+      costTolerances.update(pending.currency!.name, (value) => value + costTolerance, ifAbsent: () => costTolerance);
+    }
+
+    final price = posting.price;
+    if (price != null) {
+      final priceTolerance = _minDecimal(tolerance * price.number.abs(), _maximumTolerance);
+      costTolerances.update(price.currency.name, (value) => value + priceTolerance, ifAbsent: () => priceTolerance);
+    }
+  }
+
+  for (final entry in costTolerances.entries) {
+    final existing = tolerances[entry.key];
+    tolerances[entry.key] = existing == null ? entry.value : agg(entry.value, existing);
+  }
+
+  final fallback = tolerances.remove('*') ?? Decimal.zero;
+  return InferredTolerances(tolerances, fallback: fallback);
+}
+
+Decimal quantizeWithTolerance(InferredTolerances tolerances, String currency, Decimal number) {
+  final tolerance = tolerances[currency];
+  if (tolerance == Decimal.zero) return number;
+  final quantum = tolerance * Decimal.fromInt(2);
+  if (_coefficientDigits(quantum) >= _maxToleranceDigits) return number;
+  if (quantum == Decimal.zero) return number;
+  final rounded = (number / quantum).round();
+  return quantum * Decimal.fromBigInt(rounded);
+}
+
+Decimal _minDecimal(Decimal left, Decimal right) => left < right ? left : right;
+
+int _coefficientDigits(Decimal number) {
+  final digits = number.abs().toString().replaceAll('.', '').replaceFirst(RegExp(r'^0+'), '');
+  return digits.isEmpty ? 1 : digits.length;
+}
+
 ({List<MutablePosting> postings, List<ProcessingError> errors}) interpolateGroup(
   List<MutablePosting> postings,
   Currency weightCurrency,
   BeanLocation location,
+  InferredTolerances tolerances,
 ) {
   final incomplete = <int>[];
   for (var i = 0; i < postings.length; i++) {
@@ -136,7 +269,10 @@ Amount postingWeight(MutablePosting posting) {
     }
     final fill = -residual;
     if (target.units == null) {
-      target.units = Amount(number: fill, currency: weightCurrency);
+      target.units = Amount(
+        number: quantizeWithTolerance(tolerances, weightCurrency.name, fill),
+        currency: weightCurrency,
+      );
     } else if (target.pendingCost != null &&
         target.pendingCost!.numberPer == null &&
         target.pendingCost!.numberTotal == null) {

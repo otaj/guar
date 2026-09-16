@@ -1,0 +1,27 @@
+directives {
+  date { year: 2026 month: 4 day: 28 }
+  open { account { name: "Assets:Test" } }
+}
+directives {
+  date { year: 2026 month: 4 day: 28 }
+  open { account { name: "Expenses:Test" } }
+}
+directives {
+  date { year: 2026 month: 4 day: 28 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    narration: "Test"
+    postings {
+      account { name: "Expenses:Test" }
+      units { number { value: "4.8" } currency { name: "EUR" } }
+    }
+    postings {
+      account { name: "Expenses:Test" }
+      units { number { value: "2.97" } currency { name: "EUR" } }
+    }
+    postings {
+      account { name: "Assets:Test" }
+      units { number { value: "-7.8" } currency { name: "EUR" } }
+    }
+  }
+}

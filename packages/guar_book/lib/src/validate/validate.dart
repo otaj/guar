@@ -185,7 +185,6 @@ List<ProcessingError> validateDocumentPaths(List<Directive> directives) {
 
 List<ProcessingError> validateTransactionBalances(List<Directive> directives, LedgerOptions options) {
   final errors = <ProcessingError>[];
-  final multiplier = options.toleranceMultiplier ?? Decimal.parse('0.5');
   for (final directive in directives) {
     final body = directive.body;
     if (body is! TransactionBody) continue;
@@ -203,9 +202,9 @@ List<ProcessingError> validateTransactionBalances(List<Directive> directives, Le
       final weight = postingWeight(mutable);
       residual.update(weight.currency.name, (value) => value + weight.number, ifAbsent: () => weight.number);
     }
+    final tolerances = inferPostingTolerances(body.value.postings, options);
     for (final entry in residual.entries) {
-      final tolerance = _toleranceFor(entry.key, body.value.postings, multiplier);
-      if (entry.value.abs() > tolerance) {
+      if (entry.value.abs() > tolerances[entry.key]) {
         errors.add(
           ProcessingError(
             message: 'Transaction does not balance: ${entry.value} ${entry.key}',
@@ -216,19 +215,6 @@ List<ProcessingError> validateTransactionBalances(List<Directive> directives, Le
     }
   }
   return errors;
-}
-
-Decimal _toleranceFor(String currency, List<Posting> postings, Decimal multiplier) {
-  var maxScale = 0;
-  for (final posting in postings) {
-    if (posting.units.currency.name == currency) {
-      maxScale = maxScale > posting.units.number.scale ? maxScale : posting.units.number.scale;
-    }
-  }
-  if (maxScale <= 0) {
-    return Decimal.zero;
-  }
-  return Decimal.parse('1e-$maxScale') * multiplier;
 }
 
 BeanLocation _location(Directive directive) => switch (directive.origin) {

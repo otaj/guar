@@ -1,0 +1,10 @@
+option "operating_currency" "EUR"
+option "use_precise_interpolation" "TRUE"
+
+2026-04-28 open Assets:Test
+2026-04-28 open Expenses:Test
+
+2026-04-28 * "Test"
+  Expenses:Test 4.8 EUR
+  Expenses:Test 2.97 EUR
+  Assets:Test

@@ -36,7 +36,7 @@ StageResult bookDirectives({required List<p.ParsedDirective> parsed, required d.
       balances: balances,
       methods: methods,
       defaultMethod: defaultMethod,
-      prefixes: options.accountPrefixes,
+      options: options,
     );
     if (booked.errors.isNotEmpty) {
       errors.addAll(booked.errors);
@@ -105,8 +105,9 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   required Map<String, d.Inventory> balances,
   required Map<String, d.BookingMethod> methods,
   required d.BookingMethod defaultMethod,
-  required d.AccountPrefixes prefixes,
+  required d.LedgerOptions options,
 }) {
+  final prefixes = options.accountPrefixes;
   final location = mapLocation(directive.location);
   final date = mapDate(directive.date);
   final origin = sourceOrigin(directive.location);
@@ -203,7 +204,12 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   }
   weightCurrency ??= d.Currency(name: 'USD');
 
-  final interpolated = interpolateGroup(booked, weightCurrency, location);
+  final tolerancesMax = inferTolerances(booked, options);
+  final tolerancesInterp = options.usePreciseInterpolation == true
+      ? inferTolerances(booked, options, mode: ToleranceMode.min)
+      : tolerancesMax;
+
+  final interpolated = interpolateGroup(booked, weightCurrency, location, tolerancesInterp);
   if (interpolated.errors.isNotEmpty) {
     return (directive: null, errors: interpolated.errors);
   }
