@@ -281,6 +281,66 @@ void main() {
     });
   });
 
+  group('running balance', () {
+    late Ledger streams;
+
+    setUpAll(() {
+      streams = book('''
+2010-01-01 open Assets:Cash
+2010-01-01 open Assets:Bank
+2010-01-01 open Equity:Opening-Balances
+
+2010-01-15 * "Jan cash"
+  Assets:Cash 10.00 USD
+  Equity:Opening-Balances
+
+2010-01-20 * "Jan bank"
+  Assets:Bank 100.00 USD
+  Equity:Opening-Balances
+
+2010-02-15 * "Feb cash"
+  Assets:Cash 5.00 USD
+  Equity:Opening-Balances
+
+2010-02-20 * "Feb bank"
+  Assets:Bank 50.00 USD
+  Equity:Opening-Balances
+''');
+    });
+
+    Decimal usd(QueryValue value) => (value as QueryInventory).value.currencyUnits(Currency(name: 'USD')).number;
+
+    test('where only includes matching postings in the running total', () {
+      final table = run(streams, "SELECT date, balance WHERE account = 'Assets:Cash' ORDER BY date");
+      expect(table.rows, hasLength(2));
+      expect(usd(table.rows[0].values[1]), Decimal.parse('10.00'));
+      expect(usd(table.rows[1].values[1]), Decimal.parse('15.00'));
+    });
+
+    test('last(balance) group by account is per-account', () {
+      final table = run(
+        streams,
+        "SELECT account, last(balance) WHERE account ~ 'Assets' GROUP BY account ORDER BY account",
+      );
+      expect(usd(table.rows[0].values[1]), Decimal.parse('150.00'));
+      expect(usd(table.rows[1].values[1]), Decimal.parse('15.00'));
+    });
+
+    test('last(balance) group by year month account carries across months', () {
+      final table = run(streams, '''
+SELECT year, month, account, last(balance)
+WHERE account ~ 'Assets'
+GROUP BY year, month, account
+ORDER BY account, month
+''');
+      expect(table.rows, hasLength(4));
+      expect(usd(table.rows[0].values[3]), Decimal.parse('100.00'));
+      expect(usd(table.rows[1].values[3]), Decimal.parse('150.00'));
+      expect(usd(table.rows[2].values[3]), Decimal.parse('10.00'));
+      expect(usd(table.rows[3].values[3]), Decimal.parse('15.00'));
+    });
+  });
+
   group('error ledger', () {
     test('querying errors yields errors', () {
       final ledger = Ledger.errors(

@@ -77,6 +77,7 @@ class _Compiler {
   final Object? params;
   final List<FuncSpec> functions;
   late BqlTable table;
+  _BalanceWindow? _balanceWindow;
 
   QueryResult run(Statement statement) {
     switch (statement) {
@@ -112,6 +113,8 @@ class _Compiler {
 
   _CompiledSelect _compileSelect(SelectStatement node) {
     final previous = table;
+    final previousWindow = _balanceWindow;
+    _balanceWindow = _BalanceWindow();
     final fromWhere = _compileFrom(node.fromClause);
     final targets = _compileTargets(node.targets);
     var where = node.whereClause == null ? null : compileExpr(node.whereClause!);
@@ -134,6 +137,10 @@ class _Compiler {
       if (nonAgg.difference(groupIndexes.toSet()).isNotEmpty) {
         throw QueryException('all non-aggregates must be covered by GROUP-BY clause in aggregate query');
       }
+      _balanceWindow!.partition = [
+        for (final index in groupIndexes)
+          if (!_isDateDerived(targets[index].eval)) targets[index].eval,
+      ];
     } else if (targets.any((target) => target.isAggregate)) {
       final nonAgg = [
         for (var i = 0; i < targets.length; i++)
@@ -156,6 +163,7 @@ class _Compiler {
       pivot: pivot,
     );
     table = previous;
+    _balanceWindow = previousWindow;
     return compiled;
   }
 
@@ -223,7 +231,7 @@ class _Compiler {
     if (targets is Asterisk) {
       return [
         for (final name in table.wildcardColumns)
-          _Target(_Column(table.columns[name]!), name, table.columns[name]!.type),
+          _Target(_Column(table.columns[name]!, name: name), name, table.columns[name]!.type),
       ];
     }
     final list = targets as List<Target>;
@@ -333,7 +341,10 @@ class _Compiler {
       case ColumnExpr(:final name):
         final column = table.columns[name];
         if (column == null) throw QueryException('column "$name" does not exist');
-        return _Column(column);
+        if (name == 'balance' && table is PostingsTable) {
+          return _Balance(_balanceWindow ??= _BalanceWindow());
+        }
+        return _Column(column, name: name);
       case ConstantExpr(:final value):
         final queryValue = queryValueFromLiteral(value);
         return _Constant(queryValue);
@@ -405,7 +416,7 @@ class _Compiler {
   _Eval _compileFunction(String fname, List<Object> operands) {
     final name = fname.toLowerCase();
     if (name == 'meta' && operands.length == 1 && operands.single is Expr) {
-      return _Subscript(_Column(table.columns['meta']!), _constText(operands.single as Expr));
+      return _Subscript(_Column(table.columns['meta']!, name: 'meta'), _constText(operands.single as Expr));
     }
     if (name == 'entry_meta' && operands.length == 1 && operands.single is Expr) {
       return _EntryMeta(_constText(operands.single as Expr));
@@ -715,12 +726,64 @@ class _ResultTable extends BqlTable {
 }
 
 class _Column extends _Eval {
-  _Column(this.spec);
+  _Column(this.spec, {this.name});
   final ColumnSpec spec;
+  final String? name;
   @override
   QueryType get type => spec.type;
   @override
   QueryValue call(Object row) => spec.read(row);
+}
+
+// Running `balance` is partitioned by GROUP BY keys that are not date parts, so monthly last(balance) still carries an account forward.
+class _BalanceWindow {
+  List<_Eval> partition = const [];
+  final Map<String, Inventory> _running = {};
+  Object? _row;
+  QueryValue? _value;
+
+  QueryValue of(Object row) {
+    if (identical(row, _row) && _value != null) return _value!;
+    final position = _positionOf(row);
+    final key = [for (final eval in partition) _stringifyValue(eval.call(row))].join('\u0001');
+    final next = (_running[key] ?? const Inventory()).addPosition(position).inventory;
+    _running[key] = next;
+    _row = row;
+    _value = QueryValue.inventory(next);
+    return _value!;
+  }
+}
+
+Position _positionOf(Object row) {
+  if (row is PostingRow) {
+    return Position(units: row.posting.units, cost: row.posting.cost);
+  }
+  throw QueryException('balance is only defined on postings');
+}
+
+bool _isDateDerived(_Eval eval) {
+  const dateColumns = {'date', 'year', 'month', 'day'};
+  const dateFunctions = {'year', 'month', 'day', 'yearmonth', 'quarter', 'weekday', 'date_trunc', 'date_part'};
+  if (eval is _Column) return dateColumns.contains(eval.name);
+  if (eval is _Call) {
+    if (dateFunctions.contains(eval.spec.name)) return true;
+    return eval.args.isNotEmpty && eval.args.every(_isDateDerived);
+  }
+  if (eval is _Attribute) {
+    return dateColumns.contains(eval.name) || _isDateDerived(eval.operand);
+  }
+  if (eval is _Constant) return true;
+  final children = eval.children;
+  return children.isNotEmpty && children.every(_isDateDerived);
+}
+
+class _Balance extends _Eval {
+  _Balance(this.window);
+  final _BalanceWindow window;
+  @override
+  QueryType get type => QueryType.inventory;
+  @override
+  QueryValue call(Object row) => window.of(row);
 }
 
 class _Constant extends _Eval {
