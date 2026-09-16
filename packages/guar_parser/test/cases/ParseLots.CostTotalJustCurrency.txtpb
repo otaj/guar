@@ -8,13 +8,23 @@ directives {
       cost { currency { name: "USD" } }
     }
     postings {
+      account { name: "Assets:Invest:Cash" }
+      units { number { verbatim: "-20" resolved: "-20" } currency { name: "USD" } }
+    }
+  }
+}
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    postings {
       account { name: "Assets:Invest:AAPL" }
       units { number { verbatim: "20" resolved: "20" } currency { name: "AAPL" } }
       cost { currency { name: "USD" } }
     }
     postings {
       account { name: "Assets:Invest:Cash" }
-      units { number { verbatim: "0" resolved: "0" } currency { name: "USD" } }
+      units { number { verbatim: "-20" resolved: "-20" } currency { name: "USD" } }
     }
   }
 }

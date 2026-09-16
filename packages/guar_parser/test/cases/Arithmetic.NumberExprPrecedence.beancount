@@ -3,3 +3,4 @@
   Assets:Something   2 + 3 * 4 USD
   Assets:Something   2 + -3 * 4 USD
   Assets:Something   (2 + -3) * 4 USD
+  Assets:Something            -10 USD

@@ -11,7 +11,7 @@ directives {
     }
     postings {
       account { name: "Assets:Checking" }
-      units { number { verbatim: "-99" resolved: "-99" } currency { name: "USD" } }
+      units { number { verbatim: "-100" resolved: "-100" } currency { name: "USD" } }
     }
   }
 }

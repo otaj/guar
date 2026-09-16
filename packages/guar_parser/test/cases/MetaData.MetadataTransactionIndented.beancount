@@ -3,7 +3,7 @@
   Assets:Investments:MSFT      10 MSFT @@ 2000 USD
     test2: "has"
     test3: "to"
-  Assets:Investments:Cash  -20000 USD
+  Assets:Investments:Cash   -2000 USD
     test4: "come"
     test5: "from"
     test6: "this"

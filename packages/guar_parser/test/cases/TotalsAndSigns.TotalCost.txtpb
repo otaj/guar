@@ -10,7 +10,7 @@ directives {
     }
     postings {
       account { name: "Assets:Investments:Cash" }
-      units { number { verbatim: "-20000" resolved: "-20000" } currency { name: "USD" } }
+      units { number { verbatim: "-2000" resolved: "-2000" } currency { name: "USD" } }
     }
   }
 }
@@ -26,7 +26,7 @@ directives {
     }
     postings {
       account { name: "Assets:Investments:Cash" }
-      units { number { verbatim: "-20000" resolved: "-20000" } currency { name: "USD" } }
+      units { number { verbatim: "-2000" resolved: "-2000" } currency { name: "USD" } }
     }
   }
 }
@@ -42,7 +42,7 @@ directives {
     }
     postings {
       account { name: "Assets:Investments:Cash" }
-      units { number { verbatim: "20000" resolved: "20000" } currency { name: "USD" } }
+      units { number { verbatim: "2000" resolved: "2000" } currency { name: "USD" } }
     }
   }
 }

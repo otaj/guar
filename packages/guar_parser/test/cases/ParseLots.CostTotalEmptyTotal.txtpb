@@ -9,7 +9,7 @@ directives {
     }
     postings {
       account { name: "Assets:Invest:Cash" }
-      units { number { verbatim: "-45.23" resolved: "-45.23" } currency { name: "USD" } }
+      units { number { verbatim: "-904.60" resolved: "-904.60" } currency { name: "USD" } }
     }
   }
 }

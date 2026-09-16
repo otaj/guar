@@ -14,5 +14,9 @@ directives {
       account { name: "Assets:Something" }
       units { number { verbatim: "7.5 * 3.1" resolved: "23.25" } currency { name: "USD" } }
     }
+    postings {
+      account { name: "Assets:Something" }
+      units { number { verbatim: "-59.25" resolved: "-59.25" } currency { name: "USD" } }
+    }
   }
 }

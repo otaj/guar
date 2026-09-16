@@ -11,7 +11,7 @@ directives {
     }
     postings {
       account { name: "Assets:Investments:Cash" }
-      units { number { verbatim: "20000.00" resolved: "20000.00" } currency { name: "USD" } }
+      units { number { verbatim: "2000.00" resolved: "2000.00" } currency { name: "USD" } }
     }
   }
 }

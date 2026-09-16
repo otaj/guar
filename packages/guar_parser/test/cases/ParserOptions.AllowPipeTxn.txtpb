@@ -16,6 +16,10 @@ directives {
         account { name: "Assets:Cash" }
         units { number { verbatim: "1" resolved: "1" } currency { name: "USD" } }
       }
+      postings {
+        account { name: "Assets:Cash" }
+        units { number { verbatim: "-1" resolved: "-1" } currency { name: "USD" } }
+      }
     }
   }
 }
