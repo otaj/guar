@@ -145,6 +145,21 @@ void main() {
     expect(txn.postings.first.cost!.date, BeanDate(year: 2020, month: 3, day: 1));
   });
 
+  test('parses total-cost double braces', () {
+    final source = '''
+2024-01-01 open Assets:Brokerage
+2024-01-01 open Assets:Bank
+2024-01-15 * "Buy stock"
+  Assets:Brokerage  10 AAPL {{1500.00 USD}}
+  Assets:Bank      -1500.00 USD
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+    final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
+    expect(txn.postings.first.cost!.number, Decimal.parse('150.00'));
+    expect(txn.postings.first.flag, isNull);
+  });
+
   test('parses posting flags', () {
     final source = '''
 2024-01-01 open Assets:Bank

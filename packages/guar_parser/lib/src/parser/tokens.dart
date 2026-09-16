@@ -327,14 +327,14 @@ Parser<ParsedCost> costSpec() {
             })
           >();
   final list = (spaces() & component & (spaces() & char(',') & spaces() & component).star() & spaces()).optional();
-  return (char('{') & list & char('}')).map((values) {
+  ParsedCost fromBody(dynamic raw, {required bool total}) {
     BeanNumber? numberPer;
     BeanNumber? numberTotal;
     Currency? currency;
     BeanDate? date;
     String? label;
     var merge = false;
-    final body = values[1] as List<dynamic>?;
+    final body = raw as List<dynamic>?;
     if (body != null) {
       void take(
         ({
@@ -383,6 +383,10 @@ Parser<ParsedCost> costSpec() {
         );
       }
     }
+    if (total && numberTotal == null && numberPer != null) {
+      numberTotal = numberPer;
+      numberPer = null;
+    }
     return ParsedCost(
       numberPer: numberPer,
       numberTotal: numberTotal,
@@ -391,5 +395,9 @@ Parser<ParsedCost> costSpec() {
       label: label,
       merge: merge,
     );
-  });
+  }
+
+  final total = (string('{{') & list & string('}}')).map((values) => fromBody(values[1], total: true));
+  final unit = (char('{') & list & char('}')).map((values) => fromBody(values[1], total: false));
+  return (total | unit).cast();
 }

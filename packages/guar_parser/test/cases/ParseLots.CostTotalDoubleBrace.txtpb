@@ -1,0 +1,15 @@
+directives {
+  date { year: 2014 month: 1 day: 1 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    postings {
+      account { name: "Assets:Invest:AAPL" }
+      units { number { verbatim: "10" resolved: "10" } currency { name: "AAPL" } }
+      cost { number_total { verbatim: "9.95" resolved: "9.95" } currency { name: "USD" } }
+    }
+    postings {
+      account { name: "Assets:Invest:Cash" }
+      units { number { verbatim: "-19.90" resolved: "-19.90" } currency { name: "USD" } }
+    }
+  }
+}
