@@ -88,6 +88,7 @@ abstract class LedgerOptions with _$LedgerOptions {
     Currency? conversionCurrency,
     @Default([]) List<DisplayPrecision> displayPrecision,
     @Default([]) List<InferredTolerance> inferredToleranceDefault,
+    BeanNumber? inferredToleranceMultiplier,
     BeanNumber? toleranceMultiplier,
     bool? inferToleranceFromCost,
     @Default([]) List<String> documents,

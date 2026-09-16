@@ -67,6 +67,11 @@ import 'tokens.dart';
       final next = [...options.inferredToleranceDefault, tolerance]..sort(_compareInferredTolerance);
       return (options.copyWith(inferredToleranceDefault: next), null);
     case 'inferred_tolerance_multiplier':
+      final number = _parseBeanNumber(value);
+      if (number == null) {
+        return (options, 'unknown option');
+      }
+      return (options.copyWith(inferredToleranceMultiplier: number), null);
     case 'tolerance_multiplier':
       final number = _parseBeanNumber(value);
       if (number == null) {

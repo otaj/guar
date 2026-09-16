@@ -77,6 +77,7 @@ abstract class OptionsDiff with _$OptionsDiff {
     FieldChange<Currency?>? conversionCurrency,
     @Default(ListDiff<DisplayPrecision>()) ListDiff<DisplayPrecision> displayPrecision,
     @Default(ListDiff<InferredTolerance>()) ListDiff<InferredTolerance> inferredToleranceDefault,
+    FieldChange<BeanNumber?>? inferredToleranceMultiplier,
     FieldChange<BeanNumber?>? toleranceMultiplier,
     FieldChange<bool?>? inferToleranceFromCost,
     @Default(ListDiff<String>()) ListDiff<String> documents,
@@ -104,6 +105,7 @@ abstract class OptionsDiff with _$OptionsDiff {
       conversionCurrency == null &&
       displayPrecision.isEmpty &&
       inferredToleranceDefault.isEmpty &&
+      inferredToleranceMultiplier == null &&
       toleranceMultiplier == null &&
       inferToleranceFromCost == null &&
       documents.isEmpty &&
