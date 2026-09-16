@@ -247,22 +247,23 @@ List<FuncSpec> builtinFunctions() {
         reduceValue((args[0] as QueryInventory).value, env.prices, (args[1] as QueryDate).value),
       );
     }),
+    FuncSpec('convert', [QueryType.amount], QueryType.amount, (row, env, args) {
+      return _convertAmount((args[0] as QueryAmount).value, env, null);
+    }),
     FuncSpec('convert', [QueryType.amount, QueryType.text], QueryType.amount, (row, env, args) {
-      final converted = convertAmount((args[0] as QueryAmount).value, Currency(name: args[1].asText()!), env.prices);
-      return converted == null ? const QueryValue.null_() : QueryValue.amount(converted);
+      return _convertAmount((args[0] as QueryAmount).value, env, args[1].asText());
+    }),
+    FuncSpec('convert', [QueryType.position], QueryType.amount, (row, env, args) {
+      return _convertPosition((args[0] as QueryPosition).value, env, null);
     }),
     FuncSpec('convert', [QueryType.position, QueryType.text], QueryType.amount, (row, env, args) {
-      final converted = convertPosition(
-        (args[0] as QueryPosition).value,
-        Currency(name: args[1].asText()!),
-        env.prices,
-      );
-      return converted == null ? const QueryValue.null_() : QueryValue.amount(converted);
+      return _convertPosition((args[0] as QueryPosition).value, env, args[1].asText());
+    }),
+    FuncSpec('convert', [QueryType.inventory], QueryType.inventory, (row, env, args) {
+      return _convertInventory((args[0] as QueryInventory).value, env, null);
     }),
     FuncSpec('convert', [QueryType.inventory, QueryType.text], QueryType.inventory, (row, env, args) {
-      return QueryValue.inventory(
-        reduceConvert((args[0] as QueryInventory).value, Currency(name: args[1].asText()!), env.prices),
-      );
+      return _convertInventory((args[0] as QueryInventory).value, env, args[1].asText());
     }),
     FuncSpec(
       'number',
@@ -534,6 +535,36 @@ QueryValue _datePart(String field, BeanDate date) {
     'epoch' => QueryValue.integer(native.difference(DateTime.utc(1970, 1, 1)).inSeconds),
     _ => const QueryValue.null_(),
   };
+}
+
+Currency? _targetCurrency(TableEnv env, String? named) {
+  if (named != null) {
+    return Currency(name: named);
+  }
+  if (env.options.operatingCurrency.isEmpty) {
+    return null;
+  }
+  return env.options.operatingCurrency.first;
+}
+
+QueryValue _convertAmount(Amount amount, TableEnv env, String? named) {
+  final target = _targetCurrency(env, named);
+  if (target == null) return const QueryValue.null_();
+  final converted = convertAmount(amount, target, env.prices);
+  return converted == null ? const QueryValue.null_() : QueryValue.amount(converted);
+}
+
+QueryValue _convertPosition(Position position, TableEnv env, String? named) {
+  final target = _targetCurrency(env, named);
+  if (target == null) return const QueryValue.null_();
+  final converted = convertPosition(position, target, env.prices);
+  return converted == null ? const QueryValue.null_() : QueryValue.amount(converted);
+}
+
+QueryValue _convertInventory(Inventory inventory, TableEnv env, String? named) {
+  final target = _targetCurrency(env, named);
+  if (target == null) return const QueryValue.null_();
+  return QueryValue.inventory(reduceConvert(inventory, target, env.prices));
 }
 
 int _isoWeek(DateTime date) {

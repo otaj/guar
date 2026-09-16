@@ -341,6 +341,24 @@ ORDER BY account, month
     });
   });
 
+  group('convert', () {
+    test('defaults to operating_currency', () {
+      final ledger = book('''
+option "operating_currency" "USD"
+2010-01-01 open Assets:Cash
+2010-01-01 open Equity:Opening-Balances
+2010-01-01 price CAD 0.80 USD
+2010-01-01 * "fx"
+  Assets:Cash  10.00 CAD
+  Equity:Opening-Balances
+''');
+      final table = run(ledger, 'SELECT convert(position) WHERE account ~ "Assets"');
+      final amount = table.rows.single.values.single as QueryAmount;
+      expect(amount.value.currency.name, 'USD');
+      expect(amount.value.number, Decimal.parse('8.00'));
+    });
+  });
+
   group('error ledger', () {
     test('querying errors yields errors', () {
       final ledger = Ledger.errors(
