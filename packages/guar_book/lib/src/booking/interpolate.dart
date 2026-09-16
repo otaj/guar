@@ -227,65 +227,80 @@ int _coefficientDigits(Decimal number) {
 
 ({List<MutablePosting> postings, List<ProcessingError> errors}) interpolateGroup(
   List<MutablePosting> postings,
-  Currency weightCurrency,
   BeanLocation location,
   InferredTolerances tolerances,
 ) {
-  final incomplete = <int>[];
+  final missingUnits = <int>[];
+  final missingCost = <int>[];
   for (var i = 0; i < postings.length; i++) {
     final posting = postings[i];
     if (posting.units == null) {
-      incomplete.add(i);
+      missingUnits.add(i);
     } else if (posting.pendingCost != null && !posting.pendingCost!.isComplete) {
-      incomplete.add(i);
+      missingCost.add(i);
     }
   }
 
-  if (incomplete.length > 1) {
+  if (missingUnits.length > 1 || missingCost.length > 1) {
     return (
       postings: postings,
-      errors: [
-        ProcessingError(
-          message: 'Too many missing numbers for currency group "${weightCurrency.name}"',
-          location: location,
-        ),
-      ],
+      errors: [ProcessingError(message: 'Too many missing numbers for currency group', location: location)],
     );
   }
 
-  if (incomplete.length == 1) {
-    final index = incomplete.single;
-    final target = postings[index];
-    var residual = Decimal.zero;
+  if (missingUnits.length == 1) {
+    final index = missingUnits.single;
+    final residual = <String, Decimal>{};
     for (var i = 0; i < postings.length; i++) {
       if (i == index) continue;
       final posting = postings[i];
       if (posting.units == null) continue;
       final weight = postingWeight(posting);
-      if (weight.currency != weightCurrency) {
+      residual.update(weight.currency.name, (value) => value + weight.number, ifAbsent: () => weight.number);
+    }
+    final nonzero = [
+      for (final entry in residual.entries)
+        if (entry.value != Decimal.zero) entry,
+    ];
+    if (nonzero.length == 1) {
+      final fill = -nonzero.single.value;
+      final currency = Currency(name: nonzero.single.key);
+      postings[index].units = Amount(
+        number: quantizeWithTolerance(tolerances, currency.name, fill),
+        currency: currency,
+      );
+    }
+  }
+
+  if (missingCost.length == 1) {
+    final index = missingCost.single;
+    final target = postings[index];
+    var residual = Decimal.zero;
+    var residualCurrency = target.pendingCost?.currency;
+    for (var i = 0; i < postings.length; i++) {
+      if (i == index) continue;
+      final posting = postings[i];
+      if (posting.units == null) continue;
+      final weight = postingWeight(posting);
+      if (residualCurrency != null && weight.currency != residualCurrency) {
+        continue;
+      }
+      residualCurrency ??= weight.currency;
+      if (weight.currency != residualCurrency) {
         continue;
       }
       residual += weight.number;
     }
     final fill = -residual;
-    if (target.units == null) {
-      target.units = Amount(
-        number: quantizeWithTolerance(tolerances, weightCurrency.name, fill),
-        currency: weightCurrency,
+    final unitsAbs = target.units!.number.abs();
+    if (unitsAbs == Decimal.zero) {
+      return (
+        postings: postings,
+        errors: [ProcessingError(message: 'Cannot interpolate cost for zero units', location: location)],
       );
-    } else if (target.pendingCost != null &&
-        target.pendingCost!.numberPer == null &&
-        target.pendingCost!.numberTotal == null) {
-      final unitsAbs = target.units!.number.abs();
-      if (unitsAbs == Decimal.zero) {
-        return (
-          postings: postings,
-          errors: [ProcessingError(message: 'Cannot interpolate cost for zero units', location: location)],
-        );
-      }
-      target.pendingCost!.numberPer = (fill.abs() / unitsAbs).toDecimal(scaleOnInfinitePrecision: 28);
-      target.pendingCost!.currency ??= weightCurrency;
     }
+    target.pendingCost!.numberPer = (fill.abs() / unitsAbs).toDecimal(scaleOnInfinitePrecision: 28);
+    target.pendingCost!.currency ??= residualCurrency;
   }
 
   final errors = <ProcessingError>[];

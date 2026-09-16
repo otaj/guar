@@ -185,31 +185,12 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
     booked.addAll(reduced.postings);
   }
 
-  // Infer a weight currency for interpolation (first complete weight currency).
-  d.Currency? weightCurrency;
-  for (final posting in booked) {
-    if (posting.units != null) {
-      weightCurrency = postingWeight(posting).currency;
-      break;
-    }
-  }
-  if (weightCurrency == null) {
-    for (final posting in booked) {
-      final currency = posting.units?.currency;
-      if (currency != null) {
-        weightCurrency = currency;
-        break;
-      }
-    }
-  }
-  weightCurrency ??= d.Currency(name: 'USD');
-
   final tolerancesMax = inferTolerances(booked, options);
   final tolerancesInterp = options.usePreciseInterpolation == true
       ? inferTolerances(booked, options, mode: ToleranceMode.min)
       : tolerancesMax;
 
-  final interpolated = interpolateGroup(booked, weightCurrency, location, tolerancesInterp);
+  final interpolated = interpolateGroup(booked, location, tolerancesInterp);
   if (interpolated.errors.isNotEmpty) {
     return (directive: null, errors: interpolated.errors);
   }
