@@ -73,9 +73,6 @@ class Book {
       final padded = applyPad(directives, options);
       directives = padded.directives;
       accumulated.addAll(padded.errors);
-
-      final balances = applyBalance(directives, options);
-      accumulated.addAll(balances.errors);
     }
 
     for (final plugin in info.plugin) {
@@ -90,6 +87,8 @@ class Book {
     }
 
     if (!raw) {
+      final balances = applyBalance(directives, options);
+      accumulated.addAll(balances.errors);
       accumulated.addAll(validateDirectives(directives, options));
     }
 

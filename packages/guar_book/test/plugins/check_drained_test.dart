@@ -34,6 +34,12 @@ void main() {
           '2018-02-17 * "Do something in another currency"\n'
           '  Income:Donations       -1.00 CAD\n'
           '  Assets:Something:Cash   1.00 CAD\n'
+          '2018-12-31 * "Drain"\n'
+          '  Income:Donations        1.00 USD\n'
+          '  Assets:Something:Cash  -1.00 USD\n'
+          '2018-12-31 * "Drain CAD"\n'
+          '  Income:Donations        1.00 CAD\n'
+          '  Assets:Something:Cash  -1.00 CAD\n'
           '2019-01-01 close Assets:Something:Cash\n',
         ),
       ),
@@ -70,6 +76,21 @@ void main() {
         ),
       ),
       ['2019-01-02 Assets:Something:Cash 0 CAD', '2019-01-01 Assets:Something:Cash 1 USD'],
+    );
+  });
+
+  test('errors when a closed account still has a balance', () {
+    expect(
+      messages(
+        'plugin "beancount.plugins.check_drained"\n'
+        '2018-01-01 open Assets:Something:Cash\n'
+        '2018-01-01 open Income:Donations\n'
+        '2018-02-16 * "Do something"\n'
+        '  Income:Donations       -1.00 USD\n'
+        '  Assets:Something:Cash   1.00 USD\n'
+        '2019-01-01 close Assets:Something:Cash\n',
+      ),
+      anyElement(contains('Balance failed')),
     );
   });
 
