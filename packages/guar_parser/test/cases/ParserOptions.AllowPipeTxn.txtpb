@@ -1,0 +1,30 @@
+options {
+  allow_pipe_separator: true
+}
+directives {
+  directives {
+    date { year: 2020 month: 1 day: 1 }
+    open { account { name: "Assets:Cash" } }
+  }
+  directives {
+    date { year: 2020 month: 1 day: 1 }
+    transaction {
+      flag { special: SPECIAL_FLAG_ASTERISK }
+      payee: "Tunnel"
+      narration: "Coffees"
+      postings {
+        account { name: "Assets:Cash" }
+        units { number { verbatim: "1" resolved: "1" } currency { name: "USD" } }
+      }
+    }
+  }
+}
+info {
+  commodities { name: "USD" }
+  display_context {
+    precisions {
+      key { currency { name: "USD" } }
+      value { verbatim: "1" resolved: "1" }
+    }
+  }
+}

@@ -183,12 +183,19 @@ class BeancountGrammar {
         state.tagStack.removeAt(at);
         continue;
       }
-      final header = _parseDirectiveHeader(code, lineNo);
+      final header = _parseDirectiveHeader(code, lineNo, allowPipe: state.options.allowPipeSeparator == true);
       if (header == null) {
         final dateError = _invalidDateMessage(code);
-        final failurePos = _directiveFailurePosition(code);
+        final allowPipe = state.options.allowPipeSeparator == true;
+        final failurePos = _directiveFailurePosition(code, allowPipe: allowPipe);
         final dated = date().parse(code) is Success;
-        return fail(dateError ?? (dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos)), lineNo);
+        if (dateError != null) {
+          return fail(dateError, lineNo);
+        }
+        if (dated && !allowPipe && _txnStringsContainPipe(code)) {
+          return fail('Pipe symbol is deprecated.', lineNo);
+        }
+        return fail(dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos), lineNo);
       }
       final applied = _withPushedTags(header, state.tagStack);
       if (applied.body is TransactionBody) {
@@ -532,7 +539,7 @@ class BeancountGrammar {
     return line;
   }
 
-  ParsedDirective? _parseDirectiveHeader(String line, int lineNo) {
+  ParsedDirective? _parseDirectiveHeader(String line, int lineNo, {bool allowPipe = false}) {
     final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
     final open = (date() & spaces() & string('open') & spaces() & account() & _openTail()).map((values) {
       final tail = values[5] as ({List<Currency> currencies, BookingMethod? booking});
@@ -556,7 +563,7 @@ class BeancountGrammar {
         body: DirectiveBody.commodity(currency: values[4] as Currency),
       );
     });
-    final transaction = (date() & spaces() & flag() & _txnTail()).map((values) {
+    final transaction = (date() & spaces() & flag() & _txnTail(allowPipe: allowPipe)).map((values) {
       final tail = values[3] as ({String? payee, String narration, List<Tag> tags, List<Link> links});
       return ParsedDirective(
         location: location,
@@ -751,7 +758,7 @@ class BeancountGrammar {
     };
   }
 
-  Parser<({String? payee, String narration, List<Tag> tags, List<Link> links})> _txnTail() {
+  Parser<({String? payee, String narration, List<Tag> tags, List<Link> links})> _txnTail({required bool allowPipe}) {
     final tagsLinks = (spaces() & _tagOrLink()).star().map((values) {
       final tags = <Tag>[];
       final links = <Link>[];
@@ -765,15 +772,19 @@ class BeancountGrammar {
       }
       return (tags: tags, links: links);
     });
-    final two = (spaces() & quotedString() & spaces() & quotedString() & tagsLinks).map((values) {
+    final skippedPipes = allowPipe ? (spaces() & char('|')).star().map((_) {}) : epsilon();
+    final two =
+        (skippedPipes & spaces() & quotedString() & skippedPipes & spaces() & quotedString() & skippedPipes & tagsLinks)
+            .map((values) {
+              final tl = values[7] as ({List<Tag> tags, List<Link> links});
+              return (payee: values[2] as String, narration: values[5] as String, tags: tl.tags, links: tl.links);
+            });
+    final one = (skippedPipes & spaces() & quotedString() & skippedPipes & tagsLinks).map((values) {
       final tl = values[4] as ({List<Tag> tags, List<Link> links});
-      return (payee: values[1] as String, narration: values[3] as String, tags: tl.tags, links: tl.links);
+      return (payee: null, narration: values[2] as String, tags: tl.tags, links: tl.links);
     });
-    final one = (spaces() & quotedString() & tagsLinks).map((values) {
-      final tl = values[2] as ({List<Tag> tags, List<Link> links});
-      return (payee: null, narration: values[1] as String, tags: tl.tags, links: tl.links);
-    });
-    final none = tagsLinks.map((tl) {
+    final none = (skippedPipes & tagsLinks).map((values) {
+      final tl = values[1] as ({List<Tag> tags, List<Link> links});
       return (payee: null, narration: '', tags: tl.tags, links: tl.links);
     });
     return (two | one | none).cast();
@@ -899,9 +910,29 @@ class BeancountGrammar {
 
   int _lastFailurePosition = 0;
 
-  int _directiveFailurePosition(String line) {
-    _parseDirectiveHeader(line, 1);
+  int _directiveFailurePosition(String line, {bool allowPipe = false}) {
+    _parseDirectiveHeader(line, 1, allowPipe: allowPipe);
     return _lastFailurePosition;
+  }
+
+  bool _txnStringsContainPipe(String line) {
+    final prefix = (date() & spaces() & flag()).parse(line);
+    if (prefix is! Success) {
+      return false;
+    }
+    final rest = line.substring(prefix.position);
+    var inString = false;
+    for (var i = 0; i < rest.length; i++) {
+      final ch = rest[i];
+      if (ch == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString && ch == '|') {
+        return true;
+      }
+    }
+    return false;
   }
 
   int _postingFailurePosition(String line) {
@@ -951,13 +982,13 @@ class BeancountGrammar {
       }
       return input.substring(i, j);
     }
-    if ('{}[]()@~,*/'.contains(ch)) {
+    if ('{}[]()@~,*/|'.contains(ch)) {
       return ch;
     }
     var j = i + 1;
     while (j < input.length) {
       final c = input[j];
-      if (c == ' ' || c == '\t' || c == ':' || '{}[]()@~,*/"'.contains(c)) {
+      if (c == ' ' || c == '\t' || c == ':' || '{}[]()@~,*/|"'.contains(c)) {
         break;
       }
       j += 1;
@@ -970,7 +1001,7 @@ class BeancountGrammar {
     if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)) {
       return true;
     }
-    return '{}[]()@~,*/#+^!&?%"\'.\\-_'.contains(ch);
+    return '{}[]()@~,*/|#+^!&?%"\'.\\-_'.contains(ch);
   }
 }
 

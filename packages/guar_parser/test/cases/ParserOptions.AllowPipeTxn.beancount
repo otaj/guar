@@ -1,0 +1,5 @@
+option "allow_pipe_separator" "TRUE"
+
+2020-01-01 open Assets:Cash
+2020-01-01 * "Tunnel" | "Coffees"
+  Assets:Cash  1 USD
