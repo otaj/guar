@@ -213,6 +213,10 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   if (interpolated.errors.isNotEmpty) {
     return (directive: null, errors: interpolated.errors);
   }
+  final rounding = options.accountRounding;
+  if (rounding != null) {
+    fillResidualPostings(interpolated.postings, rounding);
+  }
 
   for (final posting in interpolated.postings) {
     if (posting.units != null &&

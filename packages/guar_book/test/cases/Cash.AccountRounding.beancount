@@ -1,0 +1,9 @@
+option "account_rounding" "Rounding"
+
+2020-01-01 open Assets:Cash
+2020-01-01 open Expenses:Food
+2020-01-01 open Equity:Rounding
+
+2020-02-01 * "lunch"
+  Expenses:Food             10.00 USD
+  Assets:Cash               -9.995 USD

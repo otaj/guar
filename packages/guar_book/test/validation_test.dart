@@ -29,6 +29,22 @@ void main() {
     expect((ledger as LedgerErrors).errors.any((e) => e.message.contains('does not balance')), isTrue);
   });
 
+  test('account_rounding absorbs residual within tolerance', () {
+    final source = '''
+option "account_rounding" "Rounding"
+2020-01-01 open Assets:Cash
+2020-01-01 open Expenses:Food
+2020-01-01 open Equity:Rounding
+2020-02-01 * "oops"
+  Expenses:Food   10.00 USD
+  Assets:Cash     -9.995 USD
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source));
+    expect(ledger, isA<LedgerDirectives>());
+    final txn = (ledger as LedgerDirectives).directives.last.body as TransactionBody;
+    expect(txn.value.postings.map((posting) => posting.account.name), contains('Equity:Rounding'));
+  });
+
   test('unknown account reference yields error', () {
     final source = '''
 2020-01-01 open Assets:Cash

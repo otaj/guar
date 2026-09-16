@@ -306,3 +306,26 @@ int _coefficientDigits(Decimal number) {
   }
   return (postings: postings, errors: errors);
 }
+
+void fillResidualPostings(List<MutablePosting> postings, Account roundingAccount) {
+  final residual = <String, Decimal>{};
+  for (final posting in postings) {
+    if (posting.units == null) continue;
+    final weight = postingWeight(posting);
+    residual.update(weight.currency.name, (value) => value + weight.number, ifAbsent: () => weight.number);
+  }
+  for (final entry in residual.entries) {
+    if (entry.value == Decimal.zero) continue;
+    postings.add(
+      MutablePosting(
+        origin: const Origin.generated(),
+        meta: const Meta(),
+        account: roundingAccount,
+        units: Amount(
+          number: -entry.value,
+          currency: Currency(name: entry.key),
+        ),
+      ),
+    );
+  }
+}
