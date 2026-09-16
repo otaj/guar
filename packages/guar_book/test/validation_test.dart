@@ -17,6 +17,18 @@ void main() {
     expect((ledger as LedgerErrors).errors.any((e) => e.message.contains('Duplicate open')), isTrue);
   });
 
+  test('mixed-currency conversion residuals are allowed', () {
+    final source = '''
+2024-01-01 open Assets:Bank
+2024-01-01 open Assets:Foreign
+2024-01-15 * "Unpriced exchange"
+  Assets:Foreign  100.00 EUR
+  Assets:Bank    -110.00 USD
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+  });
+
   test('each currency can have one elided posting', () {
     final source = '''
 2024-01-01 open Assets:Bank

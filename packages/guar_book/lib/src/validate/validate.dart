@@ -203,15 +203,17 @@ List<ProcessingError> validateTransactionBalances(List<Directive> directives, Le
       residual.update(weight.currency.name, (value) => value + weight.number, ifAbsent: () => weight.number);
     }
     final tolerances = inferPostingTolerances(body.value.postings, options);
-    for (final entry in residual.entries) {
-      if (entry.value.abs() > tolerances[entry.key]) {
-        errors.add(
-          ProcessingError(
-            message: 'Transaction does not balance: ${entry.value} ${entry.key}',
-            location: _location(directive),
-          ),
-        );
-      }
+    final large = [
+      for (final entry in residual.entries)
+        if (entry.value.abs() > tolerances[entry.key]) entry,
+    ];
+    if (large.length == 1) {
+      errors.add(
+        ProcessingError(
+          message: 'Transaction does not balance: ${large.single.value} ${large.single.key}',
+          location: _location(directive),
+        ),
+      );
     }
   }
   return errors;
