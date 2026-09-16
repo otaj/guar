@@ -59,10 +59,6 @@ import '../domain/domain.dart';
         seeAmount(amount.number, amount.currency);
       case BalanceBody(:final amount):
         seeAmount(amount.number, amount.currency);
-      case OpenBody(:final currencies):
-        for (final currency in currencies) {
-          seeCurrency(currency);
-        }
       case CommodityBody(:final currency):
         seeCurrency(currency);
       case CustomBody(:final values):

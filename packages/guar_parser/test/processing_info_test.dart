@@ -26,6 +26,15 @@ void main() {
     return null;
   }
 
+  test('does not record currencies from open constraints', () {
+    const source = '''
+2014-01-01 open Assets:Bank USD
+2014-01-01 open Assets:Cash EUR, JPY
+''';
+    final info = directives(parser.parse(source, filename: file)).info;
+    expect(commodityNames(info), isEmpty);
+  });
+
   test('records every observed commodity and infers display precision', () {
     const source = '''
 2014-01-01 commodity EUR
