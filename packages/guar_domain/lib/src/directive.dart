@@ -6,6 +6,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'account.dart';
 import 'amount.dart';
 import 'date.dart';
+import 'hash.dart';
 import 'location.dart';
 import 'meta.dart';
 import 'origin.dart';
@@ -56,14 +57,35 @@ sealed class DirectiveBody with _$DirectiveBody {
   const factory DirectiveBody.custom({required String type, @Default([]) List<CustomValue> values}) = CustomBody;
 }
 
-@freezed
+@Freezed(copyWith: false, when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Directive with _$Directive {
-  const factory Directive({
+  const Directive._();
+
+  const factory Directive._create({
     required Origin origin,
     required BeanDate date,
     @Default(Meta()) Meta meta,
     required DirectiveBody body,
+    required String hash,
   }) = _Directive;
+
+  factory Directive({
+    required Origin origin,
+    required BeanDate date,
+    Meta meta = const Meta(),
+    required DirectiveBody body,
+  }) {
+    return Directive._create(origin: origin, date: date, meta: meta, body: body, hash: hashDirective(date, body));
+  }
+
+  Directive copyWith({Origin? origin, BeanDate? date, Meta? meta, DirectiveBody? body}) {
+    return Directive(
+      origin: origin ?? this.origin,
+      date: date ?? this.date,
+      meta: meta ?? this.meta,
+      body: body ?? this.body,
+    );
+  }
 }
 
 @freezed
