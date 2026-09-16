@@ -4,6 +4,7 @@ export 'account.dart';
 export 'amount.dart';
 export 'cost.dart';
 export 'date.dart';
+export 'date_delta.dart';
 export 'directive.dart';
 export 'flag.dart';
 export 'inventory.dart';

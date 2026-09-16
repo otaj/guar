@@ -35,3 +35,11 @@ alwaysApply: true
 - `Book.splice` reuses parser span splicing, then rebooks; `Book.diff` structurally compares two booked ledgers by content (locations ignored).
 - Stock Beancount plugins ship under `beancount.plugins.*` names (including meta `auto` / `pedantic`); callers may override via `Book(plugins: …)`.
 - Do not import `protobean` from `lib/` (tests may map to Processed* for goldens).
+
+## Query (`guar_query`)
+
+- Consumes a booked `guar_domain` `Ledger` and produces `QueryResult` (table, printed directives, or errors — XOR).
+- Parse the full beanquery BQL grammar. Execute only Beancount tables derived from the ledger (`#postings`, `#entries`, and the other named directive tables). `CREATE TABLE` / `INSERT` parse and fail at compile.
+- Result cells are a `QueryValue` union in this package that wraps existing `guar_domain` types plus Dart primitives. Do not invent parallel Amount/Position/Inventory types.
+- Do not depend on `guar_parser` from `lib/` (tests may parse and book fixtures). Do not import `protobean` from `lib/`.
+- `OPEN` / `CLOSE` / `CLEAR` are query-time summarization, not booking. Do not invent booking/interpolation semantics here.
