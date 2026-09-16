@@ -1,0 +1,3 @@
+options {
+  use_precise_interpolation: true
+}

@@ -28,6 +28,12 @@ import 'tokens.dart';
         return (options, 'unknown option');
       }
       return (options.copyWith(renderCommas: parsed), null);
+    case 'use_precise_interpolation':
+      final parsed = _parseOptionBool(value);
+      if (parsed == null) {
+        return (options, 'unknown option');
+      }
+      return (options.copyWith(usePreciseInterpolation: parsed), null);
     case 'plugin_processing_mode':
       final mode = switch (value) {
         'DEFAULT' => PluginProcessingMode.defaultMode,
