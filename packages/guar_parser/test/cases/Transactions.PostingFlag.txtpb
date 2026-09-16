@@ -1,0 +1,16 @@
+directives {
+  date { year: 2014 month: 5 day: 18 }
+  transaction {
+    flag { special: SPECIAL_FLAG_ASTERISK }
+    narration: "Posting flag"
+    postings {
+      flag { special: SPECIAL_FLAG_EXCLAMATION }
+      account { name: "Expenses:Restaurant" }
+      units { number { verbatim: "100" resolved: "100" } currency { name: "USD" } }
+    }
+    postings {
+      account { name: "Assets:US:Cash" }
+      units { number { verbatim: "-100" resolved: "-100" } currency { name: "USD" } }
+    }
+  }
+}

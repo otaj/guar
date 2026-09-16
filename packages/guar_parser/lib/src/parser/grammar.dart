@@ -857,12 +857,23 @@ class BeancountGrammar {
 
   ParsedPosting? _parsePosting(String line, int lineNo) {
     final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
-    final accountResult = account().parse(line);
-    if (accountResult is! Success) {
-      _lastFailurePosition = accountResult is Failure ? accountResult.position : 0;
-      return null;
+    Flag? postingFlag;
+    final Account accountValue;
+    var position = 0;
+    final flagged = (flag() & whitespaceInline().plus() & account()).parse(line);
+    if (flagged is Success) {
+      postingFlag = flagged.value[0] as Flag;
+      accountValue = flagged.value[2] as Account;
+      position = flagged.position;
+    } else {
+      final accountResult = account().parse(line);
+      if (accountResult is! Success) {
+        _lastFailurePosition = accountResult is Failure ? accountResult.position : 0;
+        return null;
+      }
+      accountValue = accountResult.value;
+      position = accountResult.position;
     }
-    var position = accountResult.position;
     IncompleteAmount? units;
     ParsedCost? cost;
     ParsedPrice? price;
@@ -905,7 +916,15 @@ class BeancountGrammar {
       _lastFailurePosition = position;
       return null;
     }
-    return ParsedPosting(location: location, account: accountResult.value, units: units, cost: cost, price: price);
+    return ParsedPosting(
+      location: location,
+      meta: const Meta(),
+      flag: postingFlag,
+      account: accountValue,
+      units: units,
+      cost: cost,
+      price: price,
+    );
   }
 
   int _lastFailurePosition = 0;

@@ -144,4 +144,18 @@ void main() {
     expect(txn.postings.first.cost!.currency.name, 'USD');
     expect(txn.postings.first.cost!.date, BeanDate(year: 2020, month: 3, day: 1));
   });
+
+  test('parses posting flags', () {
+    final source = '''
+2024-01-01 open Assets:Bank
+2024-01-01 open Expenses:Food
+2024-01-15 * "Posting flag"
+  ! Expenses:Food  12.50 USD
+  Assets:Bank
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+    final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
+    expect(txn.postings.first.flag, const Flag.special(SpecialFlag.exclamation));
+  });
 }
