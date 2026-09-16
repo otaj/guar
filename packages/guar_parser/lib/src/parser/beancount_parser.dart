@@ -12,8 +12,8 @@ import 'splice.dart';
 class BeancountParser {
   const BeancountParser();
 
-  ParsedLedger parse(String source, {String filename = ''}) {
-    return BeancountGrammar(filename: filename, includes: IncludeController.io()).parse(source);
+  ParsedLedger parse(String source, {String filename = '', bool recover = false}) {
+    return BeancountGrammar(filename: filename, includes: IncludeController.io(), recover: recover).parse(source);
   }
 
   ParsedLedger splice(

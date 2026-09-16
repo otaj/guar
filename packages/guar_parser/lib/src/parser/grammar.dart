@@ -9,12 +9,13 @@ import 'option_apply.dart';
 import 'tokens.dart';
 
 class BeancountGrammar {
-  BeancountGrammar({this.filename = '', this.firstLine = 1, IncludeController? includes})
+  BeancountGrammar({this.filename = '', this.firstLine = 1, IncludeController? includes, this.recover = false})
     : includes = includes ?? IncludeController(readFile: (_) => null);
 
   final String filename;
   final int firstLine;
   final IncludeController includes;
+  final bool recover;
 
   ParsedLedger parse(String source, {LedgerOptions? initialOptions}) {
     final state = _ParseState();
@@ -37,18 +38,6 @@ class BeancountGrammar {
         displayContext: observed.displayContext,
         optionSettings: List.unmodifiable(state.optionSettings),
       );
-    }
-
-    ParsedLedger fail(String message, int lineNo) {
-      final error = ParseError(
-        message: message,
-        location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
-      );
-      state.aborted = true;
-      state.errors
-        ..clear()
-        ..add(error);
-      return ParsedLedger.errors(errors: [error], options: state.options, info: info());
     }
 
     void noteError(String message, int lineNo) {
@@ -80,6 +69,23 @@ class BeancountGrammar {
       }
     }
 
+    ParsedLedger? fail(String message, int lineNo) {
+      final error = ParseError(
+        message: message,
+        location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+      );
+      if (recover) {
+        state.errors.add(error);
+        skipIndentedBlock();
+        return null;
+      }
+      state.aborted = true;
+      state.errors
+        ..clear()
+        ..add(error);
+      return ParsedLedger.errors(errors: [error], options: state.options, info: info());
+    }
+
     while (index < lines.length && !state.aborted) {
       final raw = lines[index];
       final lineNo = index + firstLine;
@@ -95,7 +101,11 @@ class BeancountGrammar {
         continue;
       }
       if (code.startsWith(' ') || code.startsWith('\t')) {
-        return fail(_foundExpected(code.trimLeft(), 0), lineNo);
+        final halted = fail(_foundExpected(code.trimLeft(), 0), lineNo);
+        if (halted != null) {
+          return halted;
+        }
+        continue;
       }
       while (_hasUnclosedQuote(code) && index < lines.length) {
         code = '$code\n${lines[index]}';
@@ -112,12 +122,24 @@ class BeancountGrammar {
           case IncludeSkip():
             continue;
           case IncludeDuplicate():
-            return fail('duplicate include', lineNo);
+            final halted = fail('duplicate include', lineNo);
+            if (halted != null) {
+              return halted;
+            }
+            continue;
           case IncludeFailed():
-            return fail('include failed', lineNo);
+            final halted = fail('include failed', lineNo);
+            if (halted != null) {
+              return halted;
+            }
+            continue;
           case IncludeLoaded(:final files):
             for (final hit in files) {
-              BeancountGrammar(filename: hit.path, includes: includes)._parseInto(hit.source, state, isRoot: false);
+              BeancountGrammar(
+                filename: hit.path,
+                includes: includes,
+                recover: recover,
+              )._parseInto(hit.source, state, isRoot: false);
               if (state.aborted) {
                 return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
               }
@@ -126,13 +148,21 @@ class BeancountGrammar {
         }
       }
       if (code.startsWith('include')) {
-        return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        final halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        if (halted != null) {
+          return halted;
+        }
+        continue;
       }
       final optionPair = _parseOption(code);
       if (optionPair != null) {
         final applied = applyLedgerOption(state.options, optionPair.$1, optionPair.$2);
         if (applied.$2 != null) {
-          return fail(applied.$2!, lineNo);
+          final halted = fail(applied.$2!, lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
         state.optionSettings.add(
           OptionSetting(
@@ -145,7 +175,11 @@ class BeancountGrammar {
         continue;
       }
       if (code.startsWith('option')) {
-        return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        final halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        if (halted != null) {
+          return halted;
+        }
+        continue;
       }
       final plugin = _parsePlugin(code, lineNo);
       if (plugin != null) {
@@ -153,7 +187,11 @@ class BeancountGrammar {
         continue;
       }
       if (code.startsWith('plugin')) {
-        return fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        final halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        if (halted != null) {
+          return halted;
+        }
+        continue;
       }
       final pushMeta = _parsePushMeta(code);
       if (pushMeta != null) {
@@ -164,7 +202,11 @@ class BeancountGrammar {
       if (popMeta != null) {
         final at = state.metaStack.lastIndexWhere((entry) => entry.key == popMeta);
         if (at < 0) {
-          return fail('invalid popmeta', lineNo);
+          final halted = fail('invalid popmeta', lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
         state.metaStack.removeAt(at);
         continue;
@@ -178,7 +220,11 @@ class BeancountGrammar {
       if (pop != null) {
         final at = state.tagStack.lastIndexOf(pop);
         if (at < 0) {
-          return fail('invalid poptag', lineNo);
+          final halted = fail('invalid poptag', lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
         state.tagStack.removeAt(at);
         continue;
@@ -190,12 +236,24 @@ class BeancountGrammar {
         final failurePos = _directiveFailurePosition(code, allowPipe: allowPipe);
         final dated = date().parse(code) is Success;
         if (dateError != null) {
-          return fail(dateError, lineNo);
+          final halted = fail(dateError, lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
         if (dated && !allowPipe && _txnStringsContainPipe(code)) {
-          return fail('Pipe symbol is deprecated.', lineNo);
+          final halted = fail('Pipe symbol is deprecated.', lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
-        return fail(dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos), lineNo);
+        final halted = fail(dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos), lineNo);
+        if (halted != null) {
+          return halted;
+        }
+        continue;
       }
       final applied = _withPushedTags(header, state.tagStack);
       if (applied.body is TransactionBody) {
@@ -287,7 +345,11 @@ class BeancountGrammar {
         );
         final accountError = _accountTypeError(txnDirective, state.options);
         if (accountError != null) {
-          return fail(accountError, lineNo);
+          final halted = fail(accountError, lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
         state.directives.add(txnDirective);
       } else {
@@ -312,7 +374,11 @@ class BeancountGrammar {
           final trimmed = codeLine.trimLeft();
           final meta = _parseMetaEntry(trimmed);
           if (meta == null) {
-            return fail(_foundExpected(trimmed, 0), metaLine);
+            final halted = fail(_foundExpected(trimmed, 0), metaLine);
+            if (halted != null) {
+              return halted;
+            }
+            continue;
           }
           if (!seenMeta.add(meta.key)) {
             noteError('duplicate key ${meta.key}', metaLine);
@@ -328,7 +394,11 @@ class BeancountGrammar {
         );
         final accountError = _accountTypeError(directive, state.options);
         if (accountError != null) {
-          return fail(accountError, lineNo);
+          final halted = fail(accountError, lineNo);
+          if (halted != null) {
+            return halted;
+          }
+          continue;
         }
         state.directives.add(directive);
       }
@@ -336,17 +406,28 @@ class BeancountGrammar {
     if (!isRoot) {
       return ParsedLedger.directives(directives: const [], options: state.options, info: info());
     }
-    if (state.errors.isNotEmpty) {
+    if (state.errors.isNotEmpty && !recover) {
       return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
     }
     if (state.tagStack.isNotEmpty) {
-      return fail('invalid pushtag', firstLine + lines.length - 1);
+      final halted = fail('invalid pushtag', firstLine + lines.length - 1);
+      if (halted != null) {
+        return halted;
+      }
     }
     if (state.metaStack.isNotEmpty) {
-      return fail('invalid pushmeta', firstLine + lines.length - 1);
+      final halted = fail('invalid pushmeta', firstLine + lines.length - 1);
+      if (halted != null) {
+        return halted;
+      }
     }
     state.directives.sort(compareParsedDirectives);
-    return ParsedLedger.directives(directives: state.directives, options: state.options, info: info());
+    return ParsedLedger.directives(
+      directives: state.directives,
+      errors: List.unmodifiable(state.errors),
+      options: state.options,
+      info: info(),
+    );
   }
 
   String? _parseInclude(String line) {

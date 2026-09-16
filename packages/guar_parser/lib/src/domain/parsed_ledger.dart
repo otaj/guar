@@ -1,4 +1,4 @@
-// Top-level parse result: dated directives or errors, never both.
+// Top-level parse result: dated directives or errors by default; recover keeps both.
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -11,6 +11,7 @@ part 'parsed_ledger.freezed.dart';
 sealed class ParsedLedger with _$ParsedLedger {
   const factory ParsedLedger.directives({
     required List<ParsedDirective> directives,
+    @Default([]) List<ParseError> errors,
     @Default(LedgerOptions()) LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = ParsedLedgerDirectives;
