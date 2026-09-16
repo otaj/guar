@@ -9,3 +9,11 @@ part 'number.freezed.dart';
 abstract class BeanNumber with _$BeanNumber {
   const factory BeanNumber({required String verbatim, required Decimal resolved}) = _BeanNumber;
 }
+
+extension BeanNumberPlaces on BeanNumber {
+  int get places {
+    final compact = verbatim.replaceAll(',', '').replaceAll(' ', '');
+    final match = RegExp(r'^[+-]?\d+(?:\.(\d+))?$').firstMatch(compact);
+    return match?.group(1)?.length ?? 0;
+  }
+}
