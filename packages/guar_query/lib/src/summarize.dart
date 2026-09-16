@@ -34,8 +34,9 @@ List<Directive> applySummarize({
 Ledger clamp(Ledger ledger, BeanDate start, BeanDate end) {
   return switch (ledger) {
     LedgerErrors() => ledger,
-    LedgerDirectives(:final directives, :final options, :final info) => Ledger.directives(
+    LedgerDirectives(:final directives, :final errors, :final options, :final info) => Ledger.directives(
       directives: _clampEntries(directives, start, end, options),
+      errors: errors,
       options: options,
       info: info,
     ),

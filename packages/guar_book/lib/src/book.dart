@@ -18,7 +18,7 @@ class Book {
 
   final Map<String, BookPlugin> plugins;
 
-  Ledger process(p.ParsedLedger ledger) {
+  Ledger process(p.ParsedLedger ledger, {bool recover = false}) {
     final options = defaultOptions(ledger.options);
     final info = mapInfo(ledger.info);
 
@@ -31,8 +31,8 @@ class Book {
           options: options,
           info: info,
         );
-      case p.ParsedLedgerDirectives(:final directives):
-        return _processDirectives(directives, options, info);
+      case p.ParsedLedgerDirectives(:final directives, :final errors):
+        return _processDirectives(directives, options, info, recover: recover, parseErrors: errors);
     }
   }
 
@@ -55,14 +55,23 @@ class Book {
 
   LedgerDiff diff(Ledger left, Ledger right) => diffLedgers(left, right);
 
-  Ledger _processDirectives(List<p.ParsedDirective> parsed, LedgerOptions options, ProcessingInfo info) {
+  Ledger _processDirectives(
+    List<p.ParsedDirective> parsed,
+    LedgerOptions options,
+    ProcessingInfo info, {
+    required bool recover,
+    List<p.ParseError> parseErrors = const [],
+  }) {
+    final accumulated = <ProcessingError>[
+      for (final error in parseErrors) ProcessingError(message: error.message, location: mapLocation(error.location)),
+    ];
     final booked = bookDirectives(parsed: parsed, options: options);
-    if (booked.hasErrors) {
-      return Ledger.errors(errors: booked.errors, options: options, info: info);
+    accumulated.addAll(booked.errors);
+    if (booked.hasErrors && !recover) {
+      return Ledger.errors(errors: accumulated, options: options, info: info);
     }
 
     var directives = booked.directives;
-    final accumulated = <ProcessingError>[];
 
     final raw = options.pluginProcessingMode == PluginProcessingMode.raw;
     if (!raw) {
@@ -92,9 +101,9 @@ class Book {
       accumulated.addAll(validateDirectives(directives, options));
     }
 
-    if (accumulated.isNotEmpty) {
+    if (accumulated.isNotEmpty && !recover) {
       return Ledger.errors(errors: accumulated, options: options, info: info);
     }
-    return Ledger.directives(directives: directives, options: options, info: info);
+    return Ledger.directives(directives: directives, errors: accumulated, options: options, info: info);
   }
 }

@@ -1,4 +1,4 @@
-// Top-level booked ledger: directives or errors, never both.
+// Top-level booked ledger: directives or errors by default; recover keeps both.
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -11,6 +11,7 @@ part 'ledger.freezed.dart';
 sealed class Ledger with _$Ledger {
   const factory Ledger.directives({
     required List<Directive> directives,
+    @Default([]) List<ProcessingError> errors,
     required LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerDirectives;
