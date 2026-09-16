@@ -34,7 +34,7 @@ List<Directive> applySummarize({
 List<Directive> openEntries(List<Directive> entries, BeanDate date, LedgerOptions options) {
   var result = conversions(entries, _conversionsAccount(options, previous: true), options.conversionCurrency, date);
   result = clearEntries(result, date, options, earnings: options.accountPreviousEarnings);
-  return summarize(result, date, options.accountPreviousBalances ?? _equity(options, 'Opening-Balances'));
+  return summarize(result, date, options.accountPreviousBalances);
 }
 
 List<Directive> closeEntries(List<Directive> entries, BeanDate? date, LedgerOptions options) {
@@ -43,7 +43,7 @@ List<Directive> closeEntries(List<Directive> entries, BeanDate? date, LedgerOpti
 }
 
 List<Directive> clearEntries(List<Directive> entries, BeanDate? date, LedgerOptions options, {Account? earnings}) {
-  final target = earnings ?? options.accountCurrentEarnings ?? _equity(options, 'Earnings:Current');
+  final target = earnings ?? options.accountCurrentEarnings;
   return transferBalances(entries, date, isIncomeStatement, target);
 }
 
@@ -99,8 +99,7 @@ List<Directive> summarize(List<Directive> entries, BeanDate date, Account openin
   return [...before, ...entries.skip(index)];
 }
 
-List<Directive> conversions(List<Directive> entries, Account account, Currency? conversionCurrency, BeanDate? date) {
-  final currency = conversionCurrency ?? Currency(name: 'NOTHING');
+List<Directive> conversions(List<Directive> entries, Account account, Currency conversionCurrency, BeanDate? date) {
   final balance = computeBalance(entries, date);
   final costBalance = reduceCost(balance);
   if (costBalance.isEmpty) return entries;
@@ -115,7 +114,7 @@ List<Directive> conversions(List<Directive> entries, Account account, Currency? 
         account: account,
         units: negated.units,
         cost: negated.cost,
-        price: Amount(number: Decimal.zero, currency: currency),
+        price: Amount(number: Decimal.zero, currency: conversionCurrency),
       ),
     );
   }
@@ -269,12 +268,7 @@ int _typeRank(DirectiveBody body) => switch (body) {
 
 Account _conversionsAccount(LedgerOptions options, {required bool previous}) {
   if (previous) {
-    return options.accountPreviousConversions ?? _equity(options, 'Conversions:Previous');
+    return options.accountPreviousConversions;
   }
-  return options.accountCurrentConversions ?? _equity(options, 'Conversions:Current');
-}
-
-Account _equity(LedgerOptions options, String leaf) {
-  final prefix = options.accountPrefixes.equity ?? 'Equity';
-  return accountFor('$prefix:$leaf', options);
+  return options.accountCurrentConversions;
 }

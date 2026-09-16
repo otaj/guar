@@ -49,6 +49,7 @@ OptionsDiff _diffOptions(LedgerOptions left, LedgerOptions right) {
     conversionCurrency: _change(left.conversionCurrency, right.conversionCurrency),
     displayPrecision: _listDiff(left.displayPrecision, right.displayPrecision, _eq),
     inferredToleranceDefault: _listDiff(left.inferredToleranceDefault, right.inferredToleranceDefault, _eq),
+    inferredToleranceMultiplier: _change(left.inferredToleranceMultiplier, right.inferredToleranceMultiplier),
     toleranceMultiplier: _change(left.toleranceMultiplier, right.toleranceMultiplier),
     inferToleranceFromCost: _change(left.inferToleranceFromCost, right.inferToleranceFromCost),
     documents: _listDiff(left.documents, right.documents, _eq),

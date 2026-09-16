@@ -134,8 +134,8 @@ InferredTolerances inferTolerances(
   LedgerOptions options, {
   ToleranceMode mode = ToleranceMode.max,
 }) {
-  final useCost = options.inferToleranceFromCost ?? false;
-  final multiplier = options.toleranceMultiplier ?? Decimal.parse('0.5');
+  final useCost = options.inferToleranceFromCost;
+  final multiplier = options.inferredToleranceMultiplier.value;
   Decimal agg(Decimal left, Decimal right) => switch (mode) {
     ToleranceMode.max => left > right ? left : right,
     ToleranceMode.min => left < right ? left : right,

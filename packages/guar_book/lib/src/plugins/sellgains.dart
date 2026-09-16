@@ -84,7 +84,7 @@ Amount _postingWeight(Posting posting) {
 }
 
 Map<String, Decimal> _inferTolerances(List<Posting> postings, LedgerOptions options) {
-  final multiplier = options.toleranceMultiplier ?? Decimal.parse('0.5');
+  final multiplier = options.inferredToleranceMultiplier.value;
   final seen = <String>{};
   for (final posting in postings) {
     seen.add(posting.units.currency.name);

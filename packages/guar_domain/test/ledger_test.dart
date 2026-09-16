@@ -16,6 +16,7 @@ void main() {
           body: DirectiveBody.open(account: account('Assets:Cash', AccountType.assets)),
         ),
       ],
+      options: LedgerOptions(),
     );
     expect(ledger, isA<LedgerDirectives>());
     expect((ledger as LedgerDirectives).directives, hasLength(1));
@@ -29,6 +30,7 @@ void main() {
           location: BeanLocation(linenoBegin: 10, linenoEnd: 10),
         ),
       ],
+      options: LedgerOptions(),
     );
     expect(ledger, isA<LedgerErrors>());
     expect((ledger as LedgerErrors).errors.single.message, contains('unknown account'));

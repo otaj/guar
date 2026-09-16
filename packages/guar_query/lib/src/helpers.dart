@@ -56,8 +56,8 @@ AccountType accountTypeFor(String name, AccountPrefixes prefixes) {
   return AccountType.assets;
 }
 
-bool _hasPrefix(String name, String? prefix) {
-  if (prefix == null || prefix.isEmpty) return false;
+bool _hasPrefix(String name, String prefix) {
+  if (prefix.isEmpty) return false;
   return name == prefix || name.startsWith('$prefix:');
 }
 

@@ -11,13 +11,13 @@ part 'ledger.freezed.dart';
 sealed class Ledger with _$Ledger {
   const factory Ledger.directives({
     required List<Directive> directives,
-    @Default(LedgerOptions()) LedgerOptions options,
+    required LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerDirectives;
 
   const factory Ledger.errors({
     required List<ProcessingError> errors,
-    @Default(LedgerOptions()) LedgerOptions options,
+    required LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerErrors;
 }

@@ -1,6 +1,5 @@
 // Structural diff of two booked ledgers, including options and processing info.
 
-import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'account.dart';
@@ -61,29 +60,30 @@ abstract class OptionsDiff with _$OptionsDiff {
 
   const factory OptionsDiff({
     FieldChange<AccountPrefixes>? accountPrefixes,
-    FieldChange<String?>? title,
-    FieldChange<Account?>? accountPreviousBalances,
-    FieldChange<Account?>? accountPreviousEarnings,
-    FieldChange<Account?>? accountPreviousConversions,
-    FieldChange<Account?>? accountCurrentEarnings,
-    FieldChange<Account?>? accountCurrentConversions,
-    FieldChange<Account?>? accountUnrealizedGains,
+    FieldChange<String>? title,
+    FieldChange<Account>? accountPreviousBalances,
+    FieldChange<Account>? accountPreviousEarnings,
+    FieldChange<Account>? accountPreviousConversions,
+    FieldChange<Account>? accountCurrentEarnings,
+    FieldChange<Account>? accountCurrentConversions,
+    FieldChange<Account>? accountUnrealizedGains,
     FieldChange<Account?>? accountRounding,
-    FieldChange<Currency?>? conversionCurrency,
+    FieldChange<Currency>? conversionCurrency,
     @Default(ListDiff<DisplayPrecision>()) ListDiff<DisplayPrecision> displayPrecision,
     @Default(ListDiff<InferredTolerance>()) ListDiff<InferredTolerance> inferredToleranceDefault,
-    FieldChange<Decimal?>? toleranceMultiplier,
-    FieldChange<bool?>? inferToleranceFromCost,
+    FieldChange<OptionNumber>? inferredToleranceMultiplier,
+    FieldChange<OptionNumber>? toleranceMultiplier,
+    FieldChange<bool>? inferToleranceFromCost,
     @Default(ListDiff<String>()) ListDiff<String> documents,
     @Default(ListDiff<Currency>()) ListDiff<Currency> operatingCurrency,
-    FieldChange<bool?>? renderCommas,
-    FieldChange<PluginProcessingMode?>? pluginProcessingMode,
-    FieldChange<int?>? longStringMaxlines,
-    FieldChange<BookingMethod?>? bookingMethod,
-    FieldChange<bool?>? usePreciseInterpolation,
-    FieldChange<bool?>? insertPythonpath,
-    FieldChange<bool?>? allowPipeSeparator,
-    FieldChange<bool?>? allowDeprecatedNoneForTagsAndLinks,
+    FieldChange<bool>? renderCommas,
+    FieldChange<PluginProcessingMode>? pluginProcessingMode,
+    FieldChange<int>? longStringMaxlines,
+    FieldChange<BookingMethod>? bookingMethod,
+    FieldChange<bool>? usePreciseInterpolation,
+    FieldChange<bool>? insertPythonpath,
+    FieldChange<bool>? allowPipeSeparator,
+    FieldChange<bool>? allowDeprecatedNoneForTagsAndLinks,
   }) = _OptionsDiff;
 
   bool get isEmpty =>
@@ -99,6 +99,7 @@ abstract class OptionsDiff with _$OptionsDiff {
       conversionCurrency == null &&
       displayPrecision.isEmpty &&
       inferredToleranceDefault.isEmpty &&
+      inferredToleranceMultiplier == null &&
       toleranceMultiplier == null &&
       inferToleranceFromCost == null &&
       documents.isEmpty &&

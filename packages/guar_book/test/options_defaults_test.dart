@@ -17,12 +17,13 @@ void main() {
     expect(options.accountPrefixes.expenses, 'Expenses');
     expect(options.bookingMethod, BookingMethod.strict);
     expect(options.pluginProcessingMode, PluginProcessingMode.defaultMode);
-    expect(options.toleranceMultiplier, Decimal.parse('0.5'));
+    expect(options.toleranceMultiplier.toString(), '0.5');
+    expect(options.inferredToleranceMultiplier.toString(), '0.5');
     expect(options.conversionCurrency, Currency(name: 'NOTHING'));
-    expect(options.accountPreviousBalances?.name, 'Equity:Opening-Balances');
-    expect(options.accountPreviousEarnings?.name, 'Equity:Earnings:Previous');
-    expect(options.accountCurrentEarnings?.name, 'Equity:Earnings:Current');
-    expect(options.accountUnrealizedGains?.name, 'Income:Earnings:Unrealized');
+    expect(options.accountPreviousBalances.name, 'Equity:Opening-Balances');
+    expect(options.accountPreviousEarnings.name, 'Equity:Earnings:Previous');
+    expect(options.accountCurrentEarnings.name, 'Equity:Earnings:Current');
+    expect(options.accountUnrealizedGains.name, 'Income:Earnings:Unrealized');
     expect(options.accountRounding, isNull);
     expect(options.renderCommas, isFalse);
     expect(options.longStringMaxlines, 64);
@@ -41,12 +42,30 @@ void main() {
     expect(options.accountPrefixes.equity, 'Capitaux');
     expect(options.accountPrefixes.liabilities, 'Liabilities');
     expect(options.bookingMethod, BookingMethod.fifo);
-    expect(options.accountPreviousBalances?.name, 'Capitaux:Opening-Balances');
+    expect(options.accountPreviousBalances.name, 'Capitaux:Opening-Balances');
+  });
+
+  test('defaultOptions keeps the two tolerance multipliers apart', () {
+    final inferredOnly = defaultOptions(
+      p.LedgerOptions(
+        inferredToleranceMultiplier: p.BeanNumber(verbatim: '1.1', resolved: Decimal.parse('1.1')),
+      ),
+    );
+    expect(inferredOnly.inferredToleranceMultiplier.toString(), '1.1');
+    expect(inferredOnly.toleranceMultiplier.toString(), '0.5');
+
+    final ordinaryOnly = defaultOptions(
+      p.LedgerOptions(
+        toleranceMultiplier: p.BeanNumber(verbatim: '2.0', resolved: Decimal.parse('2.0')),
+      ),
+    );
+    expect(ordinaryOnly.toleranceMultiplier.toString(), '2.0');
+    expect(ordinaryOnly.inferredToleranceMultiplier.toString(), '0.5');
   });
 
   test('defaultOptions keeps a parser-set account_previous_balances', () {
     final options = defaultOptions(p.LedgerOptions(accountPreviousBalances: p.Account(name: 'Equity:Opening')));
-    expect(options.accountPreviousBalances?.name, 'Equity:Opening');
+    expect(options.accountPreviousBalances.name, 'Equity:Opening');
   });
 
   test('Book.process applies defaults on an empty successful ledger', () {

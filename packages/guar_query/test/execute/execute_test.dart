@@ -363,6 +363,7 @@ option "operating_currency" "USD"
     test('querying errors yields errors', () {
       final ledger = Ledger.errors(
         errors: [ProcessingError(message: 'boom', location: BeanLocation(linenoBegin: 1, linenoEnd: 1))],
+        options: LedgerOptions(),
       );
       expectError(ledger, 'SELECT account');
     });

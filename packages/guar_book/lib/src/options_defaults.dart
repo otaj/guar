@@ -1,6 +1,5 @@
 // Fill unset parse-time LedgerOptions from beancount OPTIONS_DEFAULTS.
 
-import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart' as d;
 import 'package:guar_parser/guar_parser.dart' as p;
 
@@ -12,45 +11,18 @@ d.LedgerOptions defaultOptions(p.LedgerOptions options) {
     income: options.accountPrefixes.income ?? 'Income',
     expenses: options.accountPrefixes.expenses ?? 'Expenses',
   );
-  final equity = prefixes.equity!;
 
   return d.LedgerOptions(
     accountPrefixes: prefixes,
-    title: options.title ?? 'Beancount',
-    accountPreviousBalances: _resolvedOptionAccount(
-      options.accountPreviousBalances?.name,
-      '$equity:Opening-Balances',
-      prefixes,
-    ),
-    accountPreviousEarnings: _resolvedOptionAccount(
-      options.accountPreviousEarnings?.name,
-      '$equity:Earnings:Previous',
-      prefixes,
-    ),
-    accountPreviousConversions: _resolvedOptionAccount(
-      options.accountPreviousConversions?.name,
-      '$equity:Conversions:Previous',
-      prefixes,
-    ),
-    accountCurrentEarnings: _resolvedOptionAccount(
-      options.accountCurrentEarnings?.name,
-      '$equity:Earnings:Current',
-      prefixes,
-    ),
-    accountCurrentConversions: _resolvedOptionAccount(
-      options.accountCurrentConversions?.name,
-      '$equity:Conversions:Current',
-      prefixes,
-    ),
-    accountUnrealizedGains: _resolvedOptionAccount(
-      options.accountUnrealizedGains?.name,
-      '${prefixes.income}:Earnings:Unrealized',
-      prefixes,
-    ),
+    title: options.title,
+    accountPreviousBalances: _mappedOptionAccount(options.accountPreviousBalances?.name, prefixes),
+    accountPreviousEarnings: _mappedOptionAccount(options.accountPreviousEarnings?.name, prefixes),
+    accountPreviousConversions: _mappedOptionAccount(options.accountPreviousConversions?.name, prefixes),
+    accountCurrentEarnings: _mappedOptionAccount(options.accountCurrentEarnings?.name, prefixes),
+    accountCurrentConversions: _mappedOptionAccount(options.accountCurrentConversions?.name, prefixes),
+    accountUnrealizedGains: _mappedOptionAccount(options.accountUnrealizedGains?.name, prefixes),
     accountRounding: options.accountRounding == null ? null : domainAccount(options.accountRounding!.name, prefixes),
-    conversionCurrency: options.conversionCurrency == null
-        ? d.Currency(name: 'NOTHING')
-        : d.Currency(name: options.conversionCurrency!.name),
+    conversionCurrency: options.conversionCurrency == null ? null : d.Currency(name: options.conversionCurrency!.name),
     displayPrecision: [
       for (final precision in options.displayPrecision)
         d.DisplayPrecision(key: _displayKey(precision.key), value: precision.value.resolved),
@@ -59,21 +31,23 @@ d.LedgerOptions defaultOptions(p.LedgerOptions options) {
       for (final tolerance in options.inferredToleranceDefault)
         d.InferredTolerance(key: _currencyKey(tolerance.key), value: tolerance.value.resolved),
     ],
-    toleranceMultiplier: options.toleranceMultiplier?.resolved ?? Decimal.parse('0.5'),
-    inferToleranceFromCost: options.inferToleranceFromCost ?? false,
+    inferredToleranceMultiplier: _optionNumber(options.inferredToleranceMultiplier),
+    toleranceMultiplier: _optionNumber(options.toleranceMultiplier),
+    inferToleranceFromCost: options.inferToleranceFromCost,
     documents: List<String>.from(options.documents),
     operatingCurrency: [for (final currency in options.operatingCurrency) d.Currency(name: currency.name)],
-    renderCommas: options.renderCommas ?? false,
+    renderCommas: options.renderCommas,
     pluginProcessingMode: switch (options.pluginProcessingMode) {
       p.PluginProcessingMode.raw => d.PluginProcessingMode.raw,
-      p.PluginProcessingMode.defaultMode || null => d.PluginProcessingMode.defaultMode,
+      p.PluginProcessingMode.defaultMode => d.PluginProcessingMode.defaultMode,
+      null => null,
     },
-    longStringMaxlines: options.longStringMaxlines ?? 64,
-    bookingMethod: mapBookingMethod(options.bookingMethod) ?? d.BookingMethod.strict,
-    usePreciseInterpolation: options.usePreciseInterpolation ?? false,
-    insertPythonpath: options.insertPythonpath ?? false,
-    allowPipeSeparator: options.allowPipeSeparator ?? false,
-    allowDeprecatedNoneForTagsAndLinks: options.allowDeprecatedNoneForTagsAndLinks ?? false,
+    longStringMaxlines: options.longStringMaxlines,
+    bookingMethod: mapBookingMethod(options.bookingMethod),
+    usePreciseInterpolation: options.usePreciseInterpolation,
+    insertPythonpath: options.insertPythonpath,
+    allowPipeSeparator: options.allowPipeSeparator,
+    allowDeprecatedNoneForTagsAndLinks: options.allowDeprecatedNoneForTagsAndLinks,
   );
 }
 
@@ -127,9 +101,9 @@ d.BookingMethod? mapBookingMethod(p.BookingMethod? method) {
   };
 }
 
-d.Account _resolvedOptionAccount(String? configured, String defaultName, d.AccountPrefixes prefixes) {
+d.Account? _mappedOptionAccount(String? configured, d.AccountPrefixes prefixes) {
   if (configured == null) {
-    return domainAccount(defaultName, prefixes);
+    return null;
   }
   // Parser stores a leaf or full name; join under equity when it has no colon.
   if (!configured.contains(':')) {
@@ -138,9 +112,16 @@ d.Account _resolvedOptionAccount(String? configured, String defaultName, d.Accou
   return domainAccount(configured, prefixes);
 }
 
-bool _hasPrefix(String name, String? prefix) {
-  if (prefix == null || prefix.isEmpty) return false;
+bool _hasPrefix(String name, String prefix) {
+  if (prefix.isEmpty) return false;
   return name == prefix || name.startsWith('$prefix:');
+}
+
+d.OptionNumber? _optionNumber(p.BeanNumber? number) {
+  if (number == null) {
+    return null;
+  }
+  return d.OptionNumber(verbatim: number.verbatim, value: number.resolved);
 }
 
 d.DisplayPrecisionKey _displayKey(p.DisplayPrecisionKey key) {

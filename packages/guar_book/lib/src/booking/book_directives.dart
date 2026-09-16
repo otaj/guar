@@ -12,7 +12,7 @@ import 'interpolate.dart';
 StageResult bookDirectives({required List<p.ParsedDirective> parsed, required d.LedgerOptions options}) {
   final balances = <String, d.Inventory>{};
   final methods = <String, d.BookingMethod>{};
-  final defaultMethod = options.bookingMethod ?? d.BookingMethod.strict;
+  final defaultMethod = options.bookingMethod;
   final out = <d.Directive>[];
   final errors = <d.ProcessingError>[];
 
@@ -186,7 +186,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   }
 
   final tolerancesMax = inferTolerances(booked, options);
-  final tolerancesInterp = options.usePreciseInterpolation == true
+  final tolerancesInterp = options.usePreciseInterpolation
       ? inferTolerances(booked, options, mode: ToleranceMode.min)
       : tolerancesMax;
 

@@ -8,7 +8,7 @@ import '../stage_result.dart';
 StageResult applyBalance(List<Directive> directives, LedgerOptions options) {
   final errors = <ProcessingError>[];
   final balances = <String, Inventory>{};
-  final multiplier = options.toleranceMultiplier ?? Decimal.parse('0.5');
+  final multiplier = options.inferredToleranceMultiplier.value;
 
   for (final directive in directives) {
     final body = directive.body;
