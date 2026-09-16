@@ -1,0 +1,2 @@
+option "display_precision" "USD:4"
+option "display_precision" "*:2"

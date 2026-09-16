@@ -1,0 +1,3 @@
+options {
+  account_previous_earnings { name: "Equity:Retained" }
+}

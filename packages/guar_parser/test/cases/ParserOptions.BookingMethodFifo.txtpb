@@ -1,0 +1,3 @@
+options {
+  booking_method: BOOKING_FIFO
+}

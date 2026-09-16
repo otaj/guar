@@ -1,3 +1,3 @@
-errors {
-  message: "unknown option"
+options {
+  allow_pipe_separator: true
 }

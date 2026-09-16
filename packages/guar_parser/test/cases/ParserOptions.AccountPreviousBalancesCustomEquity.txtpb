@@ -1,0 +1,4 @@
+options {
+  account_prefixes { equity: "Capitaux" }
+  account_previous_balances { name: "Capitaux:Opening-Balances" }
+}

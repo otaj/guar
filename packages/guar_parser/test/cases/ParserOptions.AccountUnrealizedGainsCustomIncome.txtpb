@@ -1,0 +1,4 @@
+options {
+  account_prefixes { income: "Revenus" }
+  account_unrealized_gains { name: "Revenus:Unrealized" }
+}

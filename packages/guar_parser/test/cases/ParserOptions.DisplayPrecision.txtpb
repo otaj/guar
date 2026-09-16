@@ -1,0 +1,4 @@
+options {
+  display_precision { key { currency { name: "USD" } } value { verbatim: "4" resolved: "4" } }
+  display_precision { key { all {} } value { verbatim: "2" resolved: "2" } }
+}

@@ -1,0 +1,1 @@
+option "infer_tolerance_from_cost" "TRUE"

@@ -1,0 +1,3 @@
+options {
+  account_previous_conversions { name: "Equity:ConvPrev" }
+}
