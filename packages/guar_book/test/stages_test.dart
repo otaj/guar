@@ -20,7 +20,23 @@ void main() {
     final txns = directives.map((d) => d.body).whereType<TransactionBody>().toList();
     expect(txns, hasLength(1));
     expect(txns.single.value.postings.first.units.number, Decimal.parse('100.00'));
+    expect(txns.single.value.flag, Flag.letter('P'));
     expect(txns.single.value.origin, const Origin.generated());
+  });
+
+  test('pad looks ahead through intervening transactions', () {
+    final source = '''
+2024-01-01 open Assets:Bank
+2024-01-01 open Equity:Opening-Balances
+2024-01-01 open Expenses:Food
+2024-01-01 pad Assets:Bank Equity:Opening-Balances
+2024-01-15 * "Withdrawal"
+  Assets:Bank  -200.00 USD
+  Expenses:Food
+2024-01-31 balance Assets:Bank 800.00 USD
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'pad-ahead.beancount'));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
   });
 
   test('balance assertion infers tolerance from written decimal places', () {
