@@ -1,4 +1,4 @@
-// Query-time OPEN / CLOSE / CLEAR summarization of a booked ledger.
+// Query-time OPEN / CLOSE / CLEAR and clamp_opt date-window summarization.
 
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
@@ -29,6 +29,23 @@ List<Directive> applySummarize({
     entries = clearEntries(entries, null, options);
   }
   return entries;
+}
+
+Ledger clamp(Ledger ledger, BeanDate start, BeanDate end) {
+  return switch (ledger) {
+    LedgerErrors() => ledger,
+    LedgerDirectives(:final directives, :final options, :final info) => Ledger.directives(
+      directives: _clampEntries(directives, start, end, options),
+      options: options,
+      info: info,
+    ),
+  };
+}
+
+List<Directive> _clampEntries(List<Directive> entries, BeanDate start, BeanDate end, LedgerOptions options) {
+  var result = clearEntries(entries, start, options, earnings: options.accountPreviousEarnings);
+  result = summarize(result, start, options.accountPreviousBalances);
+  return closeEntries(result, end, options);
 }
 
 List<Directive> openEntries(List<Directive> entries, BeanDate date, LedgerOptions options) {
