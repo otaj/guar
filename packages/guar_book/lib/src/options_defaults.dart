@@ -44,7 +44,7 @@ d.LedgerOptions defaultOptions(p.LedgerOptions options) {
     ),
     accountUnrealizedGains: _resolvedOptionAccount(
       options.accountUnrealizedGains?.name,
-      '$equity:Earnings:Unrealized',
+      '${prefixes.income}:Earnings:Unrealized',
       prefixes,
     ),
     accountRounding: options.accountRounding == null ? null : domainAccount(options.accountRounding!.name, prefixes),

@@ -22,7 +22,7 @@ void main() {
     expect(options.accountPreviousBalances?.name, 'Equity:Opening-Balances');
     expect(options.accountPreviousEarnings?.name, 'Equity:Earnings:Previous');
     expect(options.accountCurrentEarnings?.name, 'Equity:Earnings:Current');
-    expect(options.accountUnrealizedGains?.name, 'Equity:Earnings:Unrealized');
+    expect(options.accountUnrealizedGains?.name, 'Income:Earnings:Unrealized');
     expect(options.accountRounding, isNull);
     expect(options.renderCommas, isFalse);
     expect(options.longStringMaxlines, 64);
@@ -42,6 +42,11 @@ void main() {
     expect(options.accountPrefixes.liabilities, 'Liabilities');
     expect(options.bookingMethod, BookingMethod.fifo);
     expect(options.accountPreviousBalances?.name, 'Capitaux:Opening-Balances');
+  });
+
+  test('defaultOptions keeps a parser-set account_previous_balances', () {
+    final options = defaultOptions(p.LedgerOptions(accountPreviousBalances: p.Account(name: 'Equity:Opening')));
+    expect(options.accountPreviousBalances?.name, 'Equity:Opening');
   });
 
   test('Book.process applies defaults on an empty successful ledger', () {
