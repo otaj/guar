@@ -9,6 +9,7 @@ import 'gain_loss.dart';
 import 'long_short.dart';
 import 'opengroup.dart';
 import 'rename_accounts.dart';
+import 'zerosum.dart';
 
 final Map<String, BookPlugin> redsPlugins = {
   'beancount_reds_plugins.autoclose_tree.autoclose_tree': closeTree,
@@ -19,4 +20,5 @@ final Map<String, BookPlugin> redsPlugins = {
   'beancount_reds_plugins.effective_date.effective_date': effectiveDate,
   'beancount_reds_plugins.opengroup.opengroup': opengroup,
   'beancount_reds_plugins.rename_accounts.rename_accounts': renameAccounts,
+  'beancount_reds_plugins.zerosum.zerosum': zerosumPlugin,
 };
