@@ -40,6 +40,17 @@ class BeancountGrammar {
       );
     }
 
+    List<ParseWarning> warnings() => List.unmodifiable(state.warnings);
+
+    void noteWarning(String message, int lineNo) {
+      state.warnings.add(
+        ParseWarning(
+          message: message,
+          location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
+        ),
+      );
+    }
+
     void noteError(String message, int lineNo) {
       state.errors.add(
         ParseError(
@@ -83,7 +94,7 @@ class BeancountGrammar {
       state.errors
         ..clear()
         ..add(error);
-      return ParsedLedger.errors(errors: [error], options: state.options, info: info());
+      return ParsedLedger.errors(errors: [error], warnings: warnings(), options: state.options, info: info());
     }
 
     while (index < lines.length && !state.aborted) {
@@ -141,7 +152,12 @@ class BeancountGrammar {
                 recover: recover,
               )._parseInto(hit.source, state, isRoot: false);
               if (state.aborted) {
-                return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
+                return ParsedLedger.errors(
+                  errors: state.errors,
+                  warnings: warnings(),
+                  options: state.options,
+                  info: info(),
+                );
               }
             }
             continue;
@@ -172,6 +188,10 @@ class BeancountGrammar {
           ),
         );
         state.options = applied.$1;
+        final warning = ledgerOptionWarning(optionPair.$1);
+        if (warning != null) {
+          noteWarning(warning, lineNo);
+        }
         continue;
       }
       if (code.startsWith('option')) {
@@ -404,10 +424,10 @@ class BeancountGrammar {
       }
     }
     if (!isRoot) {
-      return ParsedLedger.directives(directives: const [], options: state.options, info: info());
+      return ParsedLedger.directives(directives: const [], warnings: warnings(), options: state.options, info: info());
     }
     if (state.errors.isNotEmpty && !recover) {
-      return ParsedLedger.errors(errors: state.errors, options: state.options, info: info());
+      return ParsedLedger.errors(errors: state.errors, warnings: warnings(), options: state.options, info: info());
     }
     if (state.tagStack.isNotEmpty) {
       final halted = fail('invalid pushtag', firstLine + lines.length - 1);
@@ -425,6 +445,7 @@ class BeancountGrammar {
     return ParsedLedger.directives(
       directives: state.directives,
       errors: List.unmodifiable(state.errors),
+      warnings: warnings(),
       options: state.options,
       info: info(),
     );
@@ -1142,6 +1163,7 @@ class _ParseState {
   final List<OptionSetting> optionSettings = <OptionSetting>[];
   final List<ParsedDirective> directives = <ParsedDirective>[];
   final List<ParseError> errors = <ParseError>[];
+  final List<ParseWarning> warnings = <ParseWarning>[];
   final List<String> tagStack = <String>[];
   final List<MetaEntry> metaStack = <MetaEntry>[];
   bool aborted = false;

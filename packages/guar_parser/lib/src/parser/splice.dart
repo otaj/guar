@@ -24,6 +24,7 @@ ParsedLedger spliceLedger(
   return switch ((ledger, parsed)) {
     (_, ParsedLedgerErrors(:final errors, :final info)) => ParsedLedger.errors(
       errors: [..._keptErrors(ledger, filename, startLine, oldEnd, delta), ...errors],
+      warnings: _mergedWarnings(ledger, parsed, filename, startLine, oldEnd, delta),
       options: replayLedgerOptions(_mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta)),
       info: _mergedInfo(
         ledger,
@@ -76,6 +77,7 @@ ParsedLedger _splicedDirectives({
 }) {
   return ParsedLedger.directives(
     directives: directives,
+    warnings: _mergedWarnings(ledger, parsed, filename, startLine, oldEnd, delta),
     options: replayLedgerOptions(_mergedSettings(ledger, parsed, filename, startLine, oldEnd, delta)),
     info: _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, parsed.info, directives: directives),
   );
@@ -95,9 +97,37 @@ ParsedLedger _errorsOrDirectives({
   final options = replayLedgerOptions(settings);
   final info = _mergedInfo(ledger, parsed, filename, startLine, oldEnd, delta, parsed.info, directives: directives);
   if (errors.isNotEmpty) {
-    return ParsedLedger.errors(errors: errors, options: options, info: info);
+    return ParsedLedger.errors(
+      errors: errors,
+      warnings: _mergedWarnings(ledger, parsed, filename, startLine, oldEnd, delta),
+      options: options,
+      info: info,
+    );
   }
-  return ParsedLedger.directives(directives: directives, options: options, info: info);
+  return ParsedLedger.directives(
+    directives: directives,
+    warnings: _mergedWarnings(ledger, parsed, filename, startLine, oldEnd, delta),
+    options: options,
+    info: info,
+  );
+}
+
+List<ParseWarning> _mergedWarnings(
+  ParsedLedger ledger,
+  ParsedLedger parsed,
+  String filename,
+  int startLine,
+  int oldEnd,
+  int delta,
+) {
+  final kept = [
+    for (final warning in ledger.warnings)
+      if (!warning.location.overlapsFileRange(filename, startLine, oldEnd))
+        warning.location.filename == filename && warning.location.linenoBegin > oldEnd
+            ? warning.copyWith(location: warning.location.shifted(delta))
+            : warning,
+  ];
+  return [...kept, ...parsed.warnings];
 }
 
 List<ParseError> _keptErrors(ParsedLedger ledger, String filename, int startLine, int oldEnd, int delta) {

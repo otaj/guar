@@ -7,6 +7,7 @@ final _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
 LedgerDiff diffLedgers(Ledger left, Ledger right) {
   final options = _diffOptions(left.options, right.options);
   final info = _diffInfo(left.info, right.info);
+  final warningsDiff = _listDiff(left.warnings, right.warnings, (a, b) => a.message == b.message);
   switch ((left, right)) {
     case (LedgerDirectives(directives: final leftDirectives), LedgerDirectives(directives: final rightDirectives)):
       final directivesDiff = _listDiff(
@@ -17,6 +18,8 @@ LedgerDiff diffLedgers(Ledger left, Ledger right) {
       return LedgerDiff(
         onlyInLeft: directivesDiff.onlyInLeft,
         onlyInRight: directivesDiff.onlyInRight,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
         options: options,
         info: info,
       );
@@ -25,13 +28,29 @@ LedgerDiff diffLedgers(Ledger left, Ledger right) {
       return LedgerDiff(
         errorsOnlyInLeft: errorsDiff.onlyInLeft,
         errorsOnlyInRight: errorsDiff.onlyInRight,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
         options: options,
         info: info,
       );
     case (LedgerDirectives(:final directives), LedgerErrors(:final errors)):
-      return LedgerDiff(onlyInLeft: directives, errorsOnlyInRight: errors, options: options, info: info);
+      return LedgerDiff(
+        onlyInLeft: directives,
+        errorsOnlyInRight: errors,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
+        options: options,
+        info: info,
+      );
     case (LedgerErrors(:final errors), LedgerDirectives(:final directives)):
-      return LedgerDiff(errorsOnlyInLeft: errors, onlyInRight: directives, options: options, info: info);
+      return LedgerDiff(
+        errorsOnlyInLeft: errors,
+        onlyInRight: directives,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
+        options: options,
+        info: info,
+      );
   }
 }
 

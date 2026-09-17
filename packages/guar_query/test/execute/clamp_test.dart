@@ -112,4 +112,11 @@ void main() {
     );
     expect(clamp(errors, BeanDate(year: 2024, month: 1, day: 1), BeanDate(year: 2024, month: 2, day: 1)), same(errors));
   });
+
+  test('clamp keeps parse warnings', () {
+    final warned = _book('option "insert_pythonpath" "TRUE"\n$_source');
+    expect((warned as LedgerDirectives).warnings, isNotEmpty);
+    final clamped = clamp(warned, BeanDate(year: 2024, month: 2, day: 1), BeanDate(year: 2024, month: 3, day: 1));
+    expect((clamped as LedgerDirectives).warnings, warned.warnings);
+  });
 }

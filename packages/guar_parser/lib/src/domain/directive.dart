@@ -69,3 +69,8 @@ abstract class ParsedDirective with _$ParsedDirective {
 abstract class ParseError with _$ParseError {
   const factory ParseError({required String message, required BeanLocation location}) = _ParseError;
 }
+
+@freezed
+abstract class ParseWarning with _$ParseWarning {
+  const factory ParseWarning({required String message, required BeanLocation location}) = _ParseWarning;
+}

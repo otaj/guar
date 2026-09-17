@@ -92,3 +92,8 @@ abstract class Directive with _$Directive {
 abstract class ProcessingError with _$ProcessingError {
   const factory ProcessingError({required String message, required BeanLocation location}) = _ProcessingError;
 }
+
+@freezed
+abstract class ProcessingWarning with _$ProcessingWarning {
+  const factory ProcessingWarning({required String message, required BeanLocation location}) = _ProcessingWarning;
+}

@@ -21,6 +21,10 @@ class Book {
   Ledger process(p.ParsedLedger ledger, {bool recover = false}) {
     final options = defaultOptions(ledger.options);
     final info = mapInfo(ledger.info);
+    final warnings = [
+      for (final warning in ledger.warnings)
+        ProcessingWarning(message: warning.message, location: mapLocation(warning.location)),
+    ];
 
     switch (ledger) {
       case p.ParsedLedgerErrors(:final errors):
@@ -28,11 +32,12 @@ class Book {
           errors: [
             for (final error in errors) ProcessingError(message: error.message, location: mapLocation(error.location)),
           ],
+          warnings: warnings,
           options: options,
           info: info,
         );
       case p.ParsedLedgerDirectives(:final directives, :final errors):
-        return _processDirectives(directives, options, info, recover: recover, parseErrors: errors);
+        return _processDirectives(directives, options, info, recover: recover, parseErrors: errors, warnings: warnings);
     }
   }
 
@@ -61,6 +66,7 @@ class Book {
     ProcessingInfo info, {
     required bool recover,
     List<p.ParseError> parseErrors = const [],
+    List<ProcessingWarning> warnings = const [],
   }) {
     final accumulated = <ProcessingError>[
       for (final error in parseErrors) ProcessingError(message: error.message, location: mapLocation(error.location)),
@@ -68,7 +74,7 @@ class Book {
     final booked = bookDirectives(parsed: parsed, options: options);
     accumulated.addAll(booked.errors);
     if (booked.hasErrors && !recover) {
-      return Ledger.errors(errors: accumulated, options: options, info: info);
+      return Ledger.errors(errors: accumulated, warnings: warnings, options: options, info: info);
     }
 
     var directives = booked.directives;
@@ -102,8 +108,14 @@ class Book {
     }
 
     if (accumulated.isNotEmpty && !recover) {
-      return Ledger.errors(errors: accumulated, options: options, info: info);
+      return Ledger.errors(errors: accumulated, warnings: warnings, options: options, info: info);
     }
-    return Ledger.directives(directives: directives, errors: accumulated, options: options, info: info);
+    return Ledger.directives(
+      directives: directives,
+      errors: accumulated,
+      warnings: warnings,
+      options: options,
+      info: info,
+    );
   }
 }

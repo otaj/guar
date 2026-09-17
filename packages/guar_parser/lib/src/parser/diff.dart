@@ -7,6 +7,7 @@ final _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
 LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool considerLocations}) {
   final options = _diffOptions(left.options, right.options);
   final info = _diffInfo(left.info, right.info, considerLocations: considerLocations);
+  final warningsDiff = _listDiff(left.warnings, right.warnings, (a, b) => _sameWarning(a, b, considerLocations));
   switch ((left, right)) {
     case (
       ParsedLedgerDirectives(directives: final leftDirectives),
@@ -17,6 +18,8 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
         onlyInLeft: directivesDiff.onlyInLeft,
         onlyInRight: directivesDiff.onlyInRight,
         changed: directivesDiff.changed,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
         options: options,
         info: info,
       );
@@ -25,13 +28,29 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
       return LedgerDiff(
         errorsOnlyInLeft: errorsDiff.onlyInLeft,
         errorsOnlyInRight: errorsDiff.onlyInRight,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
         options: options,
         info: info,
       );
     case (ParsedLedgerDirectives(:final directives), ParsedLedgerErrors(:final errors)):
-      return LedgerDiff(onlyInLeft: directives, errorsOnlyInRight: errors, options: options, info: info);
+      return LedgerDiff(
+        onlyInLeft: directives,
+        errorsOnlyInRight: errors,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
+        options: options,
+        info: info,
+      );
     case (ParsedLedgerErrors(:final errors), ParsedLedgerDirectives(:final directives)):
-      return LedgerDiff(errorsOnlyInLeft: errors, onlyInRight: directives, options: options, info: info);
+      return LedgerDiff(
+        errorsOnlyInLeft: errors,
+        onlyInRight: directives,
+        warningsOnlyInLeft: warningsDiff.onlyInLeft,
+        warningsOnlyInRight: warningsDiff.onlyInRight,
+        options: options,
+        info: info,
+      );
   }
 }
 
@@ -163,6 +182,13 @@ bool _sameSetting(OptionSetting left, OptionSetting right, bool considerLocation
 }
 
 bool _sameError(ParseError left, ParseError right, bool considerLocations) {
+  if (left.message != right.message) {
+    return false;
+  }
+  return !considerLocations || left.location == right.location;
+}
+
+bool _sameWarning(ParseWarning left, ParseWarning right, bool considerLocations) {
   if (left.message != right.message) {
     return false;
   }

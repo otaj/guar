@@ -139,6 +139,8 @@ abstract class LedgerDiff with _$LedgerDiff {
     @Default([]) List<Directive> onlyInRight,
     @Default([]) List<ProcessingError> errorsOnlyInLeft,
     @Default([]) List<ProcessingError> errorsOnlyInRight,
+    @Default([]) List<ProcessingWarning> warningsOnlyInLeft,
+    @Default([]) List<ProcessingWarning> warningsOnlyInRight,
     @Default(OptionsDiff()) OptionsDiff options,
     @Default(InfoDiff()) InfoDiff info,
   }) = _LedgerDiff;
@@ -148,6 +150,8 @@ abstract class LedgerDiff with _$LedgerDiff {
       onlyInRight.isEmpty &&
       errorsOnlyInLeft.isEmpty &&
       errorsOnlyInRight.isEmpty &&
+      warningsOnlyInLeft.isEmpty &&
+      warningsOnlyInRight.isEmpty &&
       options.isEmpty &&
       info.isEmpty;
 }

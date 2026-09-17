@@ -125,6 +125,16 @@ import 'tokens.dart';
   }
 }
 
+String? ledgerOptionWarning(String key) {
+  return switch (key) {
+    'inferred_tolerance_multiplier' => "Renamed to 'tolerance_multiplier'.",
+    'allow_pipe_separator' => 'Allowing pipe separator temporarily; this will go away eventually.',
+    'allow_deprecated_none_for_tags_and_links' => 'Allowing None for tags and link will go away eventually.',
+    'insert_pythonpath' => "Option 'insert_pythonpath' is not supported.",
+    _ => null,
+  };
+}
+
 LedgerOptions replayLedgerOptions(Iterable<OptionSetting> settings) {
   var options = LedgerOptions();
   for (final setting in settings) {

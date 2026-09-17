@@ -13,7 +13,7 @@ alwaysApply: true
 - Prefer sealed Freezed unions for directive bodies, flags, meta values, and similar alternatives.
 - Use civil `BeanDate` (y/m/d), not `DateTime`. Numbers keep `verbatim` plus a resolved `Decimal`.
 - Factories reject invalid shapes at construction (calendar dates, account/currency/tag/link names, letter flags, location line ranges).
-- Successful parse vs errors is XOR (same as protobean `ParsedLedger`).
+- Successful parse vs errors is XOR (same as protobean `ParsedLedger`). Non-fatal warnings sit on both variants.
 - `pushtag` / `poptag` / `pushmeta` / `popmeta` apply at parse time and are not directives.
 - Ask when a modelling choice is ambiguous; do not invent booking/interpolation semantics in the parser domain (`ProcessedLedger` / `guar_domain` is out of scope here).
 
@@ -22,7 +22,7 @@ alwaysApply: true
 - Freezed models in `packages/guar_domain/lib/src/` are the booked ledger shape after booking and interpolation.
 - Amounts are complete (`Decimal` + currency); lots use resolved per-unit `Cost` with a date.
 - Factories reject invalid shapes at construction (same calendar/name/flag/location rules as the parser domain).
-- Successful ledger vs errors is XOR (same as protobean `ProcessedLedger`).
+- Successful ledger vs errors is XOR (same as protobean `ProcessedLedger`). Non-fatal warnings sit on both variants.
 - Do not depend on `guar_parser` or import `protobean` from `lib/`.
 - Prefer sealed Freezed unions for directive bodies, origins, flags, and meta values.
 - Do not invent booking/interpolation/plugin behavior here; that belongs to `guar_book`.
@@ -31,7 +31,7 @@ alwaysApply: true
 
 - Consumes `guar_parser` `ParsedLedger` and produces `guar_domain` `Ledger`.
 - Pipeline: default unset options → book/interpolate → documents/pad/balance → injected plugins → validations.
-- Successful ledger vs errors is XOR (drop directives when any processing error occurs).
+- Successful ledger vs errors is XOR (drop directives when any processing error occurs). Parse warnings are forwarded; they do not fail booking.
 - `Book.splice` reuses parser span splicing, then rebooks; `Book.diff` structurally compares two booked ledgers by content (locations ignored).
 - Stock Beancount plugins ship under `beancount.plugins.*` names (including meta `auto` / `pedantic`); callers may override via `Book(plugins: …)`.
 - Do not import `protobean` from `lib/` (tests may map to Processed* for goldens).
