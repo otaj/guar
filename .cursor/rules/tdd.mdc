@@ -36,9 +36,9 @@ Parser work is fixture-driven. Do not implement a construct before a golden expe
 Query work is fixture-driven against beanquery’s parser and execute tests. Do not implement a construct before a test expects it.
 
 1. Port a small group from `parser_test.py` or `query_execute_test.py`.
-2. Remove that group from `test/harness/skips.yaml` (`unmigrated` or `product`).
+2. Add or extend Dart tests in `parser_test.dart` / `execute_test.dart` for that group.
 3. Run the tests; they may fail until the slice is implemented.
 4. Implement the smallest parser/compile/execute change that turns that group green.
 5. Commit often: typically `test(query):` then `feat(query):` (or one commit if the change is tiny).
 
-Skips use the same schema as book goldens (`unmigrated` list, `product` with an explicit reason). A failing assertion is a test failure, never an implicit skip. Product-skip `CREATE TABLE` / `INSERT` / generic CSV table execution.
+A failing assertion is a test failure, never an implicit skip. `CREATE TABLE` / `INSERT` / generic CSV table execution stay product-out-of-scope and are asserted as compile errors in `execute_test.dart`.

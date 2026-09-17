@@ -193,6 +193,7 @@ void main() {
     });
   });
 
+  // CREATE TABLE / INSERT parse and fail at compile; CSV / #test tables are out of scope.
   group('create table', () {
     test('compile error', () {
       expectError(dinner, 'CREATE TABLE abcd (a int, b bool, c str, d date)');

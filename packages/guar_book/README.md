@@ -10,7 +10,7 @@ guar_parser  ──►  ParsedLedger
                  (+ guar_plugins)
 ```
 
-Pipeline: default unset options → book/interpolate → documents/pad/balance → user plugins → validations. Successful result vs errors is XOR (plugin and validation errors drop directives). Default plugins come from `guar_plugins` under original `beancount.plugins.*` and `beancount_reds_plugins.*` names (including meta plugins `auto` and `pedantic`). Pass `plugins:` to override.
+Pipeline: default unset options → book/interpolate → documents/pad → user plugins → balance and validations. Successful result vs errors is XOR (plugin and validation errors drop directives). Default plugins come from `guar_plugins` under original `beancount.plugins.*` and `beancount_reds_plugins.*` names (including meta plugins `auto` and `pedantic`). Pass `plugins:` to override.
 
 `Book.splice` parses a snippet into an existing `ParsedLedger` (same span rules as `BeancountParser.splice`) and re-runs the full booking pipeline on the result:
 
