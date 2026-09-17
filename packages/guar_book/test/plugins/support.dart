@@ -5,11 +5,11 @@ import 'package:guar_domain/guar_domain.dart';
 import 'package:guar_parser/guar_parser.dart' as p;
 import 'package:test/test.dart';
 
-Ledger process(String source, {String filename = 'plugin_test.beancount'}) =>
-    Book().process(p.BeancountParser().parse(source, filename: filename));
+Ledger process(String source, {String filename = 'plugin_test.beancount', bool recover = false}) =>
+    Book().process(p.BeancountParser().parse(source, filename: filename), recover: recover);
 
-List<Directive> booked(String source) {
-  final ledger = process(source);
+List<Directive> booked(String source, {bool recover = false}) {
+  final ledger = process(source, recover: recover);
   return switch (ledger) {
     LedgerDirectives(:final directives) => directives,
     LedgerErrors(:final errors) => throw TestFailure(errors.map((error) => error.message).join('\n')),

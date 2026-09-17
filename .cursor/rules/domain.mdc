@@ -33,7 +33,7 @@ alwaysApply: true
 - Pipeline: default unset options → book/interpolate → documents/pad/balance → injected plugins → validations.
 - Successful ledger vs errors is XOR (drop directives when any processing error occurs). Parse warnings are forwarded; they do not fail booking.
 - `Book.splice` reuses parser span splicing, then rebooks; `Book.diff` structurally compares two booked ledgers by content (locations ignored).
-- Stock Beancount plugins ship under `beancount.plugins.*` names (including meta `auto` / `pedantic`); callers may override via `Book(plugins: …)`.
+- Stock Beancount plugins ship under `beancount.plugins.*` names (including meta `auto` / `pedantic`); reds plugins under `beancount_reds_plugins.*`. Callers may override via `Book(plugins: …)`.
 - Do not import `protobean` from `lib/` (tests may map to Processed* for goldens).
 
 ## Query (`guar_query`)
