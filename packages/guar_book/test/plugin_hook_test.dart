@@ -80,4 +80,24 @@ void main() {
     ];
     expect(opens, containsAll(['Assets:Cash', 'Equity:Opening']));
   });
+
+  test('reds plugin name resolves without manual registration', () {
+    final parsed = p.BeancountParser().parse(
+      'plugin "beancount_reds_plugins.rename_accounts.rename_accounts" "{\'Expenses:Taxes\': \'Income:Taxes\'}"\n'
+      '2014-01-01 open Expenses:Taxes\n'
+      '2014-01-01 open Assets:Cash\n'
+      '2014-01-16 *\n'
+      '  Assets:Cash        -10 USD\n'
+      '  Expenses:Taxes      10 USD\n',
+      filename: 'ledger.beancount',
+    );
+    final ledger = Book().process(parsed);
+    expect(ledger, isA<LedgerDirectives>());
+    final names = [
+      for (final d in (ledger as LedgerDirectives).directives)
+        if (d.body case OpenBody(:final account)) account.name,
+    ];
+    expect(names, contains('Income:Taxes'));
+    expect(names, isNot(contains('Expenses:Taxes')));
+  });
 }
