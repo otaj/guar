@@ -13,6 +13,8 @@ enum PluginProcessingMode { defaultMode, raw }
 
 @freezed
 abstract class AccountPrefixes with _$AccountPrefixes {
+  const AccountPrefixes._();
+
   const factory AccountPrefixes({
     @Default('Assets') String assets,
     @Default('Liabilities') String liabilities,
@@ -20,6 +22,22 @@ abstract class AccountPrefixes with _$AccountPrefixes {
     @Default('Income') String income,
     @Default('Expenses') String expenses,
   }) = _AccountPrefixes;
+
+  AccountType typeFor(String name) {
+    if (_hasAccountPrefix(name, assets)) return AccountType.assets;
+    if (_hasAccountPrefix(name, liabilities)) return AccountType.liabilities;
+    if (_hasAccountPrefix(name, equity)) return AccountType.equity;
+    if (_hasAccountPrefix(name, income)) return AccountType.income;
+    if (_hasAccountPrefix(name, expenses)) return AccountType.expenses;
+    return AccountType.assets;
+  }
+
+  Account account(String name) => Account(name: name, type: typeFor(name));
+}
+
+bool _hasAccountPrefix(String name, String prefix) {
+  if (prefix.isEmpty) return false;
+  return name == prefix || name.startsWith('$prefix:');
 }
 
 @freezed

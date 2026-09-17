@@ -28,6 +28,36 @@ void main() {
     });
   });
 
+  group('AccountPrefixes.typeFor', () {
+    const prefixes = AccountPrefixes();
+
+    test('classifies by root prefix including the root itself', () {
+      expect(prefixes.typeFor('Assets:Cash'), AccountType.assets);
+      expect(prefixes.typeFor('Assets'), AccountType.assets);
+      expect(prefixes.typeFor('Liabilities:Credit'), AccountType.liabilities);
+      expect(prefixes.typeFor('Equity:Opening'), AccountType.equity);
+      expect(prefixes.typeFor('Income:Salary'), AccountType.income);
+      expect(prefixes.typeFor('Expenses:Food'), AccountType.expenses);
+    });
+
+    test('defaults unknown roots to assets', () {
+      expect(prefixes.typeFor('Unknown:Foo'), AccountType.assets);
+    });
+
+    test('honors custom prefixes', () {
+      const french = AccountPrefixes(assets: 'Actifs', expenses: 'Depenses');
+      expect(french.typeFor('Actifs:Cash'), AccountType.assets);
+      expect(french.typeFor('Depenses:Food'), AccountType.expenses);
+      expect(french.typeFor('Expenses:Food'), AccountType.assets);
+    });
+
+    test('account builds a typed Account', () {
+      final account = prefixes.account('Expenses:Food');
+      expect(account.name, 'Expenses:Food');
+      expect(account.type, AccountType.expenses);
+    });
+  });
+
   group('LedgerInventory account lookup', () {
     final ledger = LedgerInventory()
         .addPosition(account('Expenses:Food', AccountType.expenses), position('10', 'USD'))
