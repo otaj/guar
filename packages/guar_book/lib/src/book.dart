@@ -2,20 +2,18 @@
 
 import 'package:guar_domain/guar_domain.dart';
 import 'package:guar_parser/guar_parser.dart' as p;
+import 'package:guar_plugins/guar_plugins.dart';
 
 import 'booking/book_directives.dart';
 import 'diff.dart';
 import 'options_defaults.dart';
-import 'plugin.dart';
-import 'plugins/reds/reds.dart';
-import 'plugins/stock.dart';
 import 'stages/balance.dart';
 import 'stages/documents.dart';
 import 'stages/pad.dart';
 import 'validate/validate.dart';
 
 class Book {
-  Book({Map<String, BookPlugin> plugins = const {}}) : plugins = {...stockPlugins, ...redsPlugins, ...plugins};
+  Book({Map<String, BookPlugin> plugins = const {}}) : plugins = {...defaultPlugins, ...plugins};
 
   final Map<String, BookPlugin> plugins;
 

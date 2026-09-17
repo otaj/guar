@@ -25,7 +25,7 @@ alwaysApply: true
 - Successful ledger vs errors is XOR (same as protobean `ProcessedLedger`). Non-fatal warnings sit on both variants.
 - Do not depend on `guar_parser` or import `protobean` from `lib/`.
 - Prefer sealed Freezed unions for directive bodies, origins, flags, and meta values.
-- Do not invent booking/interpolation/plugin behavior here; that belongs to `guar_book`.
+- Do not invent booking/interpolation/plugin behavior here; that belongs to `guar_book` / `guar_plugins`.
 
 ## Booking (`guar_book`)
 
@@ -33,8 +33,14 @@ alwaysApply: true
 - Pipeline: default unset options → book/interpolate → documents/pad/balance → injected plugins → validations.
 - Successful ledger vs errors is XOR (drop directives when any processing error occurs). Parse warnings are forwarded; they do not fail booking.
 - `Book.splice` reuses parser span splicing, then rebooks; `Book.diff` structurally compares two booked ledgers by content (locations ignored).
-- Stock Beancount plugins ship under `beancount.plugins.*` names (including meta `auto` / `pedantic`); reds plugins under `beancount_reds_plugins.*`. Callers may override via `Book(plugins: …)`.
+- Default plugins come from `guar_plugins` (`beancount.plugins.*` and `beancount_reds_plugins.*`). Callers may override via `Book(plugins: …)`.
 - Do not import `protobean` from `lib/` (tests may map to Processed* for goldens).
+
+## Plugins (`guar_plugins`)
+
+- Stock Beancount and reds plugins that rewrite or validate a booked `guar_domain` directive list.
+- Register under original Python module names. `Book()` merges `defaultPlugins`; do not invent booking/interpolation here.
+- Depend on `guar_domain` only from `lib/`. Tests may parse and book fixtures via `guar_parser` / `guar_book`.
 
 ## Query (`guar_query`)
 

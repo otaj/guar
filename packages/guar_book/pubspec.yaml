@@ -14,6 +14,8 @@ dependencies:
     path: ../guar_domain
   guar_parser:
     path: ../guar_parser
+  guar_plugins:
+    path: ../guar_plugins
 
 dev_dependencies:
   flutter_lints: ^6.0.0
