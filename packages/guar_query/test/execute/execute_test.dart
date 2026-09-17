@@ -224,6 +224,39 @@ void main() {
         isTrue,
       );
     });
+
+    test('close on date truncates later entries', () {
+      final result = Query().run(dinner, 'PRINT FROM CLOSE ON 2013-01-01');
+      expect(result, isA<QueryEntries>());
+      final entries = (result as QueryEntries).directives;
+      expect(entries.where((entry) => entry.date.year >= 2013), isEmpty);
+      expect(
+        entries.any(
+          (entry) =>
+              entry.body is TransactionBody && (entry.body as TransactionBody).value.narration == 'Dinner with Dos',
+        ),
+        isTrue,
+      );
+    });
+
+    test('close inserts conversion entries', () {
+      final result = Query().run(dinner, 'PRINT FROM CLOSE');
+      expect(result, isA<QueryEntries>());
+      final entries = (result as QueryEntries).directives;
+      expect(
+        entries.any(
+          (entry) => entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('C'),
+        ),
+        isTrue,
+      );
+      expect(
+        entries.any(
+          (entry) =>
+              entry.body is TransactionBody && (entry.body as TransactionBody).value.narration == 'Dinner with Quatro',
+        ),
+        isTrue,
+      );
+    });
   });
 
   group('pivot and subquery', () {
