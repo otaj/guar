@@ -1,4 +1,4 @@
-// Shared helpers for stock plugins: sort keys, account use maps, hashing.
+// Shared helpers for stock plugins: sort keys and account use maps.
 
 import 'package:guar_domain/guar_domain.dart';
 
@@ -156,43 +156,3 @@ Set<String> parentAccounts(Iterable<String> accounts) {
 bool isStrictParentOf(String parent, String child) => child.startsWith('$parent:');
 
 Account generatedAccount(String name, LedgerOptions options) => options.accountPrefixes.account(name);
-
-String contentHash(Directive directive) {
-  final buffer = StringBuffer()
-    ..write(directive.date)
-    ..write('|')
-    ..write(directive.body.runtimeType)
-    ..write('|')
-    ..write(_bodyHash(directive.body));
-  return buffer.toString();
-}
-
-String _bodyHash(DirectiveBody body) => switch (body) {
-  OpenBody(:final account, :final currencies, :final booking) =>
-    'open:${account.name}:${currencies.map((c) => c.name).join(',')}:$booking',
-  CloseBody(:final account) => 'close:${account.name}',
-  CommodityBody(:final currency) => 'commodity:${currency.name}',
-  PadBody(:final account, :final sourceAccount) => 'pad:${account.name}:${sourceAccount.name}',
-  BalanceBody(:final account, :final amount, :final tolerance) =>
-    'balance:${account.name}:${amount.number}:${amount.currency.name}:$tolerance',
-  PriceBody(:final currency, :final amount) => 'price:${currency.name}:${amount.number}:${amount.currency.name}',
-  NoteBody(:final account, :final comment) => 'note:${account.name}:$comment',
-  DocumentBody(:final account, :final filename) => 'document:${account.name}:$filename',
-  EventBody(:final name, :final description) => 'event:$name:$description',
-  QueryBody(:final name, :final queryString) => 'query:$name:$queryString',
-  CustomBody(:final type, :final values) => 'custom:$type:${values.join(',')}',
-  TransactionBody(:final value) =>
-    'txn:${value.flag}:${value.payee}:${value.narration}:'
-        '${value.tags.map((t) => t.name).join(',')}:'
-        '${value.links.map((l) => l.name).join(',')}:'
-        '${[for (final p in value.postings) _postingHash(p)].join(';')}',
-};
-
-String _postingHash(Posting posting) {
-  final cost = posting.cost;
-  final price = posting.price;
-  return '${posting.flag}:${posting.account.name}:'
-      '${posting.units.number} ${posting.units.currency.name}:'
-      '${cost == null ? '' : '${cost.number} ${cost.currency.name} ${cost.date} ${cost.label}'}:'
-      '${price == null ? '' : '${price.number} ${price.currency.name}'}';
-}

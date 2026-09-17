@@ -14,7 +14,7 @@ BookPluginResult validateNoDuplicates(
   final seen = <String, Directive>{};
   final errors = <ProcessingError>[];
   for (final directive in directives) {
-    final hash = contentHash(directive);
+    final hash = directive.hash;
     final other = seen[hash];
     // Exact duplicate price directives are legal: repeated fetches are common.
     if (other != null && directive.body is! PriceBody) {
