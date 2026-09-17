@@ -76,17 +76,9 @@ d.ProcessingInfo mapInfo(p.ProcessingInfo info) {
 d.BeanLocation mapLocation(p.BeanLocation location) =>
     d.BeanLocation(filename: location.filename, linenoBegin: location.linenoBegin, linenoEnd: location.linenoEnd);
 
-d.Account domainAccount(String name, d.AccountPrefixes prefixes) =>
-    d.Account(name: name, type: accountTypeFor(name, prefixes));
+d.Account domainAccount(String name, d.AccountPrefixes prefixes) => prefixes.account(name);
 
-d.AccountType accountTypeFor(String name, d.AccountPrefixes prefixes) {
-  if (_hasPrefix(name, prefixes.assets)) return d.AccountType.assets;
-  if (_hasPrefix(name, prefixes.liabilities)) return d.AccountType.liabilities;
-  if (_hasPrefix(name, prefixes.equity)) return d.AccountType.equity;
-  if (_hasPrefix(name, prefixes.income)) return d.AccountType.income;
-  if (_hasPrefix(name, prefixes.expenses)) return d.AccountType.expenses;
-  return d.AccountType.assets;
-}
+d.AccountType accountTypeFor(String name, d.AccountPrefixes prefixes) => prefixes.typeFor(name);
 
 d.BookingMethod? mapBookingMethod(p.BookingMethod? method) {
   return switch (method) {
@@ -110,11 +102,6 @@ d.Account? _mappedOptionAccount(String? configured, d.AccountPrefixes prefixes) 
     return domainAccount('${prefixes.equity}:$configured', prefixes);
   }
   return domainAccount(configured, prefixes);
-}
-
-bool _hasPrefix(String name, String prefix) {
-  if (prefix.isEmpty) return false;
-  return name == prefix || name.startsWith('$prefix:');
 }
 
 d.OptionNumber? _optionNumber(p.BeanNumber? number) {

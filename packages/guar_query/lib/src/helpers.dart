@@ -1,4 +1,4 @@
-// Shared account-prefix helpers and BQL interval parsing.
+// Account name helpers and BQL interval parsing.
 
 import 'package:guar_domain/guar_domain.dart';
 
@@ -18,22 +18,7 @@ DateDelta? parseInterval(String text) {
   };
 }
 
-AccountType accountTypeFor(String name, AccountPrefixes prefixes) {
-  if (_hasPrefix(name, prefixes.assets)) return AccountType.assets;
-  if (_hasPrefix(name, prefixes.liabilities)) return AccountType.liabilities;
-  if (_hasPrefix(name, prefixes.equity)) return AccountType.equity;
-  if (_hasPrefix(name, prefixes.income)) return AccountType.income;
-  if (_hasPrefix(name, prefixes.expenses)) return AccountType.expenses;
-  return AccountType.assets;
-}
-
-bool _hasPrefix(String name, String prefix) {
-  if (prefix.isEmpty) return false;
-  return name == prefix || name.startsWith('$prefix:');
-}
-
-Account accountFor(String name, LedgerOptions options) =>
-    Account(name: name, type: accountTypeFor(name, options.accountPrefixes));
+Account accountFor(String name, LedgerOptions options) => options.accountPrefixes.account(name);
 
 int accountSign(Account account) => switch (account.type) {
   AccountType.assets || AccountType.expenses => 1,

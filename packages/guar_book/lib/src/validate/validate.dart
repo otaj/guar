@@ -39,7 +39,7 @@ List<ProcessingError> validateOpenClose(List<Directive> directives) {
           errors.add(
             ProcessingError(message: 'Unopened account ${body.account.name} is being closed', location: location),
           );
-        } else if (_compareDate(directive.date, open.date) < 0) {
+        } else if (compareBeanDate(directive.date, open.date) < 0) {
           errors.add(
             ProcessingError(
               message: 'Internal error: closing date for ${body.account.name} appears before opening date',
@@ -223,11 +223,3 @@ BeanLocation _location(Directive directive) => switch (directive.origin) {
   SourceOrigin(:final location) => location,
   GeneratedOrigin() => BeanLocation(linenoBegin: 0, linenoEnd: 0),
 };
-
-int _compareDate(BeanDate a, BeanDate b) {
-  final byYear = a.year.compareTo(b.year);
-  if (byYear != 0) return byYear;
-  final byMonth = a.month.compareTo(b.month);
-  if (byMonth != 0) return byMonth;
-  return a.day.compareTo(b.day);
-}

@@ -293,7 +293,7 @@ List<d.Position> _matchLots(d.Inventory balance, d.Amount units, d.Cost? costHin
           if (method == d.BookingMethod.hifo) {
             return -a.cost!.number.compareTo(b.cost!.number);
           }
-          final byDate = _compareDate(a.cost!.date, b.cost!.date);
+          final byDate = d.compareBeanDate(a.cost!.date, b.cost!.date);
           return method == d.BookingMethod.lifo ? -byDate : byDate;
         });
       return _applyXifo(posting, ordered, location);
@@ -470,7 +470,7 @@ String _postingString(MutablePosting posting) {
     if (withSize) {
       final want = -units.number;
       final sized = matches.where((match) => match.units.number == want).toList()
-        ..sort((a, b) => _compareDate(a.cost!.date, b.cost!.date));
+        ..sort((a, b) => d.compareBeanDate(a.cost!.date, b.cost!.date));
       if (sized.isNotEmpty) {
         final match = sized.first;
         return (
@@ -550,14 +550,6 @@ String _postingString(MutablePosting posting) {
     return (postings: const [], errors: [d.ProcessingError(message: 'Not enough lots to reduce', location: location)]);
   }
   return (postings: out, errors: const []);
-}
-
-int _compareDate(d.BeanDate a, d.BeanDate b) {
-  final byYear = a.year.compareTo(b.year);
-  if (byYear != 0) return byYear;
-  final byMonth = a.month.compareTo(b.month);
-  if (byMonth != 0) return byMonth;
-  return a.day.compareTo(b.day);
 }
 
 d.CustomValue _customValue(p.CustomValue value, d.AccountPrefixes prefixes) => switch (value) {

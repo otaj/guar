@@ -20,7 +20,7 @@ BookPluginResult checkClosing(List<Directive> directives, LedgerOptions options,
     final postings = <Posting>[];
     final balances = <Directive>[];
     for (final posting in body.value.postings) {
-      if (metaLookup(posting.meta, _closingField) != MetaValue.boolean(true)) {
+      if (posting.meta.lookup(_closingField) != MetaValue.boolean(true)) {
         postings.add(posting);
         continue;
       }
@@ -28,7 +28,7 @@ BookPluginResult checkClosing(List<Directive> directives, LedgerOptions options,
       balances.add(
         Directive(
           origin: const Origin.generated(),
-          date: nextDay(directive.date),
+          date: addDays(directive.date, 1),
           body: DirectiveBody.balance(
             account: posting.account,
             amount: Amount(number: Decimal.zero, currency: posting.units.currency),

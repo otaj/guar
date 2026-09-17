@@ -583,13 +583,8 @@ bool isTruthy(QueryValue value) => switch (value) {
 };
 
 QueryValue metaLookup(Meta meta, String key, [QueryValue? fallback]) {
-  for (final entry in meta.entries) {
-    if (entry.key == key) {
-      final value = entry.value;
-      if (value == null) return const QueryValue.null_();
-      return QueryValue.metaValue(value);
-    }
-  }
+  final value = meta.lookup(key);
+  if (value != null) return QueryValue.metaValue(value);
   return fallback ?? const QueryValue.null_();
 }
 

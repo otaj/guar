@@ -36,7 +36,7 @@ BookPluginResult validateCommodityAttr(
   for (final directive in directives) {
     if (directive.body case CommodityBody(:final currency)) {
       for (final entry in validMap.entries) {
-        final value = metaText(metaLookup(directive.meta, entry.key));
+        final value = metaText(directive.meta.lookup(entry.key));
         if (value == null) {
           errors.add(
             ProcessingError(

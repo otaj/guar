@@ -2,20 +2,6 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-AccountType accountTypeFor(String name, AccountPrefixes prefixes) {
-  if (_hasPrefix(name, prefixes.assets)) return AccountType.assets;
-  if (_hasPrefix(name, prefixes.liabilities)) return AccountType.liabilities;
-  if (_hasPrefix(name, prefixes.equity)) return AccountType.equity;
-  if (_hasPrefix(name, prefixes.income)) return AccountType.income;
-  if (_hasPrefix(name, prefixes.expenses)) return AccountType.expenses;
-  return AccountType.assets;
-}
-
-bool _hasPrefix(String name, String prefix) {
-  if (prefix.isEmpty) return false;
-  return name == prefix || name.startsWith('$prefix:');
-}
-
 int directiveTypeOrder(DirectiveBody body) => switch (body) {
   OpenBody() => -2,
   BalanceBody() => -1,
@@ -25,7 +11,7 @@ int directiveTypeOrder(DirectiveBody body) => switch (body) {
 };
 
 int compareDirectiveDate(Directive a, Directive b) {
-  final byDate = _compareDate(a.date, b.date);
+  final byDate = compareBeanDate(a.date, b.date);
   if (byDate != 0) return byDate;
   final byType = directiveTypeOrder(a.body).compareTo(directiveTypeOrder(b.body));
   if (byType != 0) return byType;
@@ -37,32 +23,12 @@ int _originLine(Origin origin) => switch (origin) {
   GeneratedOrigin() => 0,
 };
 
-int _compareDate(BeanDate a, BeanDate b) {
-  final byYear = a.year.compareTo(b.year);
-  if (byYear != 0) return byYear;
-  final byMonth = a.month.compareTo(b.month);
-  if (byMonth != 0) return byMonth;
-  return a.day.compareTo(b.day);
-}
-
 BeanLocation nowhereLocation([String filename = '']) => BeanLocation(filename: filename, linenoBegin: 0, linenoEnd: 0);
 
 BeanLocation directiveLocation(Directive directive, [String generatedFilename = '']) => switch (directive.origin) {
   SourceOrigin(:final location) => location,
   GeneratedOrigin() => nowhereLocation(generatedFilename),
 };
-
-BeanDate nextDay(BeanDate date) {
-  final next = DateTime.utc(date.year, date.month, date.day).add(const Duration(days: 1));
-  return BeanDate(year: next.year, month: next.month, day: next.day);
-}
-
-MetaValue? metaLookup(Meta meta, String key) {
-  for (final entry in meta.entries) {
-    if (entry.key == key) return entry.value;
-  }
-  return null;
-}
 
 String? metaText(MetaValue? value) => switch (value) {
   null => null,
@@ -92,7 +58,7 @@ Map<String, BeanDate> accountFirstUse(List<Directive> directives) {
   final first = <String, BeanDate>{};
   void consider(String account, BeanDate date) {
     final existing = first[account];
-    if (existing == null || _compareDate(date, existing) < 0) {
+    if (existing == null || compareBeanDate(date, existing) < 0) {
       first[account] = date;
     }
   }
@@ -189,8 +155,7 @@ Set<String> parentAccounts(Iterable<String> accounts) {
 
 bool isStrictParentOf(String parent, String child) => child.startsWith('$parent:');
 
-Account generatedAccount(String name, LedgerOptions options) =>
-    Account(name: name, type: accountTypeFor(name, options.accountPrefixes));
+Account generatedAccount(String name, LedgerOptions options) => options.accountPrefixes.account(name);
 
 String contentHash(Directive directive) {
   final buffer = StringBuffer()

@@ -21,7 +21,7 @@ BookPluginResult validateOneCommodity(
 
   for (final directive in directives) {
     if (directive.body case OpenBody(:final account, :final currencies)) {
-      final disabled = metaLookup(directive.meta, 'onecommodity') == MetaValue.boolean(false);
+      final disabled = directive.meta.lookup('onecommodity') == MetaValue.boolean(false);
       final unmatched = accountsRe != null && accountsRe.matchAsPrefix(account.name) == null;
       if (disabled || unmatched || currencies.length > 1) {
         skip.add(account.name);

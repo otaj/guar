@@ -105,7 +105,7 @@ abstract class PriceMap with _$PriceMap {
       for (final point in entry.value) {
         byDate[point.date] = point;
       }
-      final points = byDate.values.toList()..sort((a, b) => _compareDate(a.date, b.date));
+      final points = byDate.values.toList()..sort((a, b) => compareBeanDate(a.date, b.date));
       sorted[entry.key] = points;
     }
 
@@ -161,7 +161,7 @@ abstract class PriceMap with _$PriceMap {
       final prices = allPrices(pair);
       PricePoint? found;
       for (final point in prices) {
-        if (_compareDate(point.date, date) <= 0) {
+        if (compareBeanDate(point.date, date) <= 0) {
           found = point;
         } else {
           break;
@@ -207,7 +207,7 @@ abstract class PriceMap with _$PriceMap {
         continue;
       }
       final merged = [...(next[target] ?? const <PricePoint>[]), ...projected]
-        ..sort((a, b) => _compareDate(a.date, b.date));
+        ..sort((a, b) => compareBeanDate(a.date, b.date));
       next[target] = merged;
       final inverted = CurrencyPair(base: toQuote, quote: base);
       next[inverted] = [
@@ -219,21 +219,9 @@ abstract class PriceMap with _$PriceMap {
                 ? Decimal.zero
                 : (Decimal.one / point.rate).toDecimal(scaleOnInfinitePrecision: 28),
           ),
-      ]..sort((a, b) => _compareDate(a.date, b.date));
+      ]..sort((a, b) => compareBeanDate(a.date, b.date));
     }
 
     return PriceMap(rates: next, forwardPairs: forwardPairs);
-  }
-
-  static int _compareDate(BeanDate left, BeanDate right) {
-    final byYear = left.year.compareTo(right.year);
-    if (byYear != 0) {
-      return byYear;
-    }
-    final byMonth = left.month.compareTo(right.month);
-    if (byMonth != 0) {
-      return byMonth;
-    }
-    return left.day.compareTo(right.day);
   }
 }

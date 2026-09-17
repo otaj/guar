@@ -42,7 +42,7 @@ BookPluginResult checkDrained(List<Directive> directives, LedgerOptions options,
         out.add(
           Directive(
             origin: const Origin.generated(),
-            date: nextDay(directive.date),
+            date: addDays(directive.date, 1),
             body: DirectiveBody.balance(
               account: account,
               amount: Amount(

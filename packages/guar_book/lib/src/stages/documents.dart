@@ -67,17 +67,9 @@ StageResult applyDocuments(List<Directive> directives, LedgerOptions options, Pr
 }
 
 int _directiveSort(Directive a, Directive b) {
-  final byDate = _compareDate(a.date, b.date);
+  final byDate = compareBeanDate(a.date, b.date);
   if (byDate != 0) return byDate;
   return _typeOrder(a.body).compareTo(_typeOrder(b.body));
-}
-
-int _compareDate(BeanDate a, BeanDate b) {
-  final byYear = a.year.compareTo(b.year);
-  if (byYear != 0) return byYear;
-  final byMonth = a.month.compareTo(b.month);
-  if (byMonth != 0) return byMonth;
-  return a.day.compareTo(b.day);
 }
 
 int _typeOrder(DirectiveBody body) => switch (body) {

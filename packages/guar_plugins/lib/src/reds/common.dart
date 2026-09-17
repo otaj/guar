@@ -100,7 +100,7 @@ BeanDate? parseIsoDate(Object? value) {
 }
 
 BeanDate? metaDate(Meta meta, String key) {
-  final value = metaLookup(meta, key);
+  final value = meta.lookup(key);
   return switch (value) {
     MetaDate(:final value) => value,
     MetaText(:final value) => parseIsoDate(value),
@@ -116,7 +116,7 @@ Meta metaWith(Meta meta, String key, MetaValue value) => Meta(
   ],
 );
 
-bool metaFlag(Meta meta, String key) => switch (metaLookup(meta, key)) {
+bool metaFlag(Meta meta, String key) => switch (meta.lookup(key)) {
   MetaBoolean(:final value) => value,
   MetaText(:final value) => value == 'TRUE' || value == 'true',
   _ => false,
