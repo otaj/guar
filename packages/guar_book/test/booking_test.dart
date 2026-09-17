@@ -173,4 +173,28 @@ void main() {
     final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
     expect(txn.postings.first.flag, const Flag.special(SpecialFlag.exclamation));
   });
+
+  test('meta accounts take their type from option prefixes', () {
+    final parsed = p.ParsedLedger.directives(
+      directives: [
+        p.ParsedDirective(
+          location: p.BeanLocation(linenoBegin: 1, linenoEnd: 2),
+          date: p.BeanDate(year: 2020, month: 1, day: 1),
+          meta: p.Meta(
+            entries: [
+              p.MetaEntry(
+                key: 'related',
+                value: p.MetaValue.account(p.Account(name: 'Expenses:Food')),
+              ),
+            ],
+          ),
+          body: p.DirectiveBody.open(account: p.Account(name: 'Assets:Cash')),
+        ),
+      ],
+    );
+    final ledger = Book().process(parsed);
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+    final metaAccount = (ledger as LedgerDirectives).directives.single.meta.lookup('related');
+    expect(metaAccount, MetaValue.account(Account(name: 'Expenses:Food', type: AccountType.expenses)));
+  });
 }

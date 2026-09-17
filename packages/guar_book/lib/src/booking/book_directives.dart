@@ -51,7 +51,7 @@ StageResult bookDirectives({required List<p.ParsedDirective> parsed, required d.
 d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes prefixes) {
   final origin = sourceOrigin(directive.location);
   final date = mapDate(directive.date);
-  final meta = mapMeta(directive.meta);
+  final meta = mapMeta(directive.meta, prefixes);
   final body = switch (directive.body) {
     p.PriceBody(:final currency, :final amount) => d.DirectiveBody.price(
       currency: d.Currency(name: currency.name),
@@ -138,7 +138,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
     mutable.add(
       MutablePosting(
         origin: sourceOrigin(posting.location),
-        meta: mapMeta(posting.meta),
+        meta: mapMeta(posting.meta, prefixes),
         flag: posting.flag == null ? null : mapFlag(posting.flag!),
         account: account,
         units: units,
@@ -230,7 +230,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
     directive: d.Directive(
       origin: origin,
       date: date,
-      meta: mapMeta(directive.meta),
+      meta: mapMeta(directive.meta, prefixes),
       body: d.DirectiveBody.transaction(
         d.Transaction(
           origin: origin,

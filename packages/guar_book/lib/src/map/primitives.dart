@@ -88,16 +88,16 @@ d.SpecialFlag _special(p.SpecialFlag value) => switch (value) {
   p.SpecialFlag.percent => d.SpecialFlag.percent,
 };
 
-d.Meta mapMeta(p.Meta meta) => d.Meta(
+d.Meta mapMeta(p.Meta meta, d.AccountPrefixes prefixes) => d.Meta(
   entries: [
     for (final entry in meta.entries)
-      d.MetaEntry(key: entry.key, value: entry.value == null ? null : _metaValue(entry.value!)),
+      d.MetaEntry(key: entry.key, value: entry.value == null ? null : _metaValue(entry.value!, prefixes)),
   ],
 );
 
-d.MetaValue _metaValue(p.MetaValue value) => switch (value) {
+d.MetaValue _metaValue(p.MetaValue value, d.AccountPrefixes prefixes) => switch (value) {
   p.MetaText(:final value) => d.MetaValue.text(value),
-  p.MetaAccount(:final value) => d.MetaValue.account(d.Account(name: value.name, type: d.AccountType.assets)),
+  p.MetaAccount(:final value) => d.MetaValue.account(prefixes.account(value.name)),
   p.MetaCurrency(:final value) => d.MetaValue.currency(d.Currency(name: value.name)),
   p.MetaTag(:final value) => d.MetaValue.tag(d.Tag(name: value.name)),
   p.MetaDate(:final value) => d.MetaValue.date(d.BeanDate(year: value.year, month: value.month, day: value.day)),
