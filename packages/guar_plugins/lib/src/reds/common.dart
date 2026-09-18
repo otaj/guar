@@ -196,6 +196,10 @@ Directive rewriteDirectiveAccounts(Directive directive, String Function(String n
           ],
         ),
       );
+    case BudgetBody(:final account, :final interval, :final amount):
+      return directive.copyWith(
+        body: DirectiveBody.budget(account: mapAccount(account), interval: interval, amount: amount),
+      );
     case PriceBody() || CommodityBody() || EventBody() || QueryBody():
       return directive;
   }

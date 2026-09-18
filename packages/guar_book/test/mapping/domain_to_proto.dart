@@ -92,6 +92,15 @@ pb.ProcessedDirective _directive(domain.Directive directive) {
       message.query = pb.Query(name: name, queryString: queryString);
     case domain.CustomBody(:final type, :final values):
       message.custom = pb.ProcessedCustom(type: type, values: values.map(_customValue).toList());
+    case domain.BudgetBody(:final account, :final interval, :final amount):
+      message.custom = pb.ProcessedCustom(
+        type: 'budget',
+        values: [
+          _customValue(domain.CustomValue.account(account)),
+          _customValue(domain.CustomValue.text(interval.name)),
+          _customValue(domain.CustomValue.amount(amount)),
+        ],
+      );
   }
   return message;
 }

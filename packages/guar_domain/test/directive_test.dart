@@ -77,4 +77,21 @@ void main() {
     expect((open.body as OpenBody).account.name, 'Assets:UK:Cash');
     expect((price.body as PriceBody).amount, amount('1.10', 'CAD'));
   });
+
+  test('budget directive body holds account, interval, and amount', () {
+    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final budget = Directive(
+      origin: origin,
+      date: BeanDate(year: 2014, month: 2, day: 10),
+      body: DirectiveBody.budget(
+        account: account('Expenses:Groceries', AccountType.expenses),
+        interval: BudgetInterval.monthly,
+        amount: amount('40.00', 'EUR'),
+      ),
+    );
+    final body = budget.body as BudgetBody;
+    expect(body.account.name, 'Expenses:Groceries');
+    expect(body.interval, BudgetInterval.monthly);
+    expect(body.amount, amount('40.00', 'EUR'));
+  });
 }

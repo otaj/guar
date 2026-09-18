@@ -373,6 +373,7 @@ String _entryType(Directive directive) => switch (directive.body) {
   EventBody() => 'event',
   QueryBody() => 'query',
   CustomBody() => 'custom',
+  BudgetBody() => 'budget',
 };
 
 String _entryId(Directive directive) {
@@ -393,5 +394,6 @@ Set<Account> _entryAccounts(Directive directive) => switch (directive.body) {
   PadBody(:final account, :final sourceAccount) => {account, sourceAccount},
   NoteBody(:final account) => {account},
   DocumentBody(:final account) => {account},
+  BudgetBody(:final account) => {account},
   _ => {},
 };

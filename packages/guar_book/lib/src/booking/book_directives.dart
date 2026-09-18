@@ -87,10 +87,7 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
     ),
     p.EventBody(:final name, :final description) => d.DirectiveBody.event(name: name, description: description),
     p.QueryBody(:final name, :final queryString) => d.DirectiveBody.query(name: name, queryString: queryString),
-    p.CustomBody(:final type, :final values) => d.DirectiveBody.custom(
-      type: type,
-      values: [for (final value in values) _customValue(value, prefixes)],
-    ),
+    p.CustomBody(:final type, :final values) => _mapCustom(type, values, prefixes),
     p.TransactionBody() => null,
   };
   if (body == null) {
@@ -551,6 +548,41 @@ String _postingString(MutablePosting posting) {
   }
   return (postings: out, errors: const []);
 }
+
+d.DirectiveBody _mapCustom(String type, List<p.CustomValue> values, d.AccountPrefixes prefixes) {
+  return _budgetFromCustom(type, values, prefixes) ??
+      d.DirectiveBody.custom(type: type, values: [for (final value in values) _customValue(value, prefixes)]);
+}
+
+d.DirectiveBody? _budgetFromCustom(String type, List<p.CustomValue> values, d.AccountPrefixes prefixes) {
+  if (type != 'budget' || values.length != 3) {
+    return null;
+  }
+  final account = values[0];
+  final interval = values[1];
+  final amount = values[2];
+  if (account is! p.CustomAccount || interval is! p.CustomText || amount is! p.CustomAmount) {
+    return null;
+  }
+  final parsed = _budgetInterval(interval.value);
+  if (parsed == null) {
+    return null;
+  }
+  return d.DirectiveBody.budget(
+    account: domainAccount(account.value.name, prefixes),
+    interval: parsed,
+    amount: mapAmount(amount.value),
+  );
+}
+
+d.BudgetInterval? _budgetInterval(String value) => switch (value.toLowerCase()) {
+  'daily' || 'day' => d.BudgetInterval.daily,
+  'weekly' || 'week' => d.BudgetInterval.weekly,
+  'monthly' || 'month' => d.BudgetInterval.monthly,
+  'quarterly' || 'quarter' => d.BudgetInterval.quarterly,
+  'yearly' || 'year' => d.BudgetInterval.yearly,
+  _ => null,
+};
 
 d.CustomValue _customValue(p.CustomValue value, d.AccountPrefixes prefixes) => switch (value) {
   p.CustomText(:final value) => d.CustomValue.text(value),

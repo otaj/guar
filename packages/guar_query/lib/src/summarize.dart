@@ -282,7 +282,7 @@ int _typeRank(DirectiveBody body) => switch (body) {
   QueryBody() => 7,
   PriceBody() => 8,
   DocumentBody() => 9,
-  CustomBody() => 10,
+  CustomBody() || BudgetBody() => 10,
   CommodityBody() => 11,
 };
 

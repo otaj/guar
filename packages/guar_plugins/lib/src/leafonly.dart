@@ -46,6 +46,8 @@ BookPluginResult validateLeafOnly(
             record(value.value.name, allowed: false);
           }
         }
+      case BudgetBody(:final account):
+        record(account.name, allowed: false);
       default:
         break;
     }

@@ -66,6 +66,12 @@ String _body(DirectiveBody body) {
       type,
       _join([for (final value in values) _custom(value)]),
     ]),
+    BudgetBody(:final account, :final interval, :final amount) => _join([
+      'budget',
+      account.name,
+      interval.name,
+      _amount(amount),
+    ]),
   };
 }
 

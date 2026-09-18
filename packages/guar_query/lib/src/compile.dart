@@ -1177,6 +1177,7 @@ Set<Account> _directiveAccounts(DirectiveBody body) => switch (body) {
   OpenBody(:final account) => {account},
   CloseBody(:final account) => {account},
   BalanceBody(:final account) => {account},
+  BudgetBody(:final account) => {account},
   _ => {},
 };
 

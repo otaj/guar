@@ -16,6 +16,8 @@ part 'directive.freezed.dart';
 
 enum BookingMethod { strict, strictWithSize, none, average, fifo, lifo, hifo }
 
+enum BudgetInterval { daily, weekly, monthly, quarterly, yearly }
+
 @freezed
 sealed class CustomValue with _$CustomValue {
   const factory CustomValue.text(String value) = CustomText;
@@ -55,6 +57,11 @@ sealed class DirectiveBody with _$DirectiveBody {
   const factory DirectiveBody.event({required String name, required String description}) = EventBody;
   const factory DirectiveBody.query({required String name, required String queryString}) = QueryBody;
   const factory DirectiveBody.custom({required String type, @Default([]) List<CustomValue> values}) = CustomBody;
+  const factory DirectiveBody.budget({
+    required Account account,
+    required BudgetInterval interval,
+    required Amount amount,
+  }) = BudgetBody;
 }
 
 @Freezed(copyWith: false, when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
