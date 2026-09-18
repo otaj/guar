@@ -8,6 +8,11 @@ part 'account.freezed.dart';
 
 enum AccountType { assets, liabilities, equity, income, expenses }
 
+bool isSubaccountName(String name, String parent) => parent.isNotEmpty && name.startsWith('$parent:');
+
+bool isAccountOrSubaccount(String name, String ancestor) =>
+    ancestor.isNotEmpty && (name == ancestor || isSubaccountName(name, ancestor));
+
 @Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Account with _$Account {
   const Account._();
@@ -19,7 +24,7 @@ abstract class Account with _$Account {
 
   const factory Account._create({required String name, required AccountType type}) = _Account;
 
-  bool isSubaccountOf(Account other) => name.startsWith('${other.name}:');
+  bool isSubaccountOf(Account other) => isSubaccountName(name, other.name);
 }
 
 @Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)

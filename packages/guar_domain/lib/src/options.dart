@@ -24,20 +24,15 @@ abstract class AccountPrefixes with _$AccountPrefixes {
   }) = _AccountPrefixes;
 
   AccountType typeFor(String name) {
-    if (_hasAccountPrefix(name, assets)) return AccountType.assets;
-    if (_hasAccountPrefix(name, liabilities)) return AccountType.liabilities;
-    if (_hasAccountPrefix(name, equity)) return AccountType.equity;
-    if (_hasAccountPrefix(name, income)) return AccountType.income;
-    if (_hasAccountPrefix(name, expenses)) return AccountType.expenses;
+    if (isAccountOrSubaccount(name, assets)) return AccountType.assets;
+    if (isAccountOrSubaccount(name, liabilities)) return AccountType.liabilities;
+    if (isAccountOrSubaccount(name, equity)) return AccountType.equity;
+    if (isAccountOrSubaccount(name, income)) return AccountType.income;
+    if (isAccountOrSubaccount(name, expenses)) return AccountType.expenses;
     return AccountType.assets;
   }
 
   Account account(String name) => Account(name: name, type: typeFor(name));
-}
-
-bool _hasAccountPrefix(String name, String prefix) {
-  if (prefix.isEmpty) return false;
-  return name == prefix || name.startsWith('$prefix:');
 }
 
 @freezed

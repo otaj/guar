@@ -24,7 +24,7 @@ BookPluginResult closeTree(List<Directive> directives, LedgerOptions options, Pr
     if (directive.body case CloseBody(:final account)) {
       final subaccounts = [
         for (final open in opens)
-          if (isStrictParentOf(account.name, open) && !closes.contains(open)) open,
+          if (isSubaccountName(open, account.name) && !closes.contains(open)) open,
       ]..sort();
       for (final subaccount in subaccounts) {
         out.add(

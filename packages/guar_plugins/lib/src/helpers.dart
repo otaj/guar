@@ -155,6 +155,4 @@ Set<String> parentAccounts(Iterable<String> accounts) {
   return parents;
 }
 
-bool isStrictParentOf(String parent, String child) => child.startsWith('$parent:');
-
 Account generatedAccount(String name, LedgerOptions options) => options.accountPrefixes.account(name);

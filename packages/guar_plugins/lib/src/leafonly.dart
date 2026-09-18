@@ -58,7 +58,7 @@ BookPluginResult validateLeafOnly(
   final errors = <ProcessingError>[];
   for (final name in names) {
     if (!offending.contains(name)) continue;
-    if (!names.any((other) => isStrictParentOf(name, other))) continue;
+    if (!names.any((other) => isSubaccountName(other, name))) continue;
     final open = openClose[name]?.open;
     errors.add(
       ProcessingError(

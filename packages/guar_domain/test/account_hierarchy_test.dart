@@ -6,6 +6,26 @@ import 'package:test/test.dart';
 import 'helpers/amounts.dart';
 
 void main() {
+  group('isSubaccountName', () {
+    test('detects proper descendants including invalid Account roots', () {
+      expect(isSubaccountName('Expenses:Food', 'Expenses'), isTrue);
+      expect(isSubaccountName('Expenses:Food:Restaurant', 'Expenses:Food'), isTrue);
+      expect(isSubaccountName('Expenses', 'Expenses'), isFalse);
+      expect(isSubaccountName('ExpensesExtra:Food', 'Expenses'), isFalse);
+      expect(isSubaccountName('Expenses:Food', ''), isFalse);
+    });
+  });
+
+  group('isAccountOrSubaccount', () {
+    test('includes the account itself and descendants', () {
+      expect(isAccountOrSubaccount('Expenses', 'Expenses'), isTrue);
+      expect(isAccountOrSubaccount('Expenses:Food', 'Expenses'), isTrue);
+      expect(isAccountOrSubaccount('Expenses', 'Expenses:Food'), isFalse);
+      expect(isAccountOrSubaccount('ExpensesExtra', 'Expenses'), isFalse);
+      expect(isAccountOrSubaccount('Expenses', ''), isFalse);
+    });
+  });
+
   group('Account.isSubaccountOf', () {
     test('detects proper descendants', () {
       final food = Account(name: 'Expenses:Food', type: AccountType.expenses);
