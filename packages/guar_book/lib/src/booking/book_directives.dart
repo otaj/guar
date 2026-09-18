@@ -555,13 +555,32 @@ d.DirectiveBody _mapCustom(String type, List<p.CustomValue> values, d.AccountPre
 }
 
 d.DirectiveBody? _budgetFromCustom(String type, List<p.CustomValue> values, d.AccountPrefixes prefixes) {
-  if (type != 'budget' || values.length != 3) {
+  if (type != 'budget' || values.length < 2) {
     return null;
   }
   final account = values[0];
   final interval = values[1];
+  if (account is! p.CustomAccount || interval is! p.CustomText) {
+    return null;
+  }
+  if (_isBudgetOff(interval.value)) {
+    if (values.length == 2) {
+      return d.DirectiveBody.budgetOff(account: domainAccount(account.value.name, prefixes));
+    }
+    if (values.length == 3 && values[2] is p.CustomCurrency) {
+      final currency = values[2] as p.CustomCurrency;
+      return d.DirectiveBody.budgetOff(
+        account: domainAccount(account.value.name, prefixes),
+        currency: d.Currency(name: currency.value.name),
+      );
+    }
+    return null;
+  }
+  if (values.length != 3) {
+    return null;
+  }
   final amount = values[2];
-  if (account is! p.CustomAccount || interval is! p.CustomText || amount is! p.CustomAmount) {
+  if (amount is! p.CustomAmount) {
     return null;
   }
   final parsed = _budgetInterval(interval.value);
@@ -573,6 +592,11 @@ d.DirectiveBody? _budgetFromCustom(String type, List<p.CustomValue> values, d.Ac
     interval: parsed,
     amount: mapAmount(amount.value),
   );
+}
+
+bool _isBudgetOff(String value) {
+  final name = value.toLowerCase();
+  return name == 'off' || name == 'none';
 }
 
 d.BudgetInterval? _budgetInterval(String value) => switch (value.toLowerCase()) {
@@ -591,4 +615,5 @@ d.CustomValue _customValue(p.CustomValue value, d.AccountPrefixes prefixes) => s
   p.CustomBoolean(:final value) => d.CustomValue.boolean(value),
   p.CustomNumber(:final value) => d.CustomValue.number(value.resolved),
   p.CustomAmount(:final value) => d.CustomValue.amount(mapAmount(value)),
+  p.CustomCurrency(:final value) => d.CustomValue.currency(d.Currency(name: value.name)),
 };

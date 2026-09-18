@@ -200,6 +200,10 @@ Directive rewriteDirectiveAccounts(Directive directive, String Function(String n
       return directive.copyWith(
         body: DirectiveBody.budget(account: mapAccount(account), interval: interval, amount: amount),
       );
+    case BudgetOffBody(:final account, :final currency):
+      return directive.copyWith(
+        body: DirectiveBody.budgetOff(account: mapAccount(account), currency: currency),
+      );
     case PriceBody() || CommodityBody() || EventBody() || QueryBody():
       return directive;
   }

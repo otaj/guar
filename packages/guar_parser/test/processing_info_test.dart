@@ -74,9 +74,10 @@ void main() {
     lot: 345.67 CAD
   Assets:Cash  -1000.00 USD
 2014-01-02 custom "fx" 1.2345 GBP
+2014-01-03 custom "tag" EUR
 ''';
     final info = directives(parser.parse(source, filename: file)).info;
-    expect(commodityNames(info), ['CAD', 'GBP', 'HOOL', 'USD']);
+    expect(commodityNames(info), ['CAD', 'EUR', 'GBP', 'HOOL', 'USD']);
     expect(quantum(info.displayContext, 'USD')?.verbatim, '0.01');
     expect(quantum(info.displayContext, 'CAD')?.verbatim, '0.01');
     expect(quantum(info.displayContext, 'GBP')?.verbatim, '0.0001');

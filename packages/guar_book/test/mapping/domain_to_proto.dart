@@ -101,6 +101,15 @@ pb.ProcessedDirective _directive(domain.Directive directive) {
           _customValue(domain.CustomValue.amount(amount)),
         ],
       );
+    case domain.BudgetOffBody(:final account, :final currency):
+      message.custom = pb.ProcessedCustom(
+        type: 'budget',
+        values: [
+          _customValue(domain.CustomValue.account(account)),
+          _customValue(const domain.CustomValue.text('off')),
+          if (currency != null) _customValue(domain.CustomValue.currency(currency)),
+        ],
+      );
   }
   return message;
 }
@@ -196,6 +205,8 @@ pb.ProcessedCustomValue _customValue(domain.CustomValue value) {
       message.number = _decimal(value);
     case domain.CustomAmount(:final value):
       message.amount = _amount(value);
+    case domain.CustomCurrency(:final value):
+      message.text = value.name;
   }
   return message;
 }

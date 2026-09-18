@@ -22,6 +22,7 @@ sealed class CustomValue with _$CustomValue {
   const factory CustomValue.boolean(bool value) = CustomBoolean;
   const factory CustomValue.number(BeanNumber value) = CustomNumber;
   const factory CustomValue.amount(Amount value) = CustomAmount;
+  const factory CustomValue.currency(Currency value) = CustomCurrency;
 }
 
 @freezed

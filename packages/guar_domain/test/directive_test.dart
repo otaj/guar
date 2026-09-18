@@ -94,4 +94,25 @@ void main() {
     expect(body.interval, BudgetInterval.monthly);
     expect(body.amount, amount('40.00', 'EUR'));
   });
+
+  test('budget-off directive body holds the account and optional currency', () {
+    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final off = Directive(
+      origin: origin,
+      date: BeanDate(year: 2016, month: 6, day: 1),
+      body: DirectiveBody.budgetOff(account: account('Expenses:Books', AccountType.expenses)),
+    );
+    expect((off.body as BudgetOffBody).account.name, 'Expenses:Books');
+    expect((off.body as BudgetOffBody).currency, isNull);
+
+    final eur = Directive(
+      origin: origin,
+      date: BeanDate(year: 2016, month: 6, day: 1),
+      body: DirectiveBody.budgetOff(
+        account: account('Expenses:Books', AccountType.expenses),
+        currency: Currency(name: 'EUR'),
+      ),
+    );
+    expect((eur.body as BudgetOffBody).currency?.name, 'EUR');
+  });
 }

@@ -89,7 +89,7 @@ Map<String, BeanDate> accountFirstUse(List<Directive> directives) {
             consider(custom.value.name, date);
           }
         }
-      case BudgetBody(:final account):
+      case BudgetBody(:final account) || BudgetOffBody(:final account):
         consider(account.name, date);
       case PriceBody() || CommodityBody() || EventBody() || QueryBody():
         break;

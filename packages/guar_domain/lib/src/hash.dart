@@ -72,6 +72,8 @@ String _body(DirectiveBody body) {
       interval.name,
       _amount(amount),
     ]),
+    BudgetOffBody(:final account, :final currency) =>
+      currency == null ? _join(['budget-off', account.name]) : _join(['budget-off', account.name, currency.name]),
   };
 }
 
@@ -93,6 +95,7 @@ String _custom(CustomValue value) {
     CustomBoolean(:final value) => 'bool:$value',
     CustomNumber(:final value) => 'number:$value',
     CustomAmount(:final value) => 'amount:${_amount(value)}',
+    CustomCurrency(:final value) => 'currency:${value.name}',
   };
 }
 

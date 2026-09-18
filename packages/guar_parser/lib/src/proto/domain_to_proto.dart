@@ -251,6 +251,7 @@ pb.CustomValue _customValue(domain.CustomValue value) {
     domain.CustomBoolean(:final value) => pb.CustomValue(boolean: value),
     domain.CustomNumber(:final value) => pb.CustomValue(number: _number(value)),
     domain.CustomAmount(:final value) => pb.CustomValue(amount: _amount(value)),
+    domain.CustomCurrency(:final value) => pb.CustomValue(text: value.name),
   };
 }
 

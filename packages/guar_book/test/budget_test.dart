@@ -59,10 +59,26 @@ void main() {
     }
   });
 
+  test('turns off a budget without an amount', () {
+    for (final name in ['off', 'NONE']) {
+      final body = _directives('2016-06-01 custom "budget" Expenses:Books "$name"').single.body as BudgetOffBody;
+      expect(body.account.name, 'Expenses:Books', reason: name);
+      expect(body.currency, isNull, reason: name);
+    }
+  });
+
+  test('turns off a single currency when one is attached', () {
+    final body = _directives('2016-06-01 custom "budget" Expenses:Books "off" EUR').single.body as BudgetOffBody;
+    expect(body.account.name, 'Expenses:Books');
+    expect(body.currency?.name, 'EUR');
+  });
+
   test('leaves malformed budget customs as CustomBody', () {
     final bodies = _directives('''
 2016-06-01 custom "budget" Expenses:Groceries "asdfasdf" 10.00 EUR
 2016-01-01 custom "budget" Expenses:Groceries "weekly"
+2016-06-01 custom "budget" Expenses:Groceries "off" 10.00 EUR
+2016-06-01 custom "budget" Expenses:Groceries "off" EUR "extra"
 2016-06-01 custom "budget" Expenses:Groceries 10.00 EUR
 2013-05-18 custom "budget" "weekly < 1000.00 USD" 2016-02-28 TRUE 43.03 USD 23
 ''').map((directive) => directive.body).toList();

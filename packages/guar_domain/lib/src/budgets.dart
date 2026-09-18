@@ -42,11 +42,11 @@ abstract class BudgetPeriod with _$BudgetPeriod {
 class BudgetMap {
   BudgetMap._(this._budgets, this._postings);
 
-  final Map<String, List<_Budget>> _budgets;
+  final Map<String, List<_Change>> _budgets;
   final List<_Posted> _postings;
 
   factory BudgetMap.build(Iterable<Directive> directives) {
-    final budgets = <String, List<_Budget>>{};
+    final budgets = <String, List<_Change>>{};
     final postings = <_Posted>[];
     var index = 0;
     for (final directive in directives) {
@@ -55,6 +55,10 @@ class BudgetMap {
           budgets
               .putIfAbsent(account.name, () => [])
               .add(_Budget(index: index, date: directive.date, interval: interval, amount: amount));
+        case BudgetOffBody(:final account, :final currency):
+          budgets
+              .putIfAbsent(account.name, () => [])
+              .add(_Clear(index: index, date: directive.date, currency: currency));
         case TransactionBody(:final value):
           for (final posting in value.postings) {
             postings.add(
@@ -183,11 +187,20 @@ class BudgetMap {
     return false;
   }
 
-  Map<String, _Budget> _active(List<_Budget> budgets, BeanDate day) {
+  Map<String, _Budget> _active(List<_Change> changes, BeanDate day) {
     final last = <String, _Budget>{};
-    for (final budget in budgets) {
-      if (compareBeanDate(budget.date, day) <= 0) {
-        last[budget.amount.currency.name] = budget;
+    for (final change in changes) {
+      if (compareBeanDate(change.date, day) <= 0) {
+        switch (change) {
+          case _Clear(:final currency):
+            if (currency == null) {
+              last.clear();
+            } else {
+              last.remove(currency.name);
+            }
+          case _Budget():
+            last[change.amount.currency.name] = change;
+        }
       } else {
         break;
       }
@@ -196,13 +209,24 @@ class BudgetMap {
   }
 }
 
-class _Budget {
-  _Budget({required this.index, required this.date, required this.interval, required this.amount});
+sealed class _Change {
+  const _Change({required this.index, required this.date});
 
   final int index;
   final BeanDate date;
+}
+
+class _Budget extends _Change {
+  _Budget({required super.index, required super.date, required this.interval, required this.amount});
+
   final BudgetInterval interval;
   final Amount amount;
+}
+
+class _Clear extends _Change {
+  _Clear({required super.index, required super.date, this.currency});
+
+  final Currency? currency;
 }
 
 class _Posted {

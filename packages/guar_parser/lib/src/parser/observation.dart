@@ -63,8 +63,13 @@ import '../domain/domain.dart';
         seeCurrency(currency);
       case CustomBody(:final values):
         for (final value in values) {
-          if (value case CustomAmount(:final value)) {
-            seeAmount(value.number, value.currency);
+          switch (value) {
+            case CustomAmount(:final value):
+              seeAmount(value.number, value.currency);
+            case CustomCurrency(:final value):
+              seeCurrency(value);
+            default:
+              break;
           }
         }
       case _:

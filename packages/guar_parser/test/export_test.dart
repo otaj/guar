@@ -75,6 +75,11 @@ void main() {
     expect(dest.readAsStringSync().contains('existing content'), isFalse);
   });
 
+  test('exports a bare custom currency unquoted', () {
+    final exported = parser.export(parser.parse('2014-01-01 custom "fx" EUR\n', filename: 'ledger.beancount'));
+    expect(exported.trim(), '2014-01-01 custom "fx" EUR');
+  });
+
   test('refuses to export a failed parse', () {
     final ledger = parser.parse('not a directive\n', filename: 'ledger.beancount');
     expect(() => parser.export(ledger), throwsStateError);

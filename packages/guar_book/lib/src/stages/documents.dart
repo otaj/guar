@@ -84,5 +84,5 @@ int _typeOrder(DirectiveBody body) => switch (body) {
   QueryBody() => 8,
   PriceBody() => 9,
   DocumentBody() => 10,
-  CustomBody() || BudgetBody() => 11,
+  CustomBody() || BudgetBody() || BudgetOffBody() => 11,
 };

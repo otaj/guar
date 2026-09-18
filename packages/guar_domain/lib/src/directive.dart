@@ -26,6 +26,7 @@ sealed class CustomValue with _$CustomValue {
   const factory CustomValue.boolean(bool value) = CustomBoolean;
   const factory CustomValue.number(Decimal value) = CustomNumber;
   const factory CustomValue.amount(Amount value) = CustomAmount;
+  const factory CustomValue.currency(Currency value) = CustomCurrency;
 }
 
 @freezed
@@ -62,6 +63,7 @@ sealed class DirectiveBody with _$DirectiveBody {
     required BudgetInterval interval,
     required Amount amount,
   }) = BudgetBody;
+  const factory DirectiveBody.budgetOff({required Account account, Currency? currency}) = BudgetOffBody;
 }
 
 @Freezed(copyWith: false, when: FreezedWhenOptions.none, map: FreezedMapOptions.none)

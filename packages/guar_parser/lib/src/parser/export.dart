@@ -315,6 +315,7 @@ String _customValue(CustomValue value) {
     CustomBoolean(:final value) => value ? 'TRUE' : 'FALSE',
     CustomNumber(:final value) => value.verbatim,
     CustomAmount(:final value) => _amount(value),
+    CustomCurrency(:final value) => value.name,
   };
 }
 

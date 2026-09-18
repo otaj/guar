@@ -830,7 +830,8 @@ class BeancountGrammar {
     final amountValue = amount().map(CustomValue.amount);
     final number = numberExpr().map(CustomValue.number);
     final accountValue = account().map(CustomValue.account);
-    return (boolean | dateValue | text | amountValue | number | accountValue).cast<CustomValue>();
+    final currencyValue = currency().map(CustomValue.currency);
+    return (boolean | dateValue | text | amountValue | number | accountValue | currencyValue).cast<CustomValue>();
   }
 
   Parser<({List<Currency> currencies, BookingMethod? booking})> _openTail() {

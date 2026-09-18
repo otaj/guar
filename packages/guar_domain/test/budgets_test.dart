@@ -33,6 +33,17 @@ Directive budget(BeanDate date, String name, BudgetInterval interval, String num
   );
 }
 
+Directive budgetOff(BeanDate date, String name, {String? currency}) {
+  return Directive(
+    origin: _origin,
+    date: date,
+    body: DirectiveBody.budgetOff(
+      account: account(name, AccountType.expenses),
+      currency: currency == null ? null : Currency(name: currency),
+    ),
+  );
+}
+
 Directive txn(BeanDate date, String name, String number, String currency, {int line = 1}) {
   final origin = Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line));
   return Directive(
@@ -239,5 +250,47 @@ void main() {
     ]);
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 1)))!.number, Decimal.parse('10.00'));
     expect(eur(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2)))!.number, Decimal.parse('1.00'));
+  });
+
+  test('off stops every currency on the account from the given date', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.weekly, '70.00', 'USD'),
+      budgetOff(d(2016, 6, 1), 'Expenses:Books'),
+    ]);
+    expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 1)))!.number, Decimal.parse('10.00'));
+    expect(named(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 1)), 'USD')!.number, share('70.00', 7));
+    expect(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2)), isEmpty);
+
+    final after = map.period('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2));
+    expect(after.within, isNull);
+    expect(after.currencies, isEmpty);
+
+    final onAgain = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budgetOff(d(2016, 6, 1), 'Expenses:Books'),
+      budget(d(2016, 7, 1), 'Expenses:Books', BudgetInterval.daily, '3.00', 'EUR'),
+    ]);
+    expect(onAgain.allowed('Expenses:Books', d(2016, 6, 15), d(2016, 6, 16)), isEmpty);
+    expect(eur(onAgain.allowed('Expenses:Books', d(2016, 7, 1), d(2016, 7, 2)))!.number, Decimal.parse('3.00'));
+  });
+
+  test('off with a currency stops only that currency', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.weekly, '70.00', 'USD'),
+      budgetOff(d(2016, 6, 1), 'Expenses:Books', currency: 'EUR'),
+    ]);
+    expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 1)))!.number, Decimal.parse('10.00'));
+    expect(named(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2)), 'USD')!.number, share('70.00', 7));
+    expect(eur(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2))), isNull);
+
+    final onAgain = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budgetOff(d(2016, 6, 1), 'Expenses:Books', currency: 'EUR'),
+      budget(d(2016, 7, 1), 'Expenses:Books', BudgetInterval.daily, '3.00', 'EUR'),
+    ]);
+    expect(onAgain.allowed('Expenses:Books', d(2016, 6, 15), d(2016, 6, 16)), isEmpty);
+    expect(eur(onAgain.allowed('Expenses:Books', d(2016, 7, 1), d(2016, 7, 2)))!.number, Decimal.parse('3.00'));
   });
 }
