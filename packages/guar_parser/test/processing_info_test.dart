@@ -48,7 +48,7 @@ void main() {
 2014-01-04 price HOOL 510.00 USD
 ''';
     final info = directives(parser.parse(source, filename: file)).info;
-    expect(commodityNames(info), ['EUR', 'HOOL', 'JPY', 'USD']);
+    expect(commodityNames(info), ['HOOL', 'JPY', 'USD']);
     expect(quantum(info.displayContext, 'USD'), BeanNumber(verbatim: '0.01', resolved: Decimal.parse('0.01')));
     expect(quantum(info.displayContext, 'JPY'), BeanNumber(verbatim: '1', resolved: Decimal.one));
     expect(quantum(info.displayContext, 'EUR'), isNull);
@@ -66,22 +66,25 @@ void main() {
     expect(quantum(info.displayContext, 'USD')?.verbatim, '0.01');
   });
 
-  test('includes currencies from costs, metadata, and custom amounts', () {
+  test('records currencies from transaction costs and balances but not metadata or custom values', () {
     const source = '''
 2014-01-01 * "Buy"
-  ticker: HOOL
+  ticker: CAD
   Assets:Broker    2 HOOL {500.00 USD}
     lot: 345.67 CAD
   Assets:Cash  -1000.00 USD
 2014-01-02 custom "fx" 1.2345 GBP
 2014-01-03 custom "tag" EUR
+2014-01-04 balance Assets:Cash 10.00 CHF
 ''';
     final info = directives(parser.parse(source, filename: file)).info;
-    expect(commodityNames(info), ['CAD', 'EUR', 'GBP', 'HOOL', 'USD']);
+    expect(commodityNames(info), ['CHF', 'HOOL', 'USD']);
     expect(quantum(info.displayContext, 'USD')?.verbatim, '0.01');
-    expect(quantum(info.displayContext, 'CAD')?.verbatim, '0.01');
-    expect(quantum(info.displayContext, 'GBP')?.verbatim, '0.0001');
     expect(quantum(info.displayContext, 'HOOL')?.verbatim, '1');
+    expect(quantum(info.displayContext, 'CHF')?.verbatim, '0.01');
+    expect(quantum(info.displayContext, 'CAD'), isNull);
+    expect(quantum(info.displayContext, 'GBP'), isNull);
+    expect(quantum(info.displayContext, 'EUR'), isNull);
   });
 
   test('splice recomputes commodities from the merged directives', () {

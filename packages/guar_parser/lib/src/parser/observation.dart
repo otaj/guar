@@ -1,4 +1,4 @@
-// Collects observed commodities and inferred display precision from parsed directives.
+// Collects commodities and display precision from transactions, prices, and balances.
 
 import 'package:decimal/decimal.dart';
 
@@ -23,25 +23,10 @@ import '../domain/domain.dart';
     digits.putIfAbsent(currency.name, () => []).add(_fractionalDigits(number));
   }
 
-  void seeMeta(Meta meta) {
-    for (final entry in meta.entries) {
-      switch (entry.value) {
-        case MetaCurrency(:final value):
-          seeCurrency(value);
-        case MetaAmount(:final value):
-          seeAmount(value.number, value.currency);
-        case _:
-          break;
-      }
-    }
-  }
-
   for (final directive in directives) {
-    seeMeta(directive.meta);
     switch (directive.body) {
       case TransactionBody(:final value):
         for (final posting in value.postings) {
-          seeMeta(posting.meta);
           seeAmount(posting.units?.number, posting.units?.currency);
           final cost = posting.cost;
           if (cost != null) {
@@ -59,20 +44,7 @@ import '../domain/domain.dart';
         seeAmount(amount.number, amount.currency);
       case BalanceBody(:final amount):
         seeAmount(amount.number, amount.currency);
-      case CommodityBody(:final currency):
-        seeCurrency(currency);
-      case CustomBody(:final values):
-        for (final value in values) {
-          switch (value) {
-            case CustomAmount(:final value):
-              seeAmount(value.number, value.currency);
-            case CustomCurrency(:final value):
-              seeCurrency(value);
-            default:
-              break;
-          }
-        }
-      case _:
+      default:
         break;
     }
   }
