@@ -22,6 +22,11 @@ abstract class Account with _$Account {
     return Account._create(name: name, type: type);
   }
 
+  factory Account.budget({required String name, required AccountType type}) {
+    ensureBudgetAccountName(name);
+    return Account._create(name: name, type: type);
+  }
+
   const factory Account._create({required String name, required AccountType type}) = _Account;
 
   bool isSubaccountOf(Account other) => isSubaccountName(name, other.name);

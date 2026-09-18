@@ -60,6 +60,12 @@ void main() {
       expect(prefixes.typeFor('Expenses:Food'), AccountType.expenses);
     });
 
+    test('budgetAccount accepts a quoted root', () {
+      final root = prefixes.budgetAccount('Expenses');
+      expect(root.name, 'Expenses');
+      expect(root.type, AccountType.expenses);
+    });
+
     test('defaults unknown roots to assets', () {
       expect(prefixes.typeFor('Unknown:Foo'), AccountType.assets);
     });

@@ -40,22 +40,46 @@ abstract class BudgetPeriod with _$BudgetPeriod {
 }
 
 class BudgetMap {
-  BudgetMap._(this._budgets, this._postings);
+  BudgetMap._(this._budgets, this._postings, this._warnings);
 
   final Map<String, List<_Change>> _budgets;
   final List<_Posted> _postings;
+  final List<_AccountWarning> _warnings;
+
+  List<ProcessingWarning> get warnings => [for (final warning in _warnings) warning.warning];
 
   factory BudgetMap.build(Iterable<Directive> directives) {
     final budgets = <String, List<_Change>>{};
     final postings = <_Posted>[];
+    final warnings = <_AccountWarning>[];
+    final seen = <String, ({bool off, Decimal? number})>{};
     var index = 0;
     for (final directive in directives) {
       switch (directive.body) {
         case BudgetBody(:final account, :final interval, :final amount):
+          _noteDuplicate(
+            seen,
+            warnings,
+            account: account.name,
+            currency: amount.currency.name,
+            date: directive.date,
+            origin: directive.origin,
+            off: false,
+            number: amount.number,
+          );
           budgets
               .putIfAbsent(account.name, () => [])
               .add(_Budget(index: index, date: directive.date, interval: interval, amount: amount));
         case BudgetOffBody(:final account, :final currency):
+          _noteDuplicate(
+            seen,
+            warnings,
+            account: account.name,
+            currency: currency?.name,
+            date: directive.date,
+            origin: directive.origin,
+            off: true,
+          );
           budgets
               .putIfAbsent(account.name, () => [])
               .add(_Clear(index: index, date: directive.date, currency: currency));
@@ -89,10 +113,10 @@ class BudgetMap {
       }
       return false;
     });
-    return BudgetMap._(budgets, postings);
+    return BudgetMap._(budgets, postings, warnings);
   }
 
-  List<Amount> allowed(String account, BeanDate begin, BeanDate end, {bool includeChildren = false}) {
+  List<Amount> allowed(String account, BeanDate begin, BeanDate end, {bool includeChildren = true}) {
     final totals = <String, Decimal>{};
     final currencies = <String, Currency>{};
     for (final name in _budgets.keys) {
@@ -105,7 +129,7 @@ class BudgetMap {
     return _amounts(totals, currencies);
   }
 
-  List<Amount> actual(String account, BeanDate begin, BeanDate end, {bool includeChildren = false}) {
+  List<Amount> actual(String account, BeanDate begin, BeanDate end, {bool includeChildren = true}) {
     final totals = <String, Decimal>{};
     final currencies = <String, Currency>{};
     for (final posting in _counted(account, begin, end, includeChildren: includeChildren)) {
@@ -116,7 +140,7 @@ class BudgetMap {
     return _amounts(totals, currencies);
   }
 
-  BudgetPeriod period(String account, BeanDate begin, BeanDate end, {bool includeChildren = false}) {
+  BudgetPeriod period(String account, BeanDate begin, BeanDate end, {bool includeChildren = true}) {
     final budgeted = {
       for (final amount in allowed(account, begin, end, includeChildren: includeChildren)) amount.currency.name: amount,
     };
@@ -124,7 +148,10 @@ class BudgetMap {
       for (final amount in actual(account, begin, end, includeChildren: includeChildren)) amount.currency.name: amount,
     };
     final names = budgeted.keys.toList()..sort();
-    final warnings = <ProcessingWarning>[];
+    final warnings = <ProcessingWarning>[
+      for (final warning in _warnings)
+        if (_matches(warning.account, account, includeChildren: includeChildren)) warning.warning,
+    ];
     if (budgeted.isNotEmpty) {
       for (final posting in _counted(account, begin, end, includeChildren: includeChildren)) {
         if (budgeted.containsKey(posting.units.currency.name)) continue;
@@ -253,6 +280,50 @@ BeanLocation? _warningLocation(_Posted posted) {
       GeneratedOrigin() => null,
     },
   };
+}
+
+class _AccountWarning {
+  _AccountWarning({required this.account, required this.warning});
+
+  final String account;
+  final ProcessingWarning warning;
+}
+
+void _noteDuplicate(
+  Map<String, ({bool off, Decimal? number})> seen,
+  List<_AccountWarning> warnings, {
+  required String account,
+  required String? currency,
+  required BeanDate date,
+  required Origin origin,
+  required bool off,
+  Decimal? number,
+}) {
+  if (currency == null) {
+    return;
+  }
+  final key = '$account|$currency|$date';
+  final prior = seen[key];
+  seen[key] = (off: off, number: number);
+  if (prior == null || (prior.off == off && prior.number == number)) {
+    return;
+  }
+  final location = switch (origin) {
+    SourceOrigin(:final location) => location,
+    GeneratedOrigin() => null,
+  };
+  if (location == null) {
+    return;
+  }
+  warnings.add(
+    _AccountWarning(
+      account: account,
+      warning: ProcessingWarning(
+        message: 'Duplicate budget for $account $currency on $date; using the later directive',
+        location: location,
+      ),
+    ),
+  );
 }
 
 bool _matches(String candidate, String requested, {required bool includeChildren}) {

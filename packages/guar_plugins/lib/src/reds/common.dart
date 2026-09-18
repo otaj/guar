@@ -148,6 +148,12 @@ Directive rewriteDirectiveAccounts(Directive directive, String Function(String n
     return generatedAccount(name, options);
   }
 
+  Account mapBudgetAccount(Account account) {
+    final name = rename(account.name);
+    if (name == account.name) return account;
+    return options.accountPrefixes.budgetAccount(name);
+  }
+
   switch (directive.body) {
     case TransactionBody(:final value):
       final postings = [for (final posting in value.postings) posting.copyWith(account: mapAccount(posting.account))];
@@ -198,11 +204,11 @@ Directive rewriteDirectiveAccounts(Directive directive, String Function(String n
       );
     case BudgetBody(:final account, :final interval, :final amount):
       return directive.copyWith(
-        body: DirectiveBody.budget(account: mapAccount(account), interval: interval, amount: amount),
+        body: DirectiveBody.budget(account: mapBudgetAccount(account), interval: interval, amount: amount),
       );
     case BudgetOffBody(:final account, :final currency):
       return directive.copyWith(
-        body: DirectiveBody.budgetOff(account: mapAccount(account), currency: currency),
+        body: DirectiveBody.budgetOff(account: mapBudgetAccount(account), currency: currency),
       );
     case PriceBody() || CommodityBody() || EventBody() || QueryBody():
       return directive;

@@ -41,6 +41,12 @@ void main() {
       expect(() => Account(name: 'Assets:', type: AccountType.assets), throwsArgumentError);
       expect(() => Account(name: ':Cash', type: AccountType.assets), throwsArgumentError);
     });
+
+    test('budget accounts may be a single-segment root', () {
+      expect(Account.budget(name: 'Expenses', type: AccountType.expenses).name, 'Expenses');
+      expect(Account.budget(name: 'Expenses:Food', type: AccountType.expenses).name, 'Expenses:Food');
+      expect(() => Account.budget(name: 'assets', type: AccountType.assets), throwsArgumentError);
+    });
   });
 
   group('Tag and Link', () {

@@ -558,23 +558,24 @@ d.DirectiveBody? _budgetFromCustom(String type, List<p.CustomValue> values, d.Ac
   if (type != 'budget' || values.length < 2) {
     return null;
   }
-  final account = values[0];
+  final accountName = _budgetAccountName(values[0]);
   final interval = values[1];
-  if (account is! p.CustomAccount || interval is! p.CustomText) {
+  if (accountName == null || interval is! p.CustomText) {
     return null;
   }
+  final account = prefixes.budgetAccount(accountName);
   if (_isBudgetOff(interval.value)) {
     if (values.length == 2) {
-      return d.DirectiveBody.budgetOff(account: domainAccount(account.value.name, prefixes));
+      return d.DirectiveBody.budgetOff(account: account);
     }
-    if (values.length == 3 && values[2] is p.CustomCurrency) {
-      final currency = values[2] as p.CustomCurrency;
-      return d.DirectiveBody.budgetOff(
-        account: domainAccount(account.value.name, prefixes),
-        currency: d.Currency(name: currency.value.name),
-      );
+    if (values.length != 3) {
+      return null;
     }
-    return null;
+    final currency = _budgetOffCurrency(values[2]);
+    if (currency == null) {
+      return null;
+    }
+    return d.DirectiveBody.budgetOff(account: account, currency: currency);
   }
   if (values.length != 3) {
     return null;
@@ -587,12 +588,20 @@ d.DirectiveBody? _budgetFromCustom(String type, List<p.CustomValue> values, d.Ac
   if (parsed == null) {
     return null;
   }
-  return d.DirectiveBody.budget(
-    account: domainAccount(account.value.name, prefixes),
-    interval: parsed,
-    amount: mapAmount(amount.value),
-  );
+  return d.DirectiveBody.budget(account: account, interval: parsed, amount: mapAmount(amount.value));
 }
+
+String? _budgetAccountName(p.CustomValue value) => switch (value) {
+  p.CustomAccount(:final value) => value.name,
+  p.CustomText(:final value) when d.isValidBudgetAccountName(value) => value,
+  _ => null,
+};
+
+d.Currency? _budgetOffCurrency(p.CustomValue value) => switch (value) {
+  p.CustomCurrency(:final value) => d.Currency(name: value.name),
+  p.CustomAmount(:final value) => d.Currency(name: value.currency.name),
+  _ => null,
+};
 
 bool _isBudgetOff(String value) {
   final name = value.toLowerCase();

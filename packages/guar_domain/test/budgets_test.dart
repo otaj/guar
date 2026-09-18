@@ -7,8 +7,6 @@ import 'package:test/test.dart';
 
 import 'helpers/amounts.dart';
 
-final _origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-
 BeanDate d(int year, int month, int day) => BeanDate(year: year, month: month, day: day);
 
 Decimal share(String number, int days) => shares(number, [days]);
@@ -21,24 +19,24 @@ Decimal shares(String number, List<int> days) {
   return total.toDecimal(scaleOnInfinitePrecision: 28);
 }
 
-Directive budget(BeanDate date, String name, BudgetInterval interval, String number, String currency) {
+Directive budget(BeanDate date, String name, BudgetInterval interval, String number, String currency, {int line = 1}) {
   return Directive(
-    origin: _origin,
+    origin: Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line)),
     date: date,
     body: DirectiveBody.budget(
-      account: account(name, AccountType.expenses),
+      account: Account.budget(name: name, type: AccountType.expenses),
       interval: interval,
       amount: amount(number, currency),
     ),
   );
 }
 
-Directive budgetOff(BeanDate date, String name, {String? currency}) {
+Directive budgetOff(BeanDate date, String name, {String? currency, int line = 1}) {
   return Directive(
-    origin: _origin,
+    origin: Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line)),
     date: date,
     body: DirectiveBody.budgetOff(
-      account: account(name, AccountType.expenses),
+      account: Account.budget(name: name, type: AccountType.expenses),
       currency: currency == null ? null : Currency(name: currency),
     ),
   );
@@ -86,7 +84,9 @@ void main() {
       budget(d(2016, 1, 1), 'Expenses:Groceries', BudgetInterval.weekly, '100.00', 'CNY'),
       budget(d(2016, 6, 1), 'Expenses:Groceries', BudgetInterval.weekly, '10.00', 'EUR'),
     ]);
-    expect(map.allowed('Expenses', d(2016, 6, 1), d(2016, 6, 8)), isEmpty);
+    expect(named(map.allowed('Expenses', d(2016, 6, 1), d(2016, 6, 8)), 'CNY')!.number, Decimal.parse('100'));
+    expect(named(map.allowed('Expenses', d(2016, 6, 1), d(2016, 6, 8)), 'EUR')!.number, Decimal.parse('10'));
+    expect(map.allowed('Expenses', d(2016, 6, 1), d(2016, 6, 8), includeChildren: false), isEmpty);
 
     final allowed = map.allowed('Expenses:Groceries', d(2016, 6, 1), d(2016, 6, 8));
     expect(named(allowed, 'CNY')!.number, Decimal.parse('100'));
@@ -134,22 +134,13 @@ void main() {
       budget(d(2017, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'USD'),
       budget(d(2017, 1, 1), 'Expenses:Books:Notebooks', BudgetInterval.daily, '2.00', 'USD'),
     ]);
+    expect(named(map.allowed('Expenses', d(2017, 1, 1), d(2017, 1, 2)), 'USD')!.number, Decimal.parse('12.00'));
+    expect(named(map.allowed('Expenses:Books', d(2017, 1, 1), d(2017, 1, 2)), 'USD')!.number, Decimal.parse('12.00'));
     expect(
-      named(map.allowed('Expenses', d(2017, 1, 1), d(2017, 1, 2), includeChildren: true), 'USD')!.number,
-      Decimal.parse('12.00'),
-    );
-    expect(
-      named(map.allowed('Expenses:Books', d(2017, 1, 1), d(2017, 1, 2), includeChildren: true), 'USD')!.number,
-      Decimal.parse('12.00'),
-    );
-    expect(
-      named(
-        map.allowed('Expenses:Books:Notebooks', d(2017, 1, 1), d(2017, 1, 2), includeChildren: true),
-        'USD',
-      )!.number,
+      named(map.allowed('Expenses:Books:Notebooks', d(2017, 1, 1), d(2017, 1, 2)), 'USD')!.number,
       Decimal.parse('2.00'),
     );
-    expect(map.allowed('Expenses', d(2017, 1, 1), d(2017, 1, 2)), isEmpty);
+    expect(map.allowed('Expenses', d(2017, 1, 1), d(2017, 1, 2), includeChildren: false), isEmpty);
   });
 
   test('actuals sum booked units in [begin, end) by account', () {
@@ -171,17 +162,14 @@ void main() {
       txn(d(2017, 1, 1), 'Expenses:Books:Notebooks', '3.00', 'USD'),
       txn(d(2017, 1, 1), 'Expenses:Fun', '7.00', 'USD'),
     ]);
-    expect(named(map.actual('Expenses:Books', d(2017, 1, 1), d(2017, 1, 2)), 'USD')!.number, Decimal.parse('5.00'));
     expect(
-      named(map.actual('Expenses:Books', d(2017, 1, 1), d(2017, 1, 2), includeChildren: true), 'USD')!.number,
-      Decimal.parse('8.00'),
+      named(map.actual('Expenses:Books', d(2017, 1, 1), d(2017, 1, 2), includeChildren: false), 'USD')!.number,
+      Decimal.parse('5.00'),
     );
+    expect(named(map.actual('Expenses:Books', d(2017, 1, 1), d(2017, 1, 2)), 'USD')!.number, Decimal.parse('8.00'));
     expect(map.actual('Expenses:Books:Notebooks', d(2017, 1, 1), d(2017, 1, 2)), isEmpty);
     expect(map.actual('Expenses:Fun', d(2017, 1, 1), d(2017, 1, 2)), isEmpty);
-    expect(
-      named(map.actual('Expenses', d(2017, 1, 1), d(2017, 1, 2), includeChildren: true), 'USD')!.number,
-      Decimal.parse('8.00'),
-    );
+    expect(named(map.actual('Expenses', d(2017, 1, 1), d(2017, 1, 2)), 'USD')!.number, Decimal.parse('8.00'));
   });
 
   test('period reports remaining and whether actuals stay within the prorated budget', () {
@@ -292,5 +280,123 @@ void main() {
     ]);
     expect(onAgain.allowed('Expenses:Books', d(2016, 6, 15), d(2016, 6, 16)), isEmpty);
     expect(eur(onAgain.allowed('Expenses:Books', d(2016, 7, 1), d(2016, 7, 2)))!.number, Decimal.parse('3.00'));
+  });
+
+  test('a zero budget is within only when nothing is spent', () {
+    final empty = BudgetMap.build([budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '0', 'EUR')]);
+    final idle = empty.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    expect(eur(empty.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)))!.number, Decimal.zero);
+    expect(idle.within, isTrue);
+    expect(idle.currencies.single.actual.number, Decimal.zero);
+
+    final spent = BudgetMap.build([
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '0', 'EUR'),
+      txn(d(2016, 5, 1), 'Expenses:Books', '1.00', 'EUR'),
+    ]);
+    final over = spent.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    expect(over.within, isFalse);
+    expect(over.currencies.single.remaining.number, Decimal.parse('-1.00'));
+  });
+
+  test('a root account budget covers descendants', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses', BudgetInterval.monthly, '9000', 'USD'),
+      txn(d(2016, 1, 15), 'Expenses:Food', '40', 'USD'),
+      txn(d(2016, 1, 15), 'Expenses:Food:Cafe', '10', 'USD'),
+    ]);
+    expect(named(map.allowed('Expenses', d(2016, 1, 1), d(2016, 2, 1)), 'USD')!.number, Decimal.parse('9000'));
+    expect(named(map.actual('Expenses', d(2016, 1, 1), d(2016, 2, 1)), 'USD')!.number, Decimal.parse('50'));
+    expect(map.allowed('Expenses:Food', d(2016, 1, 1), d(2016, 2, 1)), isEmpty);
+    expect(map.actual('Expenses:Food', d(2016, 1, 1), d(2016, 2, 1)), isEmpty);
+  });
+
+  test('same-day duplicate budgets keep the later one and warn', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '4.00', 'EUR', line: 3),
+    ]);
+    expect(eur(map.allowed('Expenses:Books', d(2016, 1, 1), d(2016, 1, 2)))!.number, Decimal.parse('4.00'));
+    expect(map.warnings, hasLength(1));
+    expect(map.warnings.single.location.linenoBegin, 3);
+    expect(
+      map.warnings.single.message,
+      'Duplicate budget for Expenses:Books EUR on 2016-01-01; using the later directive',
+    );
+    expect(map.period('Expenses:Books', d(2016, 1, 1), d(2016, 1, 2)).warnings, hasLength(1));
+  });
+
+  test('a range that crosses a replacement is a piecewise sum', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budget(d(2016, 6, 1), 'Expenses:Books', BudgetInterval.daily, '1.00', 'EUR'),
+    ]);
+    expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 2)))!.number, Decimal.parse('11.00'));
+  });
+
+  test('a range that crosses an off is a piecewise sum', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budgetOff(d(2016, 6, 1), 'Expenses:Books'),
+    ]);
+    expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 2)))!.number, Decimal.parse('10.00'));
+    expect(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2)), isEmpty);
+  });
+
+  test('same-day identical budgets do not warn', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 3),
+    ]);
+    expect(eur(map.allowed('Expenses:Books', d(2016, 1, 1), d(2016, 1, 2)))!.number, Decimal.parse('10.00'));
+    expect(map.warnings, isEmpty);
+  });
+
+  test('same-day budget and off keep the later directive and warn', () {
+    final offLast = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
+      budgetOff(d(2016, 1, 1), 'Expenses:Books', currency: 'EUR', line: 3),
+    ]);
+    expect(offLast.allowed('Expenses:Books', d(2016, 1, 1), d(2016, 1, 2)), isEmpty);
+    expect(offLast.warnings, hasLength(1));
+    expect(offLast.warnings.single.location.linenoBegin, 3);
+
+    final budgetLast = BudgetMap.build([
+      budgetOff(d(2016, 1, 1), 'Expenses:Books', currency: 'EUR', line: 2),
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 3),
+    ]);
+    expect(eur(budgetLast.allowed('Expenses:Books', d(2016, 1, 1), d(2016, 1, 2)))!.number, Decimal.parse('10.00'));
+    expect(budgetLast.warnings, hasLength(1));
+    expect(budgetLast.warnings.single.location.linenoBegin, 3);
+  });
+
+  test('duplicate warnings stay on the duplicated account', () {
+    final map = BudgetMap.build([
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
+      budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '4.00', 'EUR', line: 3),
+      budget(d(2016, 1, 1), 'Expenses:Food', BudgetInterval.daily, '5.00', 'EUR', line: 4),
+    ]);
+    expect(map.period('Expenses:Food', d(2016, 1, 1), d(2016, 1, 2)).warnings, isEmpty);
+    expect(map.period('Expenses:Books', d(2016, 1, 1), d(2016, 1, 2)).warnings, hasLength(1));
+  });
+
+  test('period is over if any budgeted currency is over', () {
+    final mixed = BudgetMap.build([
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '5.00', 'USD'),
+      txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR'),
+      txn(d(2016, 5, 1), 'Expenses:Books', '6.00', 'USD'),
+    ]);
+    final period = mixed.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    expect(period.currencies, hasLength(2));
+    expect(named(period.currencies.map((row) => row.budget).toList(), 'EUR')!.number, Decimal.parse('10.00'));
+    expect(period.within, isFalse);
+
+    final under = BudgetMap.build([
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '5.00', 'USD'),
+      txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR'),
+      txn(d(2016, 5, 1), 'Expenses:Books', '5.00', 'USD'),
+    ]);
+    expect(under.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)).within, isTrue);
   });
 }

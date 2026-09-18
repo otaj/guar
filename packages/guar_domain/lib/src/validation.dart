@@ -31,6 +31,10 @@ bool isValidAccountName(String name) {
   return parts.skip(1).every(_accountLeaf.hasMatch);
 }
 
+bool isValidAccountRoot(String name) => !name.contains(':') && _accountRoot.hasMatch(name);
+
+bool isValidBudgetAccountName(String name) => isValidAccountName(name) || isValidAccountRoot(name);
+
 bool isValidTagOrLinkName(String name) => name.isNotEmpty && !RegExp(r'\s').hasMatch(name);
 
 bool isValidLetterFlag(String value) => RegExp(r'^[A-Z]$').hasMatch(value);
@@ -53,6 +57,12 @@ void ensureCurrencyName(String name) {
 
 void ensureAccountName(String name) {
   if (!isValidAccountName(name)) {
+    throw ArgumentError.value(name, 'Account.name', 'not a valid account name');
+  }
+}
+
+void ensureBudgetAccountName(String name) {
+  if (!isValidBudgetAccountName(name)) {
     throw ArgumentError.value(name, 'Account.name', 'not a valid account name');
   }
 }

@@ -33,6 +33,8 @@ abstract class AccountPrefixes with _$AccountPrefixes {
   }
 
   Account account(String name) => Account(name: name, type: typeFor(name));
+
+  Account budgetAccount(String name) => Account.budget(name: name, type: typeFor(name));
 }
 
 @freezed
