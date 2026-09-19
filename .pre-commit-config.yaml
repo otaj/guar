@@ -1,6 +1,6 @@
-default_install_hook_types:
-  - pre-commit
-  - commit-msg
+# Install both hook stages:
+#   pre-commit install --hook-type pre-commit --hook-type commit-msg
+default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -16,14 +16,32 @@ repos:
         args: [--verbose]
   - repo: local
     hooks:
+      # All fvm entries go through scripts/run_fvm.sh so GIT_DIR from
+      # pre-commit/worktrees cannot poison the shared Flutter SDK git metadata.
       - id: dart-format
-        name: dart format
-        entry: bash -c 'fvm dart format --set-exit-if-changed --line-length 120 "$@"' --
+        name: fvm dart format
+        entry: bash scripts/run_fvm.sh dart format --set-exit-if-changed
         language: system
         types: [dart]
+        stages: [pre-commit]
       - id: dart-analyze
-        name: dart analyze
-        entry: bash -c 'for pkg in packages/guar_parser packages/guar_domain packages/guar_plugins packages/guar_book packages/guar_query; do (cd "$pkg" && fvm dart analyze --fatal-infos) || exit 1; done'
+        name: fvm dart analyze
+        entry: bash scripts/run_fvm.sh dart analyze --fatal-warnings --fatal-infos
         language: system
-        types: [dart]
         pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: dart-pub-outdated
+        name: fvm dart pub outdated (direct/dev)
+        entry: python3 scripts/check_pub_outdated.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      # Real ShellCheck binary via uvx (shellcheck-py); keep version pin in sync with CI.
+      - id: shellcheck
+        name: shellcheck (uvx)
+        entry: uvx --from shellcheck-py==0.11.0.1 shellcheck
+        language: system
+        files: ^scripts/.*\.sh$
+        stages: [pre-commit]
