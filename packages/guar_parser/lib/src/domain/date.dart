@@ -6,6 +6,14 @@ import 'validation.dart';
 
 part 'date.freezed.dart';
 
+int compareBeanDate(BeanDate left, BeanDate right) {
+  final byYear = left.year.compareTo(right.year);
+  if (byYear != 0) return byYear;
+  final byMonth = left.month.compareTo(right.month);
+  if (byMonth != 0) return byMonth;
+  return left.day.compareTo(right.day);
+}
+
 @Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class BeanDate with _$BeanDate {
   const BeanDate._();

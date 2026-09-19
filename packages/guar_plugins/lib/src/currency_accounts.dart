@@ -54,7 +54,12 @@ BookPluginResult insertCurrencyTradingPostings(
   final opens = [
     for (final name in newAccounts.toList()..sort())
       Directive(
-        origin: const Origin.generated(),
+        origin: insertOrigin(
+          date: earliest,
+          body: DirectiveBody.open(account: generatedAccount(name, options)),
+          existing: directives,
+          info: info,
+        ),
         date: earliest,
         body: DirectiveBody.open(account: generatedAccount(name, options)),
       ),

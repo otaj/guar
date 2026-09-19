@@ -51,7 +51,15 @@ StageResult applyDocuments(List<Directive> directives, LedgerOptions options, Pr
       }
       added.add(
         Directive(
-          origin: const Origin.generated(),
+          origin: insertOrigin(
+            date: BeanDate(year: year, month: month, day: day),
+            body: DirectiveBody.document(
+              account: Account(name: accountName, type: AccountType.assets),
+              filename: entity.path,
+            ),
+            existing: directives,
+            info: info,
+          ),
           date: BeanDate(year: year, month: month, day: day),
           body: DirectiveBody.document(
             account: Account(name: accountName, type: AccountType.assets),

@@ -98,7 +98,7 @@ BookPluginResult longShort(List<Directive> directives, LedgerOptions options, Pr
     }
     out.add(replaceTransaction(directive, transaction.copyWith(postings: kept)));
   }
-  return (directives: [...createOpenDirectives(newAccounts, directives, options), ...out], errors: const []);
+  return (directives: [...createOpenDirectives(newAccounts, directives, options, info), ...out], errors: const []);
 }
 
 bool _interesting(Transaction transaction, RegExp match, String shortRepl, String longRepl) {

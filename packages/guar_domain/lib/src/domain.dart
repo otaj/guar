@@ -9,6 +9,7 @@ export 'date_delta.dart';
 export 'directive.dart';
 export 'flag.dart';
 export 'hash.dart';
+export 'insert_route.dart';
 export 'inventory.dart';
 export 'ledger.dart';
 export 'ledger_diff.dart';

@@ -29,7 +29,12 @@ BookPluginResult closeTree(List<Directive> directives, LedgerOptions options, Pr
       for (final subaccount in subaccounts) {
         out.add(
           Directive(
-            origin: const Origin.generated(),
+            origin: insertOrigin(
+              date: directive.date,
+              body: DirectiveBody.close(account: generatedAccount(subaccount, options)),
+              existing: directives,
+              info: info,
+            ),
             date: directive.date,
             body: DirectiveBody.close(account: generatedAccount(subaccount, options)),
           ),

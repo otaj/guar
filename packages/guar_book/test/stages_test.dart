@@ -21,7 +21,23 @@ void main() {
     expect(txns, hasLength(1));
     expect(txns.single.value.postings.first.units.number, Decimal.parse('100.00'));
     expect(txns.single.value.flag, Flag.letter('P'));
-    expect(txns.single.value.origin, const Origin.generated());
+    expect(txns.single.value.origin, isA<SourceOrigin>());
+    expect((txns.single.value.origin as SourceOrigin).location.filename, 'pad.beancount');
+  });
+
+  test('pad transactions follow insert-entry on posting accounts', () {
+    final source = '''
+2020-01-01 custom "fava-option" "insert-entry" "Assets:Checking"
+2020-01-01 open Assets:Checking
+2020-01-01 open Equity:Opening-Balances
+2020-01-01 pad Assets:Checking Equity:Opening-Balances
+2020-01-02 balance Assets:Checking 100.00 USD
+''';
+    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'checking.beancount'));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+    final txns = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>();
+    final origin = txns.single.value.origin as SourceOrigin;
+    expect(origin.location.filename, 'checking.beancount');
   });
 
   test('pad looks ahead through intervening transactions', () {

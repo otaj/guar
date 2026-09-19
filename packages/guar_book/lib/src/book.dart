@@ -84,7 +84,7 @@ class Book {
       directives = docs.directives;
       accumulated.addAll(docs.errors);
 
-      final padded = applyPad(directives, options);
+      final padded = applyPad(directives, options, info);
       directives = padded.directives;
       accumulated.addAll(padded.errors);
     }

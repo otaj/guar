@@ -122,7 +122,12 @@ bool metaFlag(Meta meta, String key) => switch (meta.lookup(key)) {
   _ => false,
 };
 
-List<Directive> createOpenDirectives(Iterable<String> newAccounts, List<Directive> entries, LedgerOptions options) {
+List<Directive> createOpenDirectives(
+  Iterable<String> newAccounts,
+  List<Directive> entries,
+  LedgerOptions options,
+  ProcessingInfo info,
+) {
   if (entries.isEmpty) return const [];
   final existing = {
     for (final directive in entries)
@@ -134,7 +139,12 @@ List<Directive> createOpenDirectives(Iterable<String> newAccounts, List<Directiv
     for (final name in names)
       if (!existing.contains(name))
         Directive(
-          origin: const Origin.generated(),
+          origin: insertOrigin(
+            date: date,
+            body: DirectiveBody.open(account: generatedAccount(name, options)),
+            existing: entries,
+            info: info,
+          ),
           date: date,
           body: DirectiveBody.open(account: generatedAccount(name, options)),
         ),

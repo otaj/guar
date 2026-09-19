@@ -15,7 +15,7 @@ BookPluginResult zerosumPlugin(List<Directive> directives, LedgerOptions options
   if (parsed == null) {
     return configError(directives, 'Invalid configuration for zerosum plugin; skipping.');
   }
-  final matched = _zerosum(directives, options, parsed);
+  final matched = _zerosum(directives, options, info, parsed);
   return _flagUnmatched(matched, parsed);
 }
 
@@ -68,6 +68,7 @@ _parse(String? config) {
 List<Directive> _zerosum(
   List<Directive> directives,
   LedgerOptions options,
+  ProcessingInfo info,
   ({
     Map<String, ({String target, int dateRange})> accounts,
     String replaceFrom,
@@ -156,7 +157,7 @@ List<Directive> _zerosum(
       }
     }
   }
-  return [...createOpenDirectives(newAccounts, current, options), ...current];
+  return [...createOpenDirectives(newAccounts, current, options, info), ...current];
 }
 
 BookPluginResult _flagUnmatched(

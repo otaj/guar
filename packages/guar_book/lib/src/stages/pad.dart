@@ -5,7 +5,7 @@ import 'package:guar_domain/guar_domain.dart';
 
 import '../stage_result.dart';
 
-StageResult applyPad(List<Directive> directives, LedgerOptions options) {
+StageResult applyPad(List<Directive> directives, LedgerOptions options, ProcessingInfo info) {
   final errors = <ProcessingError>[];
   final balances = <String, Inventory>{};
   final out = <Directive>[];
@@ -56,28 +56,34 @@ StageResult applyPad(List<Directive> directives, LedgerOptions options) {
         if (diff == Decimal.zero) {
           continue;
         }
-        final padTxn = Directive(
-          origin: const Origin.generated(),
-          date: directive.date,
-          body: DirectiveBody.transaction(
-            Transaction(
-              origin: const Origin.generated(),
-              flag: Flag.letter('P'),
-              narration: '(Padding inserted for Balance of ${nextBalance.amount} for difference $diff)',
-              postings: [
-                Posting(
-                  origin: const Origin.generated(),
-                  account: account,
-                  units: Amount(number: diff, currency: nextBalance.amount.currency, scale: nextBalance.amount.scale),
-                ),
-                Posting(
-                  origin: const Origin.generated(),
-                  account: sourceAccount,
-                  units: Amount(number: -diff, currency: nextBalance.amount.currency, scale: nextBalance.amount.scale),
-                ),
-              ],
+        final balance = nextBalance;
+        Transaction padTransaction(Origin origin) => Transaction(
+          origin: origin,
+          flag: Flag.letter('P'),
+          narration: '(Padding inserted for Balance of ${balance.amount} for difference $diff)',
+          postings: [
+            Posting(
+              origin: origin,
+              account: account,
+              units: Amount(number: diff, currency: balance.amount.currency, scale: balance.amount.scale),
             ),
-          ),
+            Posting(
+              origin: origin,
+              account: sourceAccount,
+              units: Amount(number: -diff, currency: balance.amount.currency, scale: balance.amount.scale),
+            ),
+          ],
+        );
+        final origin = insertOrigin(
+          date: directive.date,
+          body: DirectiveBody.transaction(padTransaction(const Origin.generated())),
+          existing: directives,
+          info: info,
+        );
+        final padTxn = Directive(
+          origin: origin,
+          date: directive.date,
+          body: DirectiveBody.transaction(padTransaction(origin)),
         );
         out.add(padTxn);
         final padded = balances[account.name] ?? const Inventory();

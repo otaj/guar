@@ -27,7 +27,15 @@ BookPluginResult checkClosing(List<Directive> directives, LedgerOptions options,
       postings.add(posting.copyWith(meta: metaWithout(posting.meta, _closingField)));
       balances.add(
         Directive(
-          origin: const Origin.generated(),
+          origin: insertOrigin(
+            date: addDays(directive.date, 1),
+            body: DirectiveBody.balance(
+              account: posting.account,
+              amount: Amount(number: Decimal.zero, currency: posting.units.currency),
+            ),
+            existing: directives,
+            info: info,
+          ),
           date: addDays(directive.date, 1),
           body: DirectiveBody.balance(
             account: posting.account,

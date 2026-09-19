@@ -23,7 +23,12 @@ BookPluginResult autoInsertOpen(
     final date = firstUse[account]!;
     inserts.add(
       Directive(
-        origin: const Origin.generated(),
+        origin: insertOrigin(
+          date: date,
+          body: DirectiveBody.open(account: generatedAccount(account, options)),
+          existing: directives,
+          info: info,
+        ),
         date: date,
         body: DirectiveBody.open(account: generatedAccount(account, options)),
       ),

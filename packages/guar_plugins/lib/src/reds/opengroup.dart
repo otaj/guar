@@ -70,22 +70,24 @@ BookPluginResult opengroup(List<Directive> directives, LedgerOptions options, Pr
       for (final leaf in leaves) {
         for (final acc in _runRule(rules, ruleName, account, leaf.trim(), opCurrency)) {
           if (open) {
+            final body = DirectiveBody.open(
+              account: rewriteAccount(acc.account, options),
+              currencies: [for (final currency in acc.currencies) Currency(name: currency)],
+            );
             inserted.add(
               Directive(
-                origin: const Origin.generated(),
+                origin: insertOrigin(date: directive.date, body: body, existing: directives, info: info),
                 date: directive.date,
-                body: DirectiveBody.open(
-                  account: rewriteAccount(acc.account, options),
-                  currencies: [for (final currency in acc.currencies) Currency(name: currency)],
-                ),
+                body: body,
               ),
             );
           } else {
+            final body = DirectiveBody.close(account: rewriteAccount(acc.account, options));
             inserted.add(
               Directive(
-                origin: const Origin.generated(),
+                origin: insertOrigin(date: directive.date, body: body, existing: directives, info: info),
                 date: directive.date,
-                body: DirectiveBody.close(account: rewriteAccount(acc.account, options)),
+                body: body,
               ),
             );
           }

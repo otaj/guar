@@ -50,5 +50,5 @@ BookPluginResult gainLoss(List<Directive> directives, LedgerOptions options, Pro
     }
     out.add(changed ? replaceTransaction(directive, transaction.copyWith(postings: postings)) : directive);
   }
-  return (directives: [...createOpenDirectives(newAccounts, directives, options), ...out], errors: const []);
+  return (directives: [...createOpenDirectives(newAccounts, directives, options, info), ...out], errors: const []);
 }

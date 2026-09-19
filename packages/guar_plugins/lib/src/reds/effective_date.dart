@@ -71,7 +71,7 @@ BookPluginResult effectiveDate(List<Directive> directives, LedgerOptions options
     created.add(replaceTransaction(directive, transaction.copyWith(postings: modified)));
   }
   return (
-    directives: [...createOpenDirectives(newAccounts, directives, options), ...filtered, ...created],
+    directives: [...createOpenDirectives(newAccounts, directives, options, info), ...filtered, ...created],
     errors: errors,
   );
 }

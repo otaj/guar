@@ -35,6 +35,8 @@ BookPluginResult addImplicitPrices(
           currency: units.currency,
           amount: posting.price!,
           tag: 'from_price',
+          existing: directives,
+          info: info,
         );
       } else if (cost != null && added.result != MatchResult.reduced) {
         priceEntry = _priceDirective(
@@ -42,6 +44,8 @@ BookPluginResult addImplicitPrices(
           currency: units.currency,
           amount: Amount(number: cost.number, currency: cost.currency),
           tag: 'from_cost',
+          existing: directives,
+          info: info,
         );
       }
 
@@ -64,13 +68,16 @@ Directive _priceDirective({
   required Currency currency,
   required Amount amount,
   required String tag,
+  required List<Directive> existing,
+  required ProcessingInfo info,
 }) {
+  final body = DirectiveBody.price(currency: currency, amount: amount);
   return Directive(
-    origin: const Origin.generated(),
+    origin: insertOrigin(date: date, body: body, existing: existing, info: info),
     date: date,
     meta: Meta(
       entries: [MetaEntry(key: _implicitPricesField, value: MetaValue.text(tag))],
     ),
-    body: DirectiveBody.price(currency: currency, amount: amount),
+    body: body,
   );
 }

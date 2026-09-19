@@ -41,7 +41,18 @@ BookPluginResult checkDrained(List<Directive> directives, LedgerOptions options,
         if (balances.contains('${account.name}|$dateKey|$currency')) continue;
         out.add(
           Directive(
-            origin: const Origin.generated(),
+            origin: insertOrigin(
+              date: addDays(directive.date, 1),
+              body: DirectiveBody.balance(
+                account: account,
+                amount: Amount(
+                  number: Decimal.zero,
+                  currency: Currency(name: currency),
+                ),
+              ),
+              existing: directives,
+              info: info,
+            ),
             date: addDays(directive.date, 1),
             body: DirectiveBody.balance(
               account: account,
