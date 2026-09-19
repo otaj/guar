@@ -3,18 +3,19 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import '../domain/domain.dart';
+import 'package:guar_parser/src/domain/domain.dart';
 
-String exportLedger(ParsedLedger ledger) {
-  return switch (ledger) {
-    ParsedLedgerErrors() => throw StateError('cannot export a ledger with parse errors'),
-    ParsedLedgerDirectives(:final directives, :final info) => _render(directives, info),
-  };
-}
+String exportLedger(ParsedLedger ledger) => switch (ledger) {
+  ParsedLedgerErrors() => throw StateError('cannot export a ledger with parse errors'),
+  ParsedLedgerDirectives(:final List<ParsedDirective> directives, :final ProcessingInfo info) => _render(
+    directives,
+    info,
+  ),
+};
 
 void writeExportedLedger(ParsedLedger ledger, File file, {required bool overwrite}) {
   if (file.existsSync()) {
-    final existing = file.readAsStringSync();
+    final String existing = file.readAsStringSync();
     if (existing.isNotEmpty && !overwrite) {
       throw StateError('refusing to overwrite ${file.path}');
     }
@@ -23,9 +24,9 @@ void writeExportedLedger(ParsedLedger ledger, File file, {required bool overwrit
 }
 
 String _render(List<ParsedDirective> directives, ProcessingInfo info) {
-  final mainName = info.filename ?? '';
-  final main = _FileRender();
-  final included = <String, _FileRender>{};
+  final String mainName = info.filename ?? '';
+  final _FileRender main = _FileRender();
+  final Map<String, _FileRender> included = <String, _FileRender>{};
 
   _FileRender bucket(String filename) {
     if (filename == mainName) {
@@ -34,38 +35,38 @@ String _render(List<ParsedDirective> directives, ProcessingInfo info) {
     return included.putIfAbsent(filename, _FileRender.new);
   }
 
-  for (final setting in info.optionSettings) {
+  for (final OptionSetting setting in info.optionSettings) {
     bucket(setting.location.filename).place(setting.location.linenoBegin, _optionLine(setting));
   }
-  for (final plugin in info.plugin) {
+  for (final Plugin plugin in info.plugin) {
     bucket(plugin.location.filename).place(plugin.location.linenoBegin, _pluginLine(plugin));
   }
-  for (final directive in directives) {
+  for (final ParsedDirective directive in directives) {
     _placeDirective(bucket(directive.location.filename), directive);
   }
 
-  final chunks = <String>[];
-  final mainText = main.render();
+  final List<String> chunks = <String>[];
+  final String mainText = main.render();
   if (mainText.isNotEmpty) {
     chunks.add(mainText);
   }
-  final seen = <String>{};
-  for (final path in info.include) {
-    final part = included[path];
+  final Set<String> seen = <String>{};
+  for (final String path in info.include) {
+    final _FileRender? part = included[path];
     if (part == null) {
       continue;
     }
     seen.add(path);
-    final text = part.renderRebased();
+    final String text = part.renderRebased();
     if (text.isNotEmpty) {
       chunks.add(text);
     }
   }
-  for (final entry in included.entries) {
+  for (final MapEntry<String, _FileRender> entry in included.entries) {
     if (seen.contains(entry.key)) {
       continue;
     }
-    final text = entry.value.renderRebased();
+    final String text = entry.value.renderRebased();
     if (text.isNotEmpty) {
       chunks.add(text);
     }
@@ -77,13 +78,13 @@ String _render(List<ParsedDirective> directives, ProcessingInfo info) {
 }
 
 void _placeDirective(_FileRender file, ParsedDirective directive) {
-  final begin = directive.location.linenoBegin;
+  final int begin = directive.location.linenoBegin;
   file.place(begin, _directiveHeader(directive));
-  var metaLine = begin + 1;
-  var metaIndex = 0;
-  if (directive.body case TransactionBody(:final value)) {
-    final firstPosting = value.postings.isEmpty ? null : value.postings.first.location.linenoBegin;
-    for (final entry in directive.meta.entries) {
+  int metaLine = begin + 1;
+  int metaIndex = 0;
+  if (directive.body case TransactionBody(:final ParsedTransaction value)) {
+    final int? firstPosting = value.postings.isEmpty ? null : value.postings.first.location.linenoBegin;
+    for (final MetaEntry entry in directive.meta.entries) {
       if (firstPosting != null && metaLine >= firstPosting) {
         break;
       }
@@ -91,37 +92,37 @@ void _placeDirective(_FileRender file, ParsedDirective directive) {
       metaIndex += 1;
       metaLine += 1;
     }
-    for (final posting in value.postings) {
-      var postingLine = posting.location.linenoBegin;
+    for (final ParsedPosting posting in value.postings) {
+      int postingLine = posting.location.linenoBegin;
       file.place(postingLine, _postingLine(posting));
       postingLine += 1;
-      for (final entry in posting.meta.entries) {
+      for (final MetaEntry entry in posting.meta.entries) {
         file.place(postingLine, '  ${_metaLine(entry)}');
         postingLine += 1;
       }
     }
     if (metaIndex < directive.meta.entries.length) {
-      var after = value.postings.isEmpty
+      int after = value.postings.isEmpty
           ? begin + 1
           : value.postings.last.location.linenoBegin + 1 + value.postings.last.meta.entries.length;
-      for (final entry in directive.meta.entries.skip(metaIndex)) {
+      for (final MetaEntry entry in directive.meta.entries.skip(metaIndex)) {
         file.place(after, '  ${_metaLine(entry)}');
         after += 1;
       }
     }
     return;
   }
-  for (final entry in directive.meta.entries) {
+  for (final MetaEntry entry in directive.meta.entries) {
     file.place(metaLine, '  ${_metaLine(entry)}');
     metaLine += 1;
   }
 }
 
 class _FileRender {
-  final Map<int, String> _lines = {};
+  final Map<int, String> _lines = <int, String>{};
 
   void place(int line, String text) {
-    var at = line < 1 ? 1 : line;
+    int at = line < 1 ? 1 : line;
     while (_lines.containsKey(at)) {
       at += 1;
     }
@@ -134,9 +135,9 @@ class _FileRender {
     if (_lines.isEmpty) {
       return '';
     }
-    final minLine = _lines.keys.reduce(math.min);
-    final shifted = <int, String>{};
-    for (final entry in _lines.entries) {
+    final int minLine = _lines.keys.reduce(math.min);
+    final Map<int, String> shifted = <int, String>{};
+    for (final MapEntry<int, String> entry in _lines.entries) {
       shifted[entry.key - minLine + 1] = entry.value;
     }
     return _join(shifted);
@@ -146,9 +147,9 @@ class _FileRender {
     if (lines.isEmpty) {
       return '';
     }
-    final last = lines.keys.reduce(math.max);
-    final out = <String>[];
-    for (var i = 1; i <= last; i++) {
+    final int last = lines.keys.reduce(math.max);
+    final List<String> out = <String>[];
+    for (int i = 1; i <= last; i++) {
       out.add(lines[i] ?? '');
     }
     return '${out.join('\n')}\n';
@@ -165,46 +166,49 @@ String _pluginLine(Plugin plugin) {
 }
 
 String _directiveHeader(ParsedDirective directive) {
-  final date = _date(directive.date);
+  final String date = _date(directive.date);
   return switch (directive.body) {
-    TransactionBody(:final value) => _transactionHeader(date, value),
-    PriceBody(:final currency, :final amount) => '$date price ${currency.name} ${_amount(amount)}',
-    BalanceBody(:final account, :final amount, :final tolerance) =>
+    TransactionBody(:final ParsedTransaction value) => _transactionHeader(date, value),
+    PriceBody(:final Currency currency, :final Amount amount) => '$date price ${currency.name} ${_amount(amount)}',
+    BalanceBody(:final Account account, :final Amount amount, :final BeanNumber? tolerance) =>
       tolerance == null
           ? '$date balance ${account.name} ${_amount(amount)}'
           : '$date balance ${account.name} ${amount.number.verbatim} ~ ${tolerance.verbatim} ${amount.currency.name}',
-    OpenBody(:final account, :final currencies, :final booking) => [
+    OpenBody(:final Account account, :final List<Currency> currencies, :final BookingMethod? booking) => <String>[
       '$date open ${account.name}',
-      if (currencies.isNotEmpty) currencies.map((c) => c.name).join(','),
+      if (currencies.isNotEmpty) currencies.map((Currency c) => c.name).join(','),
       if (booking != null) _quote(_booking(booking)),
     ].join(' '),
-    CloseBody(:final account) => '$date close ${account.name}',
-    CommodityBody(:final currency) => '$date commodity ${currency.name}',
-    PadBody(:final account, :final sourceAccount) => '$date pad ${account.name} ${sourceAccount.name}',
-    DocumentBody(:final account, :final filename, :final tags, :final links) => _suffixTags(
-      '$date document ${account.name} ${_quote(filename)}',
-      tags,
-      links,
-    ),
-    NoteBody(:final account, :final comment, :final tags, :final links) => _suffixTags(
-      '$date note ${account.name} ${_quote(comment)}',
-      tags,
-      links,
-    ),
-    EventBody(:final name, :final description) => '$date event ${_quote(name)} ${_quote(description)}',
-    QueryBody(:final name, :final queryString) => '$date query ${_quote(name)} ${_quote(queryString)}',
-    CustomBody(:final type, :final values) => [
+    CloseBody(:final Account account) => '$date close ${account.name}',
+    CommodityBody(:final Currency currency) => '$date commodity ${currency.name}',
+    PadBody(:final Account account, :final Account sourceAccount) => '$date pad ${account.name} ${sourceAccount.name}',
+    DocumentBody(:final Account account, :final String filename, :final List<Tag> tags, :final List<Link> links) =>
+      _suffixTags(
+        '$date document ${account.name} ${_quote(filename)}',
+        tags,
+        links,
+      ),
+    NoteBody(:final Account account, :final String comment, :final List<Tag> tags, :final List<Link> links) =>
+      _suffixTags(
+        '$date note ${account.name} ${_quote(comment)}',
+        tags,
+        links,
+      ),
+    EventBody(:final String name, :final String description) => '$date event ${_quote(name)} ${_quote(description)}',
+    QueryBody(:final String name, :final String queryString) => '$date query ${_quote(name)} ${_quote(queryString)}',
+    CustomBody(:final String type, :final List<CustomValue> values) => <String>[
       '$date custom ${_quote(type)}',
-      for (final value in values) _customValue(value),
+      for (final CustomValue value in values) _customValue(value),
     ].join(' '),
   };
 }
 
 String _transactionHeader(String date, ParsedTransaction txn) {
-  final parts = <String>[_flag(txn.flag)];
+  final List<String> parts = <String>[_flag(txn.flag)];
   if (txn.payee != null) {
-    parts.add(_quote(txn.payee!));
-    parts.add(_quote(txn.narration));
+    parts
+      ..add(_quote(txn.payee!))
+      ..add(_quote(txn.narration));
   } else if (txn.narration.isNotEmpty) {
     parts.add(_quote(txn.narration));
   }
@@ -212,13 +216,13 @@ String _transactionHeader(String date, ParsedTransaction txn) {
 }
 
 String _postingLine(ParsedPosting posting) {
-  final parts = <String>[];
+  final List<String> parts = <String>[];
   if (posting.flag != null) {
     parts.add(_flag(posting.flag!));
   }
   parts.add(posting.account.name);
   if (posting.units != null) {
-    final units = _incomplete(posting.units!);
+    final String units = _incomplete(posting.units!);
     if (units.isNotEmpty) {
       parts.add(units);
     }
@@ -233,7 +237,7 @@ String _postingLine(ParsedPosting posting) {
 }
 
 String _cost(ParsedCost cost) {
-  final parts = <String>[];
+  final List<String> parts = <String>[];
   if (cost.numberPer != null) {
     parts.add(cost.numberPer!.verbatim);
   }
@@ -243,7 +247,7 @@ String _cost(ParsedCost cost) {
   if (cost.currency != null) {
     parts.add(cost.currency!.name);
   }
-  final extras = <String>[];
+  final List<String> extras = <String>[];
   if (cost.date != null) {
     extras.add(_date(cost.date!));
   }
@@ -253,7 +257,7 @@ String _cost(ParsedCost cost) {
   if (cost.merge) {
     extras.add('*');
   }
-  var inner = parts.join(' ');
+  String inner = parts.join(' ');
   if (extras.isNotEmpty) {
     inner = inner.isEmpty ? extras.join(', ') : '$inner, ${extras.join(', ')}';
   }
@@ -261,8 +265,8 @@ String _cost(ParsedCost cost) {
 }
 
 String _price(ParsedPrice price) {
-  final mark = price.isTotal ? '@@' : '@';
-  final amount = _incomplete(IncompleteAmount(number: price.number, currency: price.currency));
+  final String mark = price.isTotal ? '@@' : '@';
+  final String amount = _incomplete(IncompleteAmount(number: price.number, currency: price.currency));
   return amount.isEmpty ? mark : '$mark $amount';
 }
 
@@ -284,7 +288,7 @@ String _amount(Amount amount) => '${amount.number.verbatim} ${amount.currency.na
 String _metaLine(MetaEntry entry) {
   if (entry.key.isEmpty) {
     return switch (entry.value) {
-      MetaTag(:final value) => '#${value.name}',
+      MetaTag(:final Tag value) => '#${value.name}',
       _ => entry.value == null ? ':' : ': ${_metaValue(entry.value!)}',
     };
   }
@@ -294,64 +298,59 @@ String _metaLine(MetaEntry entry) {
   return '${entry.key}: ${_metaValue(entry.value!)}';
 }
 
-String _metaValue(MetaValue value) {
-  return switch (value) {
-    MetaText(:final value) => _quote(value),
-    MetaAccount(:final value) => value.name,
-    MetaCurrency(:final value) => value.name,
-    MetaTag(:final value) => '#${value.name}',
-    MetaDate(:final value) => _date(value),
-    MetaBoolean(:final value) => value ? 'TRUE' : 'FALSE',
-    MetaNumber(:final value) => value.verbatim,
-    MetaAmount(:final value) => _amount(value),
-  };
-}
+String _metaValue(MetaValue value) => switch (value) {
+  MetaText(:final String value) => _quote(value),
+  MetaAccount(:final Account value) => value.name,
+  MetaCurrency(:final Currency value) => value.name,
+  MetaTag(:final Tag value) => '#${value.name}',
+  MetaDate(:final BeanDate value) => _date(value),
+  MetaBoolean(:final bool value) => value ? 'TRUE' : 'FALSE',
+  MetaNumber(:final BeanNumber value) => value.verbatim,
+  MetaAmount(:final Amount value) => _amount(value),
+};
 
-String _customValue(CustomValue value) {
-  return switch (value) {
-    CustomText(:final value) => _quote(value),
-    CustomAccount(:final value) => value.name,
-    CustomDate(:final value) => _date(value),
-    CustomBoolean(:final value) => value ? 'TRUE' : 'FALSE',
-    CustomNumber(:final value) => value.verbatim,
-    CustomAmount(:final value) => _amount(value),
-    CustomCurrency(:final value) => value.name,
-  };
-}
+String _customValue(CustomValue value) => switch (value) {
+  CustomText(:final String value) => _quote(value),
+  CustomAccount(:final Account value) => value.name,
+  CustomDate(:final BeanDate value) => _date(value),
+  CustomBoolean(:final bool value) => value ? 'TRUE' : 'FALSE',
+  CustomNumber(:final BeanNumber value) => value.verbatim,
+  CustomAmount(:final Amount value) => _amount(value),
+  CustomCurrency(:final Currency value) => value.name,
+};
 
 String _suffixTags(String head, List<Tag> tags, List<Link> links) {
-  final extra = [for (final tag in tags) '#${tag.name}', for (final link in links) '^${link.name}'];
+  final List<String> extra = <String>[
+    for (final Tag tag in tags) '#${tag.name}',
+    for (final Link link in links) '^${link.name}',
+  ];
   if (extra.isEmpty) {
     return head;
   }
   return '$head ${extra.join(' ')}';
 }
 
-String _flag(Flag flag) {
-  return switch (flag) {
-    SpecialFlagValue(:final value) => switch (value) {
-      SpecialFlag.asterisk => '*',
-      SpecialFlag.exclamation => '!',
-      SpecialFlag.hash => '#',
-      SpecialFlag.ampersand => '&',
-      SpecialFlag.question => '?',
-      SpecialFlag.percent => '%',
-    },
-    LetterFlag(:final value) => value,
-  };
-}
+String _flag(Flag flag) => switch (flag) {
+  SpecialFlagValue(:final SpecialFlag value) => switch (value) {
+    SpecialFlag.asterisk => '*',
+    SpecialFlag.exclamation => '!',
+    SpecialFlag.hash => '#',
+    SpecialFlag.ampersand => '&',
+    SpecialFlag.question => '?',
+    SpecialFlag.percent => '%',
+  },
+  LetterFlag(:final String value) => value,
+};
 
-String _booking(BookingMethod method) {
-  return switch (method) {
-    BookingMethod.strict => 'STRICT',
-    BookingMethod.strictWithSize => 'STRICT_WITH_SIZE',
-    BookingMethod.none => 'NONE',
-    BookingMethod.average => 'AVERAGE',
-    BookingMethod.fifo => 'FIFO',
-    BookingMethod.lifo => 'LIFO',
-    BookingMethod.hifo => 'HIFO',
-  };
-}
+String _booking(BookingMethod method) => switch (method) {
+  BookingMethod.strict => 'STRICT',
+  BookingMethod.strictWithSize => 'STRICT_WITH_SIZE',
+  BookingMethod.none => 'NONE',
+  BookingMethod.average => 'AVERAGE',
+  BookingMethod.fifo => 'FIFO',
+  BookingMethod.lifo => 'LIFO',
+  BookingMethod.hifo => 'HIFO',
+};
 
 String _date(BeanDate date) => '$date';
 

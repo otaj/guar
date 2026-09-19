@@ -2,7 +2,7 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'validation.dart';
+import 'package:guar_domain/src/validation.dart';
 
 part 'account.freezed.dart';
 
@@ -15,12 +15,11 @@ bool isAccountOrSubaccount(String name, String ancestor) =>
 
 @Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class Account with _$Account {
-  const Account._();
-
   factory Account({required String name, required AccountType type}) {
     ensureAccountName(name);
     return Account._create(name: name, type: type);
   }
+  const Account._();
 
   factory Account.budget({required String name, required AccountType type}) {
     ensureBudgetAccountName(name);

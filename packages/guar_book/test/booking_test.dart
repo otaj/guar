@@ -14,8 +14,8 @@ p.ParsedDirective open(String account, {int line = 1}) => p.ParsedDirective(
 
 void main() {
   test('complete cash transaction passes through with defaults', () {
-    final parsed = p.ParsedLedger.directives(
-      directives: [
+    final p.ParsedLedger parsed = p.ParsedLedger.directives(
+      directives: <p.ParsedDirective>[
         open('Assets:Cash'),
         open('Expenses:Food', line: 2),
         p.ParsedDirective(
@@ -25,7 +25,7 @@ void main() {
             p.ParsedTransaction(
               flag: const p.Flag.special(p.SpecialFlag.asterisk),
               narration: 'lunch',
-              postings: [
+              postings: <p.ParsedPosting>[
                 p.ParsedPosting(
                   location: p.BeanLocation(linenoBegin: 4, linenoEnd: 4),
                   account: p.Account(name: 'Expenses:Food'),
@@ -49,18 +49,23 @@ void main() {
       ],
     );
 
-    final ledger = Book().process(parsed);
+    final Ledger ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final directives = (ledger as LedgerDirectives).directives;
-    final txn = directives.whereType<Directive>().map((d) => d.body).whereType<TransactionBody>().single.value;
+    final List<Directive> directives = (ledger as LedgerDirectives).directives;
+    final Transaction txn = directives
+        .whereType<Directive>()
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>()
+        .single
+        .value;
     expect(txn.postings, hasLength(2));
     expect(txn.postings.first.units.number, Decimal.parse('10.00'));
     expect(txn.postings.first.account.type, AccountType.expenses);
   });
 
   test('interpolates a single elided posting', () {
-    final parsed = p.ParsedLedger.directives(
-      directives: [
+    final p.ParsedLedger parsed = p.ParsedLedger.directives(
+      directives: <p.ParsedDirective>[
         open('Assets:Cash'),
         open('Expenses:Food', line: 2),
         p.ParsedDirective(
@@ -70,7 +75,7 @@ void main() {
             p.ParsedTransaction(
               flag: const p.Flag.special(p.SpecialFlag.asterisk),
               narration: 'lunch',
-              postings: [
+              postings: <p.ParsedPosting>[
                 p.ParsedPosting(
                   location: p.BeanLocation(linenoBegin: 4, linenoEnd: 4),
                   account: p.Account(name: 'Expenses:Food'),
@@ -90,16 +95,20 @@ void main() {
       ],
     );
 
-    final ledger = Book().process(parsed);
+    final Ledger ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
+    final Transaction txn = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>()
+        .single
+        .value;
     expect(txn.postings.last.units.number, Decimal.parse('-12.50'));
     expect(txn.postings.last.units.currency.name, 'USD');
   });
 
   test('converts total cost to per-unit cost', () {
-    final parsed = p.ParsedLedger.directives(
-      directives: [
+    final p.ParsedLedger parsed = p.ParsedLedger.directives(
+      directives: <p.ParsedDirective>[
         open('Assets:Shares'),
         open('Assets:Cash', line: 2),
         p.ParsedDirective(
@@ -109,7 +118,7 @@ void main() {
             p.ParsedTransaction(
               flag: const p.Flag.special(p.SpecialFlag.asterisk),
               narration: 'buy',
-              postings: [
+              postings: <p.ParsedPosting>[
                 p.ParsedPosting(
                   location: p.BeanLocation(linenoBegin: 4, linenoEnd: 4),
                   account: p.Account(name: 'Assets:Shares'),
@@ -137,51 +146,63 @@ void main() {
       ],
     );
 
-    final ledger = Book().process(parsed);
+    final Ledger ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
+    final Transaction txn = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>()
+        .single
+        .value;
     expect(txn.postings.first.cost!.number, Decimal.parse('100.00'));
     expect(txn.postings.first.cost!.currency.name, 'USD');
     expect(txn.postings.first.cost!.date, BeanDate(year: 2020, month: 3, day: 1));
   });
 
   test('parses total-cost double braces', () {
-    final source = '''
+    const String source = '''
 2024-01-01 open Assets:Brokerage
 2024-01-01 open Assets:Bank
 2024-01-15 * "Buy stock"
   Assets:Brokerage  10 AAPL {{1500.00 USD}}
   Assets:Bank      -1500.00 USD
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
+    final Transaction txn = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>()
+        .single
+        .value;
     expect(txn.postings.first.cost!.number, Decimal.parse('150.00'));
     expect(txn.postings.first.flag, isNull);
   });
 
   test('parses posting flags', () {
-    final source = '''
+    const String source = '''
 2024-01-01 open Assets:Bank
 2024-01-01 open Expenses:Food
 2024-01-15 * "Posting flag"
   ! Expenses:Food  12.50 USD
   Assets:Bank
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final txn = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>().single.value;
+    final Transaction txn = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>()
+        .single
+        .value;
     expect(txn.postings.first.flag, const Flag.special(SpecialFlag.exclamation));
   });
 
   test('meta accounts take their type from option prefixes', () {
-    final parsed = p.ParsedLedger.directives(
-      directives: [
+    final p.ParsedLedger parsed = p.ParsedLedger.directives(
+      directives: <p.ParsedDirective>[
         p.ParsedDirective(
           location: p.BeanLocation(linenoBegin: 1, linenoEnd: 2),
           date: p.BeanDate(year: 2020, month: 1, day: 1),
           meta: p.Meta(
-            entries: [
+            entries: <p.MetaEntry>[
               p.MetaEntry(
                 key: 'related',
                 value: p.MetaValue.account(p.Account(name: 'Expenses:Food')),
@@ -192,9 +213,9 @@ void main() {
         ),
       ],
     );
-    final ledger = Book().process(parsed);
+    final Ledger ledger = Book().process(parsed);
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final metaAccount = (ledger as LedgerDirectives).directives.single.meta.lookup('related');
+    final MetaValue? metaAccount = (ledger as LedgerDirectives).directives.single.meta.lookup('related');
     expect(metaAccount, MetaValue.account(Account(name: 'Expenses:Food', type: AccountType.expenses)));
   });
 }

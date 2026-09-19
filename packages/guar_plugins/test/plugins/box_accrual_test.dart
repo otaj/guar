@@ -8,7 +8,7 @@ import 'support.dart';
 
 void main() {
   test('splits a multi-year capital loss across calendar years', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.auto_accounts"\n'
       'plugin "beancount_reds_plugins.box_accrual.box_accrual"\n'
       '2025-09-25 * "SPX 18DEC26" "Box Borrow 100k"\n'
@@ -18,12 +18,12 @@ void main() {
       '  Liabilities:Loans:BoxSpreadLoans                                      -90012 USD\n'
       '  Income:Investments:Taxable:BoxTrades:Capital-Losses                    -4994 USD\n',
     );
-    final txn = [
-      for (final directive in directives)
-        if (directive.body case TransactionBody(:final value)) value,
+    final Transaction txn = <Transaction>[
+      for (final Directive directive in directives)
+        if (directive.body case TransactionBody(:final Transaction value)) value,
     ].single;
-    final losses = [
-      for (final posting in txn.postings)
+    final List<Posting> losses = <Posting>[
+      for (final Posting posting in txn.postings)
         if (posting.account.name.endsWith(':Capital-Losses')) posting,
     ];
     expect(losses, hasLength(2));
@@ -38,10 +38,10 @@ void main() {
 }
 
 BeanDate? metaDate(Meta meta) {
-  for (final entry in meta.entries) {
+  for (final MetaEntry entry in meta.entries) {
     if (entry.key == 'effective_date') {
       return switch (entry.value) {
-        MetaDate(:final value) => value,
+        MetaDate(:final BeanDate value) => value,
         _ => null,
       };
     }

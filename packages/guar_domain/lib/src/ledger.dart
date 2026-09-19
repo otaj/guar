@@ -2,8 +2,8 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'directive.dart';
-import 'options.dart';
+import 'package:guar_domain/src/directive.dart';
+import 'package:guar_domain/src/options.dart';
 
 part 'ledger.freezed.dart';
 
@@ -11,16 +11,16 @@ part 'ledger.freezed.dart';
 sealed class Ledger with _$Ledger {
   const factory Ledger.directives({
     required List<Directive> directives,
-    @Default([]) List<ProcessingError> errors,
-    @Default([]) List<ProcessingWarning> warnings,
     required LedgerOptions options,
+    @Default(<dynamic>[]) List<ProcessingError> errors,
+    @Default(<dynamic>[]) List<ProcessingWarning> warnings,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerDirectives;
 
   const factory Ledger.errors({
     required List<ProcessingError> errors,
-    @Default([]) List<ProcessingWarning> warnings,
     required LedgerOptions options,
+    @Default(<dynamic>[]) List<ProcessingWarning> warnings,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerErrors;
 }

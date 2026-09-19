@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 void main() {
   group('Amount', () {
     test('constructor keeps number and currency', () {
-      final amount = Amount(
+      final Amount amount = Amount(
         number: Decimal.parse('100034.02'),
         currency: Currency(name: 'USD'),
       );
@@ -33,23 +33,23 @@ void main() {
     });
 
     test('equality and hash ignore identity', () {
-      final a = Amount(
+      final Amount a = Amount(
         number: Decimal.parse('100'),
         currency: Currency(name: 'USD'),
       );
-      final b = Amount(
+      final Amount b = Amount(
         number: Decimal.parse('100'),
         currency: Currency(name: 'USD'),
       );
-      final c = Amount(
+      final Amount c = Amount(
         number: Decimal.parse('101'),
         currency: Currency(name: 'USD'),
       );
       expect(a, b);
       expect(a, isNot(c));
-      expect({a: true, b: false}.length, 1);
+      expect(<Amount, bool>{a: true, b: false}.length, 1);
       expect(
-        {
+        <Amount, bool>{
           a: true,
           Amount(
             number: Decimal.parse('100'),
@@ -61,7 +61,7 @@ void main() {
     });
 
     test('sort is currency-first then number', () {
-      final amounts = [
+      final List<Amount> amounts = <Amount>[
         Amount(
           number: Decimal.parse('1'),
           currency: Currency(name: 'USD'),
@@ -87,7 +87,7 @@ void main() {
           currency: Currency(name: 'EUR'),
         ),
       ]..sort(Amount.compare);
-      expect(amounts, [
+      expect(amounts, <Amount>[
         Amount(
           number: Decimal.parse('100'),
           currency: Currency(name: 'CAD'),
@@ -149,7 +149,7 @@ void main() {
     });
 
     test('mul and div scale the number', () {
-      final amount = Amount(
+      final Amount amount = Amount(
         number: Decimal.parse('100'),
         currency: Currency(name: 'CAD'),
       );

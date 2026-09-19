@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _plugin = 'plugin "beancount_reds_plugins.opengroup.opengroup" "{}"\n';
+const String _plugin = 'plugin "beancount_reds_plugins.opengroup.opengroup" "{}"\n';
 
 void main() {
   test('empty entries', () {
@@ -21,7 +21,7 @@ void main() {
           '  opengroup_commodity_leaves_income: "ABC,DEFGH"\n',
         ),
       ),
-      containsAll([
+      containsAll(<dynamic>[
         'Assets:Investments:Taxable:Midelity PARENT',
         'Income:Investments:Taxable:Capital-Gains:Midelity:ABC USD',
         'Income:Investments:Taxable:Dividends:Midelity:ABC USD',
@@ -42,7 +42,7 @@ void main() {
           '  opengroup_commodity_leaves_income_and_asset: "ABC,DEFGH"\n',
         ),
       ),
-      containsAll([
+      containsAll(<dynamic>[
         'Assets:Investments:Taxable:Midelity:ABC ABC',
         'Assets:Investments:Taxable:Midelity:DEFGH DEFGH',
         'Income:Investments:Taxable:Dividends:Midelity:ABC USD',
@@ -51,8 +51,8 @@ void main() {
   });
 }
 
-List<String> _openLines(List<Directive> directives) => [
-  for (final directive in directives)
-    if (directive.body case OpenBody(:final account, :final currencies))
-      currencies.isEmpty ? account.name : '${account.name} ${currencies.map((c) => c.name).join(',')}',
+List<String> _openLines(List<Directive> directives) => <String>[
+  for (final Directive directive in directives)
+    if (directive.body case OpenBody(:final Account account, :final List<Currency> currencies))
+      currencies.isEmpty ? account.name : '${account.name} ${currencies.map((Currency c) => c.name).join(',')}',
 ];

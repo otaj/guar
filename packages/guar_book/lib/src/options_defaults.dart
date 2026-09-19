@@ -4,7 +4,7 @@ import 'package:guar_domain/guar_domain.dart' as d;
 import 'package:guar_parser/guar_parser.dart' as p;
 
 d.LedgerOptions defaultOptions(p.LedgerOptions options) {
-  final prefixes = d.AccountPrefixes(
+  final d.AccountPrefixes prefixes = d.AccountPrefixes(
     assets: options.accountPrefixes.assets ?? 'Assets',
     liabilities: options.accountPrefixes.liabilities ?? 'Liabilities',
     equity: options.accountPrefixes.equity ?? 'Equity',
@@ -23,19 +23,21 @@ d.LedgerOptions defaultOptions(p.LedgerOptions options) {
     accountUnrealizedGains: _mappedOptionAccount(options.accountUnrealizedGains?.name, prefixes),
     accountRounding: options.accountRounding == null ? null : domainAccount(options.accountRounding!.name, prefixes),
     conversionCurrency: options.conversionCurrency == null ? null : d.Currency(name: options.conversionCurrency!.name),
-    displayPrecision: [
-      for (final precision in options.displayPrecision)
+    displayPrecision: <d.DisplayPrecision>[
+      for (final p.DisplayPrecision precision in options.displayPrecision)
         d.DisplayPrecision(key: _displayKey(precision.key), value: precision.value.resolved),
     ],
-    inferredToleranceDefault: [
-      for (final tolerance in options.inferredToleranceDefault)
+    inferredToleranceDefault: <d.InferredTolerance>[
+      for (final p.InferredTolerance tolerance in options.inferredToleranceDefault)
         d.InferredTolerance(key: _currencyKey(tolerance.key), value: tolerance.value.resolved),
     ],
     inferredToleranceMultiplier: _optionNumber(options.inferredToleranceMultiplier),
     toleranceMultiplier: _optionNumber(options.toleranceMultiplier),
     inferToleranceFromCost: options.inferToleranceFromCost,
     documents: List<String>.from(options.documents),
-    operatingCurrency: [for (final currency in options.operatingCurrency) d.Currency(name: currency.name)],
+    operatingCurrency: <d.Currency>[
+      for (final p.Currency currency in options.operatingCurrency) d.Currency(name: currency.name),
+    ],
     renderCommas: options.renderCommas,
     pluginProcessingMode: switch (options.pluginProcessingMode) {
       p.PluginProcessingMode.raw => d.PluginProcessingMode.raw,
@@ -51,27 +53,25 @@ d.LedgerOptions defaultOptions(p.LedgerOptions options) {
   );
 }
 
-d.ProcessingInfo mapInfo(p.ProcessingInfo info) {
-  return d.ProcessingInfo(
-    filename: info.filename,
-    include: List<String>.from(info.include),
-    commodities: [for (final currency in info.commodities) d.Currency(name: currency.name)],
-    plugin: [
-      for (final plugin in info.plugin)
-        d.Plugin(name: plugin.name, config: plugin.config, location: mapLocation(plugin.location)),
+d.ProcessingInfo mapInfo(p.ProcessingInfo info) => d.ProcessingInfo(
+  filename: info.filename,
+  include: List<String>.from(info.include),
+  commodities: <d.Currency>[for (final p.Currency currency in info.commodities) d.Currency(name: currency.name)],
+  plugin: <d.Plugin>[
+    for (final p.Plugin plugin in info.plugin)
+      d.Plugin(name: plugin.name, config: plugin.config, location: mapLocation(plugin.location)),
+  ],
+  displayContext: d.DisplayContext(
+    precisions: <d.DisplayPrecision>[
+      for (final p.DisplayPrecision precision in info.displayContext.precisions)
+        d.DisplayPrecision(key: _displayKey(precision.key), value: precision.value.resolved),
     ],
-    displayContext: d.DisplayContext(
-      precisions: [
-        for (final precision in info.displayContext.precisions)
-          d.DisplayPrecision(key: _displayKey(precision.key), value: precision.value.resolved),
-      ],
-    ),
-    optionSettings: [
-      for (final setting in info.optionSettings)
-        d.OptionSetting(location: mapLocation(setting.location), key: setting.key, value: setting.value),
-    ],
-  );
-}
+  ),
+  optionSettings: <d.OptionSetting>[
+    for (final p.OptionSetting setting in info.optionSettings)
+      d.OptionSetting(location: mapLocation(setting.location), key: setting.key, value: setting.value),
+  ],
+);
 
 d.BeanLocation mapLocation(p.BeanLocation location) =>
     d.BeanLocation(filename: location.filename, linenoBegin: location.linenoBegin, linenoEnd: location.linenoEnd);
@@ -80,18 +80,16 @@ d.Account domainAccount(String name, d.AccountPrefixes prefixes) => prefixes.acc
 
 d.AccountType accountTypeFor(String name, d.AccountPrefixes prefixes) => prefixes.typeFor(name);
 
-d.BookingMethod? mapBookingMethod(p.BookingMethod? method) {
-  return switch (method) {
-    p.BookingMethod.strict => d.BookingMethod.strict,
-    p.BookingMethod.strictWithSize => d.BookingMethod.strictWithSize,
-    p.BookingMethod.none => d.BookingMethod.none,
-    p.BookingMethod.average => d.BookingMethod.average,
-    p.BookingMethod.fifo => d.BookingMethod.fifo,
-    p.BookingMethod.lifo => d.BookingMethod.lifo,
-    p.BookingMethod.hifo => d.BookingMethod.hifo,
-    null => null,
-  };
-}
+d.BookingMethod? mapBookingMethod(p.BookingMethod? method) => switch (method) {
+  p.BookingMethod.strict => d.BookingMethod.strict,
+  p.BookingMethod.strictWithSize => d.BookingMethod.strictWithSize,
+  p.BookingMethod.none => d.BookingMethod.none,
+  p.BookingMethod.average => d.BookingMethod.average,
+  p.BookingMethod.fifo => d.BookingMethod.fifo,
+  p.BookingMethod.lifo => d.BookingMethod.lifo,
+  p.BookingMethod.hifo => d.BookingMethod.hifo,
+  null => null,
+};
 
 d.Account? _mappedOptionAccount(String? configured, d.AccountPrefixes prefixes) {
   if (configured == null) {
@@ -111,20 +109,16 @@ d.OptionNumber? _optionNumber(p.BeanNumber? number) {
   return d.OptionNumber(verbatim: number.verbatim, value: number.resolved);
 }
 
-d.DisplayPrecisionKey _displayKey(p.DisplayPrecisionKey key) {
-  return switch (key) {
-    p.DisplayPrecisionCurrency(:final value) => d.DisplayPrecisionKey.currency(d.Currency(name: value.name)),
-    p.DisplayPrecisionAll() => const d.DisplayPrecisionKey.all(),
-    p.DisplayPrecisionPair(:final first, :final second) => d.DisplayPrecisionKey.pair(
-      first: d.Currency(name: first.name),
-      second: d.Currency(name: second.name),
-    ),
-  };
-}
+d.DisplayPrecisionKey _displayKey(p.DisplayPrecisionKey key) => switch (key) {
+  p.DisplayPrecisionCurrency(:final p.Currency value) => d.DisplayPrecisionKey.currency(d.Currency(name: value.name)),
+  p.DisplayPrecisionAll() => const d.DisplayPrecisionKey.all(),
+  p.DisplayPrecisionPair(:final p.Currency first, :final p.Currency second) => d.DisplayPrecisionKey.pair(
+    first: d.Currency(name: first.name),
+    second: d.Currency(name: second.name),
+  ),
+};
 
-d.CurrencyKey _currencyKey(p.CurrencyKey key) {
-  return switch (key) {
-    p.CurrencyKeyCurrency(:final value) => d.CurrencyKey.currency(d.Currency(name: value.name)),
-    p.CurrencyKeyAll() => const d.CurrencyKey.all(),
-  };
-}
+d.CurrencyKey _currencyKey(p.CurrencyKey key) => switch (key) {
+  p.CurrencyKeyCurrency(:final p.Currency value) => d.CurrencyKey.currency(d.Currency(name: value.name)),
+  p.CurrencyKeyAll() => const d.CurrencyKey.all(),
+};

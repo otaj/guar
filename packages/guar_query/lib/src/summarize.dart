@@ -3,9 +3,9 @@
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
 
-import 'ast.dart';
-import 'convert.dart';
-import 'helpers.dart';
+import 'package:guar_query/src/ast.dart';
+import 'package:guar_query/src/convert.dart';
+import 'package:guar_query/src/helpers.dart';
 
 List<Directive> applySummarize({
   required List<Directive> directives,
@@ -14,13 +14,13 @@ List<Directive> applySummarize({
   CloseSpec? close,
   bool? clear,
 }) {
-  var entries = directives;
+  List<Directive> entries = directives;
   if (open != null) {
     entries = openEntries(entries, open, options);
   }
   if (close != null) {
-    final date = switch (close) {
-      CloseOnDate(:final date) => date,
+    final BeanDate? date = switch (close) {
+      CloseOnDate(:final BeanDate date) => date,
       CloseEnd() => null,
     };
     entries = closeEntries(entries, date, options);
@@ -31,48 +31,55 @@ List<Directive> applySummarize({
   return entries;
 }
 
-Ledger clamp(Ledger ledger, BeanDate start, BeanDate end) {
-  return switch (ledger) {
-    LedgerErrors() => ledger,
-    LedgerDirectives(:final directives, :final errors, :final warnings, :final options, :final info) =>
-      Ledger.directives(
-        directives: _clampEntries(directives, start, end, options),
-        errors: errors,
-        warnings: warnings,
-        options: options,
-        info: info,
-      ),
-  };
-}
+Ledger clamp(Ledger ledger, BeanDate start, BeanDate end) => switch (ledger) {
+  LedgerErrors() => ledger,
+  LedgerDirectives(
+    :final List<Directive> directives,
+    :final List<ProcessingError> errors,
+    :final List<ProcessingWarning> warnings,
+    :final LedgerOptions options,
+    :final ProcessingInfo info,
+  ) =>
+    Ledger.directives(
+      directives: _clampEntries(directives, start, end, options),
+      errors: errors,
+      warnings: warnings,
+      options: options,
+      info: info,
+    ),
+};
 
 List<Directive> _clampEntries(List<Directive> entries, BeanDate start, BeanDate end, LedgerOptions options) {
-  var result = clearEntries(entries, start, options, earnings: options.accountPreviousEarnings);
+  List<Directive> result = clearEntries(entries, start, options, earnings: options.accountPreviousEarnings);
   result = summarize(result, start, options.accountPreviousBalances);
   return closeEntries(result, end, options);
 }
 
 List<Directive> openEntries(List<Directive> entries, BeanDate date, LedgerOptions options) {
-  var result = conversions(entries, _conversionsAccount(options, previous: true), options.conversionCurrency, date);
+  List<Directive> result = conversions(
+    entries,
+    _conversionsAccount(options, previous: true),
+    options.conversionCurrency,
+    date,
+  );
   result = clearEntries(result, date, options, earnings: options.accountPreviousEarnings);
   return summarize(result, date, options.accountPreviousBalances);
 }
 
 List<Directive> closeEntries(List<Directive> entries, BeanDate? date, LedgerOptions options) {
-  var result = date == null ? entries : truncate(entries, date);
+  final List<Directive> result = date == null ? entries : truncate(entries, date);
   return conversions(result, _conversionsAccount(options, previous: false), options.conversionCurrency, date);
 }
 
 List<Directive> clearEntries(List<Directive> entries, BeanDate? date, LedgerOptions options, {Account? earnings}) {
-  final target = earnings ?? options.accountCurrentEarnings;
+  final Account target = earnings ?? options.accountCurrentEarnings;
   return transferBalances(entries, date, isIncomeStatement, target);
 }
 
-List<Directive> truncate(List<Directive> entries, BeanDate date) {
-  return [
-    for (final entry in entries)
-      if (compareBeanDate(entry.date, date) < 0) entry,
-  ];
-}
+List<Directive> truncate(List<Directive> entries, BeanDate date) => <Directive>[
+  for (final Directive entry in entries)
+    if (compareBeanDate(entry.date, date) < 0) entry,
+];
 
 List<Directive> transferBalances(
   List<Directive> entries,
@@ -81,13 +88,13 @@ List<Directive> transferBalances(
   Account transferAccount,
 ) {
   if (entries.isEmpty) return entries;
-  final (balances, index) = balanceByAccount(entries, date);
-  final selected = <Account, Inventory>{
-    for (final entry in balances.entries)
+  final (Map<Account, Inventory> balances, int index) = balanceByAccount(entries, date);
+  final Map<Account, Inventory> selected = <Account, Inventory>{
+    for (final MapEntry<Account, Inventory> entry in balances.entries)
       if (predicate(entry.key)) entry.key: entry.value,
   };
-  final transferDate = date == null ? entries.last.date : addDays(date, -1);
-  final synthesized = createEntriesFromBalances(
+  final BeanDate transferDate = date == null ? entries.last.date : addDays(date, -1);
+  final List<Directive> synthesized = createEntriesFromBalances(
     selected,
     transferDate,
     transferAccount,
@@ -95,17 +102,17 @@ List<Directive> transferBalances(
     flag: Flag.letter('T'),
     narrationTemplate: "Transfer balance for '{account}' (Transfer balance)",
   );
-  final after = [
-    for (final entry in entries.skip(index))
+  final List<Directive> after = <Directive>[
+    for (final Directive entry in entries.skip(index))
       if (entry.body is! BalanceBody || !selected.containsKey((entry.body as BalanceBody).account)) entry,
   ];
-  return [...entries.take(index), ...synthesized, ...after];
+  return <Directive>[...entries.take(index), ...synthesized, ...after];
 }
 
 List<Directive> summarize(List<Directive> entries, BeanDate date, Account opening) {
-  final (balances, index) = balanceByAccount(entries, date);
-  final summarizeDate = addDays(date, -1);
-  final summarizing = createEntriesFromBalances(
+  final (Map<Account, Inventory> balances, int index) = balanceByAccount(entries, date);
+  final BeanDate summarizeDate = addDays(date, -1);
+  final List<Directive> summarizing = createEntriesFromBalances(
     balances,
     summarizeDate,
     opening,
@@ -113,21 +120,21 @@ List<Directive> summarize(List<Directive> entries, BeanDate date, Account openin
     flag: Flag.letter('S'),
     narrationTemplate: "Opening balance for '{account}' (Summarization)",
   );
-  final priceEntries = lastPricesBefore(entries, date);
-  final opens = openEntriesAt(entries, date);
-  final before = [...opens, ...priceEntries, ...summarizing]..sort(_directiveSort);
-  return [...before, ...entries.skip(index)];
+  final List<Directive> priceEntries = lastPricesBefore(entries, date);
+  final List<Directive> opens = openEntriesAt(entries, date);
+  final List<Directive> before = <Directive>[...opens, ...priceEntries, ...summarizing]..sort(_directiveSort);
+  return <Directive>[...before, ...entries.skip(index)];
 }
 
 List<Directive> conversions(List<Directive> entries, Account account, Currency conversionCurrency, BeanDate? date) {
-  final balance = computeBalance(entries, date);
-  final costBalance = reduceCost(balance);
+  final Inventory balance = computeBalance(entries, date);
+  final Inventory costBalance = reduceCost(balance);
   if (costBalance.isEmpty) return entries;
-  final index = date == null ? entries.length : _indexAt(entries, date);
-  final lastDate = date == null ? entries.last.date : addDays(date, -1);
-  final postings = <Posting>[];
-  for (final position in costBalance.positions) {
-    final negated = -position;
+  final int index = date == null ? entries.length : _indexAt(entries, date);
+  final BeanDate lastDate = date == null ? entries.last.date : addDays(date, -1);
+  final List<Posting> postings = <Posting>[];
+  for (final Position position in costBalance.positions) {
+    final Position negated = -position;
     postings.add(
       Posting(
         origin: const Origin.generated(),
@@ -138,7 +145,7 @@ List<Directive> conversions(List<Directive> entries, Account account, Currency c
       ),
     );
   }
-  final entry = Directive(
+  final Directive entry = Directive(
     origin: const Origin.generated(),
     date: lastDate,
     body: DirectiveBody.transaction(
@@ -150,17 +157,17 @@ List<Directive> conversions(List<Directive> entries, Account account, Currency c
       ),
     ),
   );
-  return [...entries.take(index), entry, ...entries.skip(index)];
+  return <Directive>[...entries.take(index), entry, ...entries.skip(index)];
 }
 
 (Map<Account, Inventory>, int) balanceByAccount(List<Directive> entries, BeanDate? date) {
-  final index = date == null ? entries.length : _indexAt(entries, date);
-  final balances = <Account, Inventory>{};
-  for (final entry in entries.take(index)) {
-    final body = entry.body;
+  final int index = date == null ? entries.length : _indexAt(entries, date);
+  final Map<Account, Inventory> balances = <Account, Inventory>{};
+  for (final Directive entry in entries.take(index)) {
+    final DirectiveBody body = entry.body;
     if (body is! TransactionBody) continue;
-    for (final posting in body.value.postings) {
-      final current = balances[posting.account] ?? const Inventory();
+    for (final Posting posting in body.value.postings) {
+      final Inventory current = balances[posting.account] ?? const Inventory();
       balances[posting.account] = current.addPosition(Position(units: posting.units, cost: posting.cost)).inventory;
     }
   }
@@ -168,12 +175,12 @@ List<Directive> conversions(List<Directive> entries, Account account, Currency c
 }
 
 Inventory computeBalance(List<Directive> entries, BeanDate? date) {
-  final index = date == null ? entries.length : _indexAt(entries, date);
-  var inventory = const Inventory();
-  for (final entry in entries.take(index)) {
-    final body = entry.body;
+  final int index = date == null ? entries.length : _indexAt(entries, date);
+  Inventory inventory = const Inventory();
+  for (final Directive entry in entries.take(index)) {
+    final DirectiveBody body = entry.body;
     if (body is! TransactionBody) continue;
-    for (final posting in body.value.postings) {
+    for (final Posting posting in body.value.postings) {
       inventory = inventory.addPosition(Position(units: posting.units, cost: posting.cost)).inventory;
     }
   }
@@ -188,21 +195,21 @@ List<Directive> createEntriesFromBalances(
   required Flag flag,
   required String narrationTemplate,
 }) {
-  final entries = <Directive>[];
-  final accounts = balances.keys.toList()..sort((a, b) => a.name.compareTo(b.name));
-  for (final account in accounts) {
-    var inventory = balances[account]!;
+  final List<Directive> entries = <Directive>[];
+  final List<Account> accounts = balances.keys.toList()..sort((Account a, Account b) => a.name.compareTo(b.name));
+  for (final Account account in accounts) {
+    Inventory inventory = balances[account]!;
     if (inventory.isEmpty) continue;
     if (!direction) inventory = -inventory;
-    final postings = <Posting>[
-      for (final position in inventory.positions)
+    final List<Posting> postings = <Posting>[
+      for (final Position position in inventory.positions)
         Posting(origin: const Origin.generated(), account: account, units: position.units, cost: position.cost),
     ];
-    var sourceInventory = const Inventory();
-    for (final position in inventory.positions) {
+    Inventory sourceInventory = const Inventory();
+    for (final Position position in inventory.positions) {
       sourceInventory = sourceInventory.addAmount(-costOf(position)).inventory;
     }
-    for (final position in sourceInventory.positions) {
+    for (final Position position in sourceInventory.positions) {
       postings.add(
         Posting(origin: const Origin.generated(), account: sourceAccount, units: position.units, cost: position.cost),
       );
@@ -226,10 +233,10 @@ List<Directive> createEntriesFromBalances(
 }
 
 List<Directive> lastPricesBefore(List<Directive> entries, BeanDate date) {
-  final last = <String, Directive>{};
-  for (final entry in entries) {
+  final Map<String, Directive> last = <String, Directive>{};
+  for (final Directive entry in entries) {
     if (compareBeanDate(entry.date, date) >= 0) break;
-    final body = entry.body;
+    final DirectiveBody body = entry.body;
     if (body is PriceBody) {
       last['${body.currency.name}:${body.amount.currency.name}'] = entry;
     }
@@ -238,35 +245,35 @@ List<Directive> lastPricesBefore(List<Directive> entries, BeanDate date) {
 }
 
 List<Directive> openEntriesAt(List<Directive> entries, BeanDate date) {
-  final opens = <String, Directive>{};
-  final closed = <String>{};
-  for (final entry in entries) {
+  final Map<String, Directive> opens = <String, Directive>{};
+  final Set<String> closed = <String>{};
+  for (final Directive entry in entries) {
     if (compareBeanDate(entry.date, date) >= 0) break;
     switch (entry.body) {
-      case OpenBody(:final account):
+      case OpenBody(:final Account account):
         opens[account.name] = entry;
         closed.remove(account.name);
-      case CloseBody(:final account):
+      case CloseBody(:final Account account):
         closed.add(account.name);
       default:
         break;
     }
   }
-  return [
-    for (final entry in opens.entries)
+  return <Directive>[
+    for (final MapEntry<String, Directive> entry in opens.entries)
       if (!closed.contains(entry.key)) entry.value,
   ];
 }
 
 int _indexAt(List<Directive> entries, BeanDate date) {
-  for (var i = 0; i < entries.length; i++) {
+  for (int i = 0; i < entries.length; i++) {
     if (compareBeanDate(entries[i].date, date) >= 0) return i;
   }
   return entries.length;
 }
 
 int _directiveSort(Directive left, Directive right) {
-  final byDate = compareBeanDate(left.date, right.date);
+  final int byDate = compareBeanDate(left.date, right.date);
   if (byDate != 0) return byDate;
   return _typeRank(left.body).compareTo(_typeRank(right.body));
 }

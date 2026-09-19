@@ -9,41 +9,38 @@ import 'helpers/amounts.dart';
 
 BeanDate d(int year, int month, int day) => BeanDate(year: year, month: month, day: day);
 
-Decimal share(String number, int days) => shares(number, [days]);
+Decimal share(String number, int days) => shares(number, <int>[days]);
 
 Decimal shares(String number, List<int> days) {
-  var total = Rational.zero;
-  for (final length in days) {
+  Rational total = Rational.zero;
+  for (final int length in days) {
     total += Decimal.parse(number) / Decimal.fromInt(length);
   }
   return total.toDecimal(scaleOnInfinitePrecision: 28);
 }
 
-Directive budget(BeanDate date, String name, BudgetInterval interval, String number, String currency, {int line = 1}) {
-  return Directive(
-    origin: Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line)),
-    date: date,
-    body: DirectiveBody.budget(
-      account: Account.budget(name: name, type: AccountType.expenses),
-      interval: interval,
-      amount: amount(number, currency),
-    ),
-  );
-}
+Directive budget(BeanDate date, String name, BudgetInterval interval, String number, String currency, {int line = 1}) =>
+    Directive(
+      origin: Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line)),
+      date: date,
+      body: DirectiveBody.budget(
+        account: Account.budget(name: name, type: AccountType.expenses),
+        interval: interval,
+        amount: amount(number, currency),
+      ),
+    );
 
-Directive budgetOff(BeanDate date, String name, {String? currency, int line = 1}) {
-  return Directive(
-    origin: Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line)),
-    date: date,
-    body: DirectiveBody.budgetOff(
-      account: Account.budget(name: name, type: AccountType.expenses),
-      currency: currency == null ? null : Currency(name: currency),
-    ),
-  );
-}
+Directive budgetOff(BeanDate date, String name, {String? currency, int line = 1}) => Directive(
+  origin: Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line)),
+  date: date,
+  body: DirectiveBody.budgetOff(
+    account: Account.budget(name: name, type: AccountType.expenses),
+    currency: currency == null ? null : Currency(name: currency),
+  ),
+);
 
 Directive txn(BeanDate date, String name, String number, String currency, {int line = 1}) {
-  final origin = Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line));
+  final Origin origin = Origin.source(BeanLocation(linenoBegin: line, linenoEnd: line));
   return Directive(
     origin: origin,
     date: date,
@@ -51,7 +48,7 @@ Directive txn(BeanDate date, String name, String number, String currency, {int l
       Transaction(
         origin: origin,
         flag: const Flag.special(SpecialFlag.asterisk),
-        postings: [
+        postings: <Posting>[
           Posting(origin: origin, account: account(name, AccountType.expenses), units: amount(number, currency)),
           Posting(
             origin: origin,
@@ -65,14 +62,14 @@ Directive txn(BeanDate date, String name, String number, String currency, {int l
 }
 
 Amount? eur(List<Amount> amounts) {
-  for (final amount in amounts) {
+  for (final Amount amount in amounts) {
     if (amount.currency.name == 'EUR') return amount;
   }
   return null;
 }
 
 Amount? named(List<Amount> amounts, String currency) {
-  for (final amount in amounts) {
+  for (final Amount amount in amounts) {
     if (amount.currency.name == currency) return amount;
   }
   return null;
@@ -80,7 +77,7 @@ Amount? named(List<Amount> amounts, String currency) {
 
 void main() {
   test('weekly budgets stay active by currency until replaced', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Groceries', BudgetInterval.weekly, '100.00', 'CNY'),
       budget(d(2016, 6, 1), 'Expenses:Groceries', BudgetInterval.weekly, '10.00', 'EUR'),
     ]);
@@ -88,13 +85,15 @@ void main() {
     expect(named(map.allowed('Expenses', d(2016, 6, 1), d(2016, 6, 8)), 'EUR')!.number, Decimal.parse('10'));
     expect(map.allowed('Expenses', d(2016, 6, 1), d(2016, 6, 8), includeChildren: false), isEmpty);
 
-    final allowed = map.allowed('Expenses:Groceries', d(2016, 6, 1), d(2016, 6, 8));
+    final List<Amount> allowed = map.allowed('Expenses:Groceries', d(2016, 6, 1), d(2016, 6, 8));
     expect(named(allowed, 'CNY')!.number, Decimal.parse('100'));
     expect(named(allowed, 'EUR')!.number, Decimal.parse('10'));
   });
 
   test('daily budgets prorate by civil day and ignore days before they start', () {
-    final map = BudgetMap.build([budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '2.5', 'EUR')]);
+    final BudgetMap map = BudgetMap.build(<Directive>[
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '2.5', 'EUR'),
+    ]);
     expect(named(map.allowed('Expenses:Books', d(2010, 2, 1), d(2010, 2, 2)), 'EUR'), isNull);
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)))!.number, Decimal.parse('2.5'));
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 3)))!.number, Decimal.parse('5.0'));
@@ -103,34 +102,42 @@ void main() {
   });
 
   test('weekly budgets divide by seven days', () {
-    final map = BudgetMap.build([budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.weekly, '21', 'EUR')]);
+    final BudgetMap map = BudgetMap.build(<Directive>[
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.weekly, '21', 'EUR'),
+    ]);
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)))!.number, share('21', 7));
     expect(eur(map.allowed('Expenses:Books', d(2016, 9, 1), d(2016, 9, 2)))!.number, share('21', 7));
   });
 
   test('monthly budgets divide by the actual length of that month', () {
-    final map = BudgetMap.build([budget(d(2014, 5, 1), 'Expenses:Books', BudgetInterval.monthly, '100', 'EUR')]);
+    final BudgetMap map = BudgetMap.build(<Directive>[
+      budget(d(2014, 5, 1), 'Expenses:Books', BudgetInterval.monthly, '100', 'EUR'),
+    ]);
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)))!.number, share('100', 31));
     expect(eur(map.allowed('Expenses:Books', d(2016, 2, 1), d(2016, 2, 2)))!.number, share('100', 29));
     expect(eur(map.allowed('Expenses:Books', d(2018, 3, 31), d(2018, 4, 1)))!.number, share('100', 31));
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 6, 1)))!.number, Decimal.parse('100'));
-    expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 2)))!.number, shares('100', [31, 30]));
+    expect(eur(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 2)))!.number, shares('100', <int>[31, 30]));
   });
 
   test('quarterly budgets divide by the actual length of that quarter', () {
-    final map = BudgetMap.build([budget(d(2014, 5, 1), 'Expenses:Books', BudgetInterval.quarterly, '123456.7', 'EUR')]);
+    final BudgetMap map = BudgetMap.build(<Directive>[
+      budget(d(2014, 5, 1), 'Expenses:Books', BudgetInterval.quarterly, '123456.7', 'EUR'),
+    ]);
     expect(eur(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)))!.number, share('123456.7', 91));
     expect(eur(map.allowed('Expenses:Books', d(2016, 8, 15), d(2016, 8, 16)))!.number, share('123456.7', 92));
   });
 
   test('yearly budgets divide by the actual length of that year', () {
-    final map = BudgetMap.build([budget(d(2010, 1, 1), 'Expenses:Books', BudgetInterval.yearly, '99999.87', 'EUR')]);
+    final BudgetMap map = BudgetMap.build(<Directive>[
+      budget(d(2010, 1, 1), 'Expenses:Books', BudgetInterval.yearly, '99999.87', 'EUR'),
+    ]);
     expect(eur(map.allowed('Expenses:Books', d(2011, 2, 1), d(2011, 2, 2)))!.number, share('99999.87', 365));
     expect(eur(map.allowed('Expenses:Books', d(2012, 2, 1), d(2012, 2, 2)))!.number, share('99999.87', 366));
   });
 
   test('child budgets sum with the requested account', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2017, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'USD'),
       budget(d(2017, 1, 1), 'Expenses:Books:Notebooks', BudgetInterval.daily, '2.00', 'USD'),
     ]);
@@ -144,7 +151,7 @@ void main() {
   });
 
   test('actuals sum booked units in [begin, end) by account', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR'),
       txn(d(2016, 5, 2), 'Expenses:Books', '3.00', 'EUR'),
@@ -156,7 +163,7 @@ void main() {
   });
 
   test('actuals with children include descendant postings under a budgeted account', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2017, 1, 1), 'Expenses:Books', BudgetInterval.daily, '20.00', 'USD'),
       txn(d(2017, 1, 1), 'Expenses:Books', '5.00', 'USD'),
       txn(d(2017, 1, 1), 'Expenses:Books:Notebooks', '3.00', 'USD'),
@@ -173,54 +180,54 @@ void main() {
   });
 
   test('period reports remaining and whether actuals stay within the prorated budget', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR'),
       txn(d(2016, 5, 2), 'Expenses:Books', '3.00', 'EUR'),
     ]);
 
-    final under = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 3));
+    final BudgetPeriod under = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 3));
     expect(under.within, isTrue);
     expect(under.currencies, hasLength(1));
     expect(under.currencies.single.budget.number, Decimal.parse('20.00'));
     expect(under.currencies.single.actual.number, Decimal.parse('7.00'));
     expect(under.currencies.single.remaining.number, Decimal.parse('13.00'));
 
-    final over = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetPeriod over = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(over.within, isTrue);
     expect(map.period('Expenses:Books', d(2016, 5, 2), d(2016, 5, 3)).within, isTrue);
 
-    final overMap = BudgetMap.build([
+    final BudgetMap overMap = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '5.00', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '6.00', 'EUR'),
     ]);
-    final exceeded = overMap.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetPeriod exceeded = overMap.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(exceeded.within, isFalse);
     expect(exceeded.currencies.single.remaining.number, Decimal.parse('-1.00'));
   });
 
   test('unbudgeted accounts are absent from the map', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Groceries', BudgetInterval.weekly, '10.00', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '1.00', 'EUR'),
     ]);
     expect(map.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)), isEmpty);
     expect(map.actual('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)), isEmpty);
     expect(map.actual('Assets:Cash', d(2016, 5, 1), d(2016, 5, 2)), isEmpty);
-    final period = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetPeriod period = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(period.within, isNull);
     expect(period.currencies, isEmpty);
     expect(period.warnings, isEmpty);
   });
 
   test('actuals in an unbudgeted currency are omitted from the budgeted currency and warned', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR', line: 2),
       txn(d(2016, 5, 1), 'Expenses:Books', '9.00', 'USD', line: 3),
     ]);
 
-    final period = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetPeriod period = map.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(period.within, isTrue);
     expect(period.currencies, hasLength(1));
     expect(period.currencies.single.budget.currency.name, 'EUR');
@@ -232,7 +239,7 @@ void main() {
   });
 
   test('a later budget for the same currency replaces the earlier one from that day', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budget(d(2016, 6, 1), 'Expenses:Books', BudgetInterval.daily, '1.00', 'EUR'),
     ]);
@@ -241,7 +248,7 @@ void main() {
   });
 
   test('off stops every currency on the account from the given date', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.weekly, '70.00', 'USD'),
       budgetOff(d(2016, 6, 1), 'Expenses:Books'),
@@ -250,11 +257,11 @@ void main() {
     expect(named(map.allowed('Expenses:Books', d(2016, 5, 31), d(2016, 6, 1)), 'USD')!.number, share('70.00', 7));
     expect(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2)), isEmpty);
 
-    final after = map.period('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2));
+    final BudgetPeriod after = map.period('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2));
     expect(after.within, isNull);
     expect(after.currencies, isEmpty);
 
-    final onAgain = BudgetMap.build([
+    final BudgetMap onAgain = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budgetOff(d(2016, 6, 1), 'Expenses:Books'),
       budget(d(2016, 7, 1), 'Expenses:Books', BudgetInterval.daily, '3.00', 'EUR'),
@@ -264,7 +271,7 @@ void main() {
   });
 
   test('off with a currency stops only that currency', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.weekly, '70.00', 'USD'),
       budgetOff(d(2016, 6, 1), 'Expenses:Books', currency: 'EUR'),
@@ -273,7 +280,7 @@ void main() {
     expect(named(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2)), 'USD')!.number, share('70.00', 7));
     expect(eur(map.allowed('Expenses:Books', d(2016, 6, 1), d(2016, 6, 2))), isNull);
 
-    final onAgain = BudgetMap.build([
+    final BudgetMap onAgain = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budgetOff(d(2016, 6, 1), 'Expenses:Books', currency: 'EUR'),
       budget(d(2016, 7, 1), 'Expenses:Books', BudgetInterval.daily, '3.00', 'EUR'),
@@ -283,23 +290,25 @@ void main() {
   });
 
   test('a zero budget is within only when nothing is spent', () {
-    final empty = BudgetMap.build([budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '0', 'EUR')]);
-    final idle = empty.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetMap empty = BudgetMap.build(<Directive>[
+      budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '0', 'EUR'),
+    ]);
+    final BudgetPeriod idle = empty.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(eur(empty.allowed('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2)))!.number, Decimal.zero);
     expect(idle.within, isTrue);
     expect(idle.currencies.single.actual.number, Decimal.zero);
 
-    final spent = BudgetMap.build([
+    final BudgetMap spent = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '0', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '1.00', 'EUR'),
     ]);
-    final over = spent.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetPeriod over = spent.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(over.within, isFalse);
     expect(over.currencies.single.remaining.number, Decimal.parse('-1.00'));
   });
 
   test('a root account budget covers descendants', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses', BudgetInterval.monthly, '9000', 'USD'),
       txn(d(2016, 1, 15), 'Expenses:Food', '40', 'USD'),
       txn(d(2016, 1, 15), 'Expenses:Food:Cafe', '10', 'USD'),
@@ -311,7 +320,7 @@ void main() {
   });
 
   test('same-day duplicate budgets keep the later one and warn', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '4.00', 'EUR', line: 3),
     ]);
@@ -326,7 +335,7 @@ void main() {
   });
 
   test('a range that crosses a replacement is a piecewise sum', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budget(d(2016, 6, 1), 'Expenses:Books', BudgetInterval.daily, '1.00', 'EUR'),
     ]);
@@ -334,7 +343,7 @@ void main() {
   });
 
   test('a range that crosses an off is a piecewise sum', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budgetOff(d(2016, 6, 1), 'Expenses:Books'),
     ]);
@@ -343,7 +352,7 @@ void main() {
   });
 
   test('same-day identical budgets do not warn', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 3),
     ]);
@@ -352,7 +361,7 @@ void main() {
   });
 
   test('same-day budget and off keep the later directive and warn', () {
-    final offLast = BudgetMap.build([
+    final BudgetMap offLast = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
       budgetOff(d(2016, 1, 1), 'Expenses:Books', currency: 'EUR', line: 3),
     ]);
@@ -360,7 +369,7 @@ void main() {
     expect(offLast.warnings, hasLength(1));
     expect(offLast.warnings.single.location.linenoBegin, 3);
 
-    final budgetLast = BudgetMap.build([
+    final BudgetMap budgetLast = BudgetMap.build(<Directive>[
       budgetOff(d(2016, 1, 1), 'Expenses:Books', currency: 'EUR', line: 2),
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 3),
     ]);
@@ -370,7 +379,7 @@ void main() {
   });
 
   test('duplicate warnings stay on the duplicated account', () {
-    final map = BudgetMap.build([
+    final BudgetMap map = BudgetMap.build(<Directive>[
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR', line: 2),
       budget(d(2016, 1, 1), 'Expenses:Books', BudgetInterval.daily, '4.00', 'EUR', line: 3),
       budget(d(2016, 1, 1), 'Expenses:Food', BudgetInterval.daily, '5.00', 'EUR', line: 4),
@@ -380,18 +389,21 @@ void main() {
   });
 
   test('period is over if any budgeted currency is over', () {
-    final mixed = BudgetMap.build([
+    final BudgetMap mixed = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '5.00', 'USD'),
       txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR'),
       txn(d(2016, 5, 1), 'Expenses:Books', '6.00', 'USD'),
     ]);
-    final period = mixed.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
+    final BudgetPeriod period = mixed.period('Expenses:Books', d(2016, 5, 1), d(2016, 5, 2));
     expect(period.currencies, hasLength(2));
-    expect(named(period.currencies.map((row) => row.budget).toList(), 'EUR')!.number, Decimal.parse('10.00'));
+    expect(
+      named(period.currencies.map((BudgetCurrencyStatus row) => row.budget).toList(), 'EUR')!.number,
+      Decimal.parse('10.00'),
+    );
     expect(period.within, isFalse);
 
-    final under = BudgetMap.build([
+    final BudgetMap under = BudgetMap.build(<Directive>[
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '10.00', 'EUR'),
       budget(d(2016, 5, 1), 'Expenses:Books', BudgetInterval.daily, '5.00', 'USD'),
       txn(d(2016, 5, 1), 'Expenses:Books', '4.00', 'EUR'),

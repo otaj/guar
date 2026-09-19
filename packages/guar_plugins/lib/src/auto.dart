@@ -1,8 +1,8 @@
 // Meta-plugin: auto_accounts then implicit_prices.
 
-import 'plugin.dart';
-import 'auto_accounts.dart';
-import 'combine.dart';
-import 'implicit_prices.dart';
+import 'package:guar_plugins/src/auto_accounts.dart';
+import 'package:guar_plugins/src/combine.dart';
+import 'package:guar_plugins/src/implicit_prices.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
-final BookPlugin autoPlugin = combinePlugins([autoInsertOpen, addImplicitPrices]);
+final BookPlugin autoPlugin = combinePlugins(<BookPlugin>[autoInsertOpen, addImplicitPrices]);

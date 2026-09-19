@@ -37,6 +37,7 @@ sealed class QueryValue with _$QueryValue {
   const QueryValue._();
 
   const factory QueryValue.null_() = QueryNull;
+  // ignore: avoid_positional_boolean_parameters, bool is the stored payload
   const factory QueryValue.boolean(bool value) = QueryBoolean;
   const factory QueryValue.integer(int value) = QueryInteger;
   const factory QueryValue.number(Decimal value) = QueryNumber;
@@ -76,7 +77,7 @@ sealed class QueryValue with _$QueryValue {
     QueryCost() => QueryType.cost,
     QueryInventory() => QueryType.inventory,
     QueryMeta() => QueryType.meta,
-    QueryMetaCell(:final value) => metaValueType(value),
+    QueryMetaCell(:final MetaValue value) => metaValueType(value),
     QueryTags() => QueryType.tags,
     QueryLinks() => QueryType.links,
     QueryAccounts() => QueryType.accounts,
@@ -89,10 +90,10 @@ sealed class QueryValue with _$QueryValue {
   };
 
   String? asText() => switch (this) {
-    QueryText(:final value) => value,
-    QueryAccount(:final value) => value.name,
-    QueryCurrency(:final value) => value.name,
-    QueryFlag(:final value) => flagChar(value),
+    QueryText(:final String value) => value,
+    QueryAccount(:final Account value) => value.name,
+    QueryCurrency(:final Currency value) => value.name,
+    QueryFlag(:final Flag value) => flagChar(value),
     _ => null,
   };
 }
@@ -109,7 +110,7 @@ QueryType metaValueType(MetaValue value) => switch (value) {
 };
 
 String flagChar(Flag flag) => switch (flag) {
-  SpecialFlagValue(:final value) => switch (value) {
+  SpecialFlagValue(:final SpecialFlag value) => switch (value) {
     SpecialFlag.asterisk => '*',
     SpecialFlag.exclamation => '!',
     SpecialFlag.hash => '#',
@@ -117,7 +118,7 @@ String flagChar(Flag flag) => switch (flag) {
     SpecialFlag.question => '?',
     SpecialFlag.percent => '%',
   },
-  LetterFlag(:final value) => value,
+  LetterFlag(:final String value) => value,
 };
 
 Flag? parseFlag(String? text) {
@@ -142,7 +143,7 @@ QueryValue queryValueFromLiteral(Object? value) {
   if (value is String) return QueryValue.text(value);
   if (value is BeanDate) return QueryValue.date(value);
   if (value is List) {
-    return QueryValue.list([for (final item in value) queryValueFromLiteral(item)]);
+    return QueryValue.list(<QueryValue>[for (final dynamic item in value) queryValueFromLiteral(item)]);
   }
   if (value is QueryValue) return value;
   return QueryValue.text('$value');

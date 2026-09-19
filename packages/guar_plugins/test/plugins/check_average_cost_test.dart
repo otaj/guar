@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _setup =
+const String _setup =
     'plugin "beancount.plugins.check_average_cost"\n'
     '2018-01-01 open Assets:US:Cash\n'
     '2018-01-01 open Assets:US:Retirement         "NONE"\n'
@@ -62,7 +62,7 @@ void main() {
           'plugin "beancount.plugins.check_average_cost" "1"',
         ),
       ),
-      ['Invalid configuration for check_average_cost: must be a float'],
+      <String>['Invalid configuration for check_average_cost: must be a float'],
     );
   });
 

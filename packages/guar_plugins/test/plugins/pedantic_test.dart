@@ -21,7 +21,7 @@ void main() {
   });
 
   test('reports findings from several bundled checks at once', () {
-    final found = messages(
+    final List<String> found = messages(
       'plugin "beancount.plugins.pedantic"\n'
       '2000-01-01 open Assets:Checking\n'
       '2000-01-01 open Assets:Unused\n'

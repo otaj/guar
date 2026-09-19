@@ -14,9 +14,9 @@ dependencies:
     path: ../guar_domain
 
 dev_dependencies:
-  flutter_lints: ^6.0.0
   guar_book:
     path: ../guar_book
   guar_parser:
     path: ../guar_parser
+  lints: ^6.0.0
   test: ^1.26.3

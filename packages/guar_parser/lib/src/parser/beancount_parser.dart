@@ -2,20 +2,19 @@
 
 import 'dart:io';
 
-import '../domain/domain.dart';
-import 'diff.dart';
-import 'export.dart';
-import 'grammar.dart';
-import 'include.dart';
-import 'insert.dart';
-import 'splice.dart';
+import 'package:guar_parser/src/domain/domain.dart';
+import 'package:guar_parser/src/parser/diff.dart';
+import 'package:guar_parser/src/parser/export.dart';
+import 'package:guar_parser/src/parser/grammar.dart';
+import 'package:guar_parser/src/parser/include.dart';
+import 'package:guar_parser/src/parser/insert.dart';
+import 'package:guar_parser/src/parser/splice.dart';
 
 class BeancountParser {
   const BeancountParser();
 
-  ParsedLedger parse(String source, {String filename = '', bool recover = false}) {
-    return BeancountGrammar(filename: filename, includes: IncludeController.io(), recover: recover).parse(source);
-  }
+  ParsedLedger parse(String source, {String filename = '', bool recover = false}) =>
+      BeancountGrammar(filename: filename, includes: IncludeController.io(), recover: recover).parse(source);
 
   ParsedLedger splice(
     ParsedLedger ledger,
@@ -23,9 +22,7 @@ class BeancountParser {
     required String filename,
     required int startLine,
     required int endLine,
-  }) {
-    return spliceLedger(ledger, snippet, filename: filename, startLine: startLine, endLine: endLine);
-  }
+  }) => spliceLedger(ledger, snippet, filename: filename, startLine: startLine, endLine: endLine);
 
   String export(ParsedLedger ledger) => exportLedger(ledger);
 
@@ -37,11 +34,9 @@ class BeancountParser {
 
   ParsedLedger insertOption(ParsedLedger ledger, String key, String value) => insertOptionSetting(ledger, key, value);
 
-  ParsedLedger insertPlugin(ParsedLedger ledger, String name, {String? config}) {
-    return insertPluginSetting(ledger, name, config: config);
-  }
+  ParsedLedger insertPlugin(ParsedLedger ledger, String name, {String? config}) =>
+      insertPluginSetting(ledger, name, config: config);
 
-  LedgerDiff diff(ParsedLedger left, ParsedLedger right, {required bool considerLocations}) {
-    return diffLedgers(left, right, considerLocations: considerLocations);
-  }
+  LedgerDiff diff(ParsedLedger left, ParsedLedger right, {required bool considerLocations}) =>
+      diffLedgers(left, right, considerLocations: considerLocations);
 }

@@ -2,10 +2,9 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
-
-import 'plugin.dart';
-import 'config_literal.dart';
-import 'helpers.dart';
+import 'package:guar_plugins/src/config_literal.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 final Decimal _defaultTolerance = Decimal.parse('0.01');
 
@@ -15,14 +14,14 @@ BookPluginResult validateAverageCost(
   ProcessingInfo info,
   String? config,
 ) {
-  var tolerance = _defaultTolerance;
+  Decimal tolerance = _defaultTolerance;
   if (config != null && config.trim().isNotEmpty) {
-    final parsed = parseConfigLiteral(config);
-    final value = parsed.value;
+    final ConfigLiteral parsed = parseConfigLiteral(config);
+    final Object? value = parsed.value;
     if (parsed.error != null || value is! double) {
       return (
         directives: directives,
-        errors: [
+        errors: <ProcessingError>[
           ProcessingError(
             message: 'Invalid configuration for check_average_cost: must be a float',
             location: nowhereLocation('<check_average_cost>'),
@@ -32,28 +31,28 @@ BookPluginResult validateAverageCost(
     }
     tolerance = Decimal.parse(value.toString());
   }
-  final minTolerance = Decimal.one - tolerance;
-  final maxTolerance = Decimal.one + tolerance;
+  final Decimal minTolerance = Decimal.one - tolerance;
+  final Decimal maxTolerance = Decimal.one + tolerance;
 
-  final openClose = accountOpenClose(directives);
-  final units = <String, Decimal>{};
-  final costs = <String, Decimal>{};
-  final errors = <ProcessingError>[];
+  final Map<String, ({Directive? close, Directive? open})> openClose = accountOpenClose(directives);
+  final Map<String, Decimal> units = <String, Decimal>{};
+  final Map<String, Decimal> costs = <String, Decimal>{};
+  final List<ProcessingError> errors = <ProcessingError>[];
 
-  for (final directive in directives) {
-    if (directive.body case TransactionBody(:final value)) {
-      for (final posting in value.postings) {
-        final open = openClose[posting.account.name]?.open;
+  for (final Directive directive in directives) {
+    if (directive.body case TransactionBody(:final Transaction value)) {
+      for (final Posting posting in value.postings) {
+        final Directive? open = openClose[posting.account.name]?.open;
         if (open == null || (open.body as OpenBody).booking != BookingMethod.none) continue;
-        final cost = posting.cost;
-        final key = '${posting.account.name}|${posting.units.currency.name}|${cost?.currency.name}';
+        final Cost? cost = posting.cost;
+        final String key = '${posting.account.name}|${posting.units.currency.name}|${cost?.currency.name}';
         if (posting.units.number < Decimal.zero && cost != null) {
-          final heldUnits = units[key] ?? Decimal.zero;
-          final heldCost = costs[key] ?? Decimal.zero;
+          final Decimal heldUnits = units[key] ?? Decimal.zero;
+          final Decimal heldCost = costs[key] ?? Decimal.zero;
           if (heldUnits != Decimal.zero) {
-            final average = (heldCost / heldUnits).toDecimal(scaleOnInfinitePrecision: 28);
-            final minValid = average * minTolerance;
-            final maxValid = average * maxTolerance;
+            final Decimal average = (heldCost / heldUnits).toDecimal(scaleOnInfinitePrecision: 28);
+            final Decimal minValid = average * minTolerance;
+            final Decimal maxValid = average * maxTolerance;
             if (cost.number < minValid || cost.number > maxValid) {
               errors.add(
                 ProcessingError(

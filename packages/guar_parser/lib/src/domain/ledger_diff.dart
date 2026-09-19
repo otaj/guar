@@ -2,13 +2,14 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'directive.dart';
-import 'number.dart';
-import 'options.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/directive.dart';
+import 'package:guar_parser/src/domain/number.dart';
+import 'package:guar_parser/src/domain/options.dart';
 
 part 'ledger_diff.freezed.dart';
 
+@immutable
 class FieldChange<T> {
   const FieldChange({required this.left, required this.right});
 
@@ -16,16 +17,15 @@ class FieldChange<T> {
   final T right;
 
   @override
-  bool operator ==(Object other) {
-    return other is FieldChange<T> && other.left == left && other.right == right;
-  }
+  bool operator ==(Object other) => other is FieldChange<T> && other.left == left && other.right == right;
 
   @override
   int get hashCode => Object.hash(left, right);
 }
 
+@immutable
 class ListDiff<T> {
-  const ListDiff({this.onlyInLeft = const [], this.onlyInRight = const []});
+  const ListDiff({this.onlyInLeft = const <Never>[], this.onlyInRight = const <Never>[]});
 
   final List<T> onlyInLeft;
   final List<T> onlyInRight;
@@ -33,11 +33,8 @@ class ListDiff<T> {
   bool get isEmpty => onlyInLeft.isEmpty && onlyInRight.isEmpty;
 
   @override
-  bool operator ==(Object other) {
-    return other is ListDiff<T> &&
-        _listEquals(other.onlyInLeft, onlyInLeft) &&
-        _listEquals(other.onlyInRight, onlyInRight);
-  }
+  bool operator ==(Object other) =>
+      other is ListDiff<T> && _listEquals(other.onlyInLeft, onlyInLeft) && _listEquals(other.onlyInRight, onlyInRight);
 
   @override
   int get hashCode => Object.hash(Object.hashAll(onlyInLeft), Object.hashAll(onlyInRight));
@@ -47,7 +44,7 @@ bool _listEquals<T>(List<T> left, List<T> right) {
   if (left.length != right.length) {
     return false;
   }
-  for (var i = 0; i < left.length; i++) {
+  for (int i = 0; i < left.length; i++) {
     if (left[i] != right[i]) {
       return false;
     }
@@ -62,8 +59,6 @@ abstract class ChangedDirective with _$ChangedDirective {
 
 @freezed
 abstract class OptionsDiff with _$OptionsDiff {
-  const OptionsDiff._();
-
   const factory OptionsDiff({
     FieldChange<AccountPrefixes>? accountPrefixes,
     FieldChange<String?>? title,
@@ -91,6 +86,7 @@ abstract class OptionsDiff with _$OptionsDiff {
     FieldChange<bool?>? allowPipeSeparator,
     FieldChange<bool?>? allowDeprecatedNoneForTagsAndLinks,
   }) = _OptionsDiff;
+  const OptionsDiff._();
 
   bool get isEmpty =>
       accountPrefixes == null &&
@@ -122,8 +118,6 @@ abstract class OptionsDiff with _$OptionsDiff {
 
 @freezed
 abstract class InfoDiff with _$InfoDiff {
-  const InfoDiff._();
-
   const factory InfoDiff({
     FieldChange<String?>? filename,
     @Default(ListDiff<String>()) ListDiff<String> include,
@@ -132,6 +126,7 @@ abstract class InfoDiff with _$InfoDiff {
     @Default(ListDiff<DisplayPrecision>()) ListDiff<DisplayPrecision> displayContext,
     @Default(ListDiff<OptionSetting>()) ListDiff<OptionSetting> optionSettings,
   }) = _InfoDiff;
+  const InfoDiff._();
 
   bool get isEmpty =>
       filename == null &&
@@ -144,19 +139,18 @@ abstract class InfoDiff with _$InfoDiff {
 
 @freezed
 abstract class LedgerDiff with _$LedgerDiff {
-  const LedgerDiff._();
-
   const factory LedgerDiff({
-    @Default([]) List<ParsedDirective> onlyInLeft,
-    @Default([]) List<ParsedDirective> onlyInRight,
-    @Default([]) List<ChangedDirective> changed,
-    @Default([]) List<ParseError> errorsOnlyInLeft,
-    @Default([]) List<ParseError> errorsOnlyInRight,
-    @Default([]) List<ParseWarning> warningsOnlyInLeft,
-    @Default([]) List<ParseWarning> warningsOnlyInRight,
+    @Default(<dynamic>[]) List<ParsedDirective> onlyInLeft,
+    @Default(<dynamic>[]) List<ParsedDirective> onlyInRight,
+    @Default(<dynamic>[]) List<ChangedDirective> changed,
+    @Default(<dynamic>[]) List<ParseError> errorsOnlyInLeft,
+    @Default(<dynamic>[]) List<ParseError> errorsOnlyInRight,
+    @Default(<dynamic>[]) List<ParseWarning> warningsOnlyInLeft,
+    @Default(<dynamic>[]) List<ParseWarning> warningsOnlyInRight,
     @Default(OptionsDiff()) OptionsDiff options,
     @Default(InfoDiff()) InfoDiff info,
   }) = _LedgerDiff;
+  const LedgerDiff._();
 
   bool get isEmpty =>
       onlyInLeft.isEmpty &&

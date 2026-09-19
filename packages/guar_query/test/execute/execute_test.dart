@@ -8,14 +8,14 @@ import 'package:guar_query/guar_query.dart';
 import 'package:test/test.dart';
 
 Ledger book(String source) {
-  final parsed = const p.BeancountParser().parse(source, filename: 'test.beancount');
-  final booked = Book().process(parsed);
+  final p.ParsedLedger parsed = const p.BeancountParser().parse(source, filename: 'test.beancount');
+  final Ledger booked = Book().process(parsed);
   expect(booked, isA<LedgerDirectives>(), reason: booked is LedgerErrors ? booked.errors.toString() : null);
   return booked;
 }
 
 QueryTable run(Ledger ledger, String query) {
-  final result = Query(clock: () => DateTime.utc(2022, 4, 5)).run(ledger, query);
+  final QueryResult result = Query(clock: () => DateTime.utc(2022, 4, 5)).run(ledger, query);
   expect(
     result,
     isA<QueryTable>(),
@@ -25,13 +25,13 @@ QueryTable run(Ledger ledger, String query) {
 }
 
 void expectError(Ledger ledger, String query) {
-  final result = Query().run(ledger, query);
+  final QueryResult result = Query().run(ledger, query);
   expect(result, isA<QueryErrors>());
 }
 
 QueryValue n(String number) => QueryValue.number(Decimal.parse(number));
 
-const common = '''
+const String common = '''
 2010-01-01 open Assets:Bank:Checking
 2010-01-01 open Assets:ForeignBank:Checking
 2010-01-01 open Assets:Bank:Savings
@@ -97,7 +97,7 @@ void main() {
       expect(run(fundamentals, 'SELECT int(TRUE)').rows.first.values.single, const QueryValue.integer(1));
       expect(run(fundamentals, 'SELECT int(1.2)').rows.first.values.single, const QueryValue.integer(1));
       expect(run(fundamentals, 'SELECT decimal(1)').rows.first.values.single, n('1'));
-      expect(run(fundamentals, "SELECT str(TRUE)").rows.first.values.single, const QueryValue.text('TRUE'));
+      expect(run(fundamentals, 'SELECT str(TRUE)').rows.first.values.single, const QueryValue.text('TRUE'));
       expect(
         run(fundamentals, 'SELECT date(2022-04-05)').rows.first.values.single,
         QueryValue.date(BeanDate(year: 2022, month: 4, day: 5)),
@@ -107,25 +107,25 @@ void main() {
 
   group('select postings', () {
     test('filter by year', () {
-      final table = run(dinner, "SELECT date, narration WHERE year = 2012");
+      final QueryTable table = run(dinner, 'SELECT date, narration WHERE year = 2012');
       expect(table.rows, hasLength(2));
       expect(table.rows.first.values[1], const QueryValue.text('Dinner with Dos'));
     });
 
     test('sum position grouped by account', () {
-      final table = run(dinner, 'SELECT account, sum(position) WHERE account ~ "Expenses" GROUP BY account');
+      final QueryTable table = run(dinner, 'SELECT account, sum(position) WHERE account ~ "Expenses" GROUP BY account');
       expect(table.rows, hasLength(1));
       expect(
         table.rows.single.values[0],
         QueryValue.account(Account(name: 'Expenses:Restaurant', type: AccountType.expenses)),
       );
-      final inventory = table.rows.single.values[1] as QueryInventory;
+      final QueryInventory inventory = table.rows.single.values[1] as QueryInventory;
       expect(inventory.value.positions, isNotEmpty);
     });
 
     test('distinct accounts', () {
-      final table = run(dinner, 'SELECT DISTINCT account ORDER BY account');
-      expect(table.rows.map((row) => (row.values.single as QueryAccount).value.name).toList(), [
+      final QueryTable table = run(dinner, 'SELECT DISTINCT account ORDER BY account');
+      expect(table.rows.map((QueryRow row) => (row.values.single as QueryAccount).value.name).toList(), <String>[
         'Assets:Bank:Checking',
         'Assets:ForeignBank:Checking',
         'Equity:Opening-Balances',
@@ -134,17 +134,20 @@ void main() {
     });
 
     test('limit', () {
-      final table = run(dinner, 'SELECT date LIMIT 3');
+      final QueryTable table = run(dinner, 'SELECT date LIMIT 3');
       expect(table.rows, hasLength(3));
     });
 
     test('order desc', () {
-      final table = run(dinner, 'SELECT DISTINCT year ORDER BY year DESC');
+      final QueryTable table = run(dinner, 'SELECT DISTINCT year ORDER BY year DESC');
       expect((table.rows.first.values.single as QueryInteger).value, 2014);
     });
 
     test('having', () {
-      final table = run(dinner, 'SELECT account, count(*) GROUP BY account HAVING count(*) > 2 ORDER BY account');
+      final QueryTable table = run(
+        dinner,
+        'SELECT account, count(*) GROUP BY account HAVING count(*) > 2 ORDER BY account',
+      );
       expect(table.rows, isNotEmpty);
       expect((table.rows.first.values[0] as QueryAccount).value.name, isNotEmpty);
     });
@@ -152,13 +155,13 @@ void main() {
 
   group('named tables', () {
     test('entries types', () {
-      final table = run(dinner, 'SELECT type FROM #entries WHERE type = "open"');
+      final QueryTable table = run(dinner, 'SELECT type FROM #entries WHERE type = "open"');
       expect(table.rows, hasLength(5));
     });
 
     test('transactions', () {
-      final table = run(dinner, 'SELECT narration FROM #transactions WHERE year = 2013');
-      expect(table.rows.map((row) => (row.values.single as QueryText).value), [
+      final QueryTable table = run(dinner, 'SELECT narration FROM #transactions WHERE year = 2013');
+      expect(table.rows.map((QueryRow row) => (row.values.single as QueryText).value), <String>[
         'Dinner with Tres',
         'International Transfer',
       ]);
@@ -167,22 +170,22 @@ void main() {
 
   group('journal balances print', () {
     test('balances', () {
-      final table = run(dinner, 'BALANCES');
+      final QueryTable table = run(dinner, 'BALANCES');
       expect(table.columns.first.name, 'account');
       expect(table.rows, isNotEmpty);
     });
 
     test('print', () {
-      final result = Query().run(dinner, 'PRINT FROM year = 2012');
+      final QueryResult result = Query().run(dinner, 'PRINT FROM year = 2012');
       expect(result, isA<QueryEntries>());
-      final entries = (result as QueryEntries).directives;
+      final List<Directive> entries = (result as QueryEntries).directives;
       expect(entries, isNotEmpty);
-      expect(entries.every((entry) => entry.date.year == 2012), isTrue);
+      expect(entries.every((Directive entry) => entry.date.year == 2012), isTrue);
     });
 
     test('journal', () {
-      final table = run(dinner, "JOURNAL 'Expenses:Restaurant'");
-      expect(table.columns.map((column) => column.name).take(5).toList(), [
+      final QueryTable table = run(dinner, "JOURNAL 'Expenses:Restaurant'");
+      expect(table.columns.map((QueryColumn column) => column.name).take(5).toList(), <String>[
         'date',
         'flag',
         'maxwidth(payee, 48)',
@@ -197,43 +200,45 @@ void main() {
   group('create table', () {
     test('compile error', () {
       expectError(dinner, 'CREATE TABLE abcd (a int, b bool, c str, d date)');
-      expectError(dinner, "INSERT INTO abcd (a) VALUES (1)");
+      expectError(dinner, 'INSERT INTO abcd (a) VALUES (1)');
     });
   });
 
   group('open close clear', () {
     test('open dated inserts balances', () {
-      final result = Query().run(dinner, 'PRINT FROM OPEN ON 2013-01-01');
+      final QueryResult result = Query().run(dinner, 'PRINT FROM OPEN ON 2013-01-01');
       expect(result, isA<QueryEntries>());
-      final entries = (result as QueryEntries).directives;
+      final List<Directive> entries = (result as QueryEntries).directives;
       expect(
         entries.any(
-          (entry) => entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('S'),
+          (Directive entry) =>
+              entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('S'),
         ),
         isTrue,
       );
     });
 
     test('clear transfers income statement', () {
-      final result = Query().run(dinner, 'PRINT FROM CLEAR');
+      final QueryResult result = Query().run(dinner, 'PRINT FROM CLEAR');
       expect(result, isA<QueryEntries>());
-      final entries = (result as QueryEntries).directives;
+      final List<Directive> entries = (result as QueryEntries).directives;
       expect(
         entries.any(
-          (entry) => entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('T'),
+          (Directive entry) =>
+              entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('T'),
         ),
         isTrue,
       );
     });
 
     test('close on date truncates later entries', () {
-      final result = Query().run(dinner, 'PRINT FROM CLOSE ON 2013-01-01');
+      final QueryResult result = Query().run(dinner, 'PRINT FROM CLOSE ON 2013-01-01');
       expect(result, isA<QueryEntries>());
-      final entries = (result as QueryEntries).directives;
-      expect(entries.where((entry) => entry.date.year >= 2013), isEmpty);
+      final List<Directive> entries = (result as QueryEntries).directives;
+      expect(entries.where((Directive entry) => entry.date.year >= 2013), isEmpty);
       expect(
         entries.any(
-          (entry) =>
+          (Directive entry) =>
               entry.body is TransactionBody && (entry.body as TransactionBody).value.narration == 'Dinner with Dos',
         ),
         isTrue,
@@ -241,18 +246,19 @@ void main() {
     });
 
     test('close inserts conversion entries', () {
-      final result = Query().run(dinner, 'PRINT FROM CLOSE');
+      final QueryResult result = Query().run(dinner, 'PRINT FROM CLOSE');
       expect(result, isA<QueryEntries>());
-      final entries = (result as QueryEntries).directives;
+      final List<Directive> entries = (result as QueryEntries).directives;
       expect(
         entries.any(
-          (entry) => entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('C'),
+          (Directive entry) =>
+              entry.body is TransactionBody && (entry.body as TransactionBody).value.flag == Flag.letter('C'),
         ),
         isTrue,
       );
       expect(
         entries.any(
-          (entry) =>
+          (Directive entry) =>
               entry.body is TransactionBody && (entry.body as TransactionBody).value.narration == 'Dinner with Quatro',
         ),
         isTrue,
@@ -262,17 +268,20 @@ void main() {
 
   group('pivot and subquery', () {
     test('subquery arithmetic', () {
-      final table = run(dinner, 'SELECT a + 2 AS b FROM (SELECT 3 AS a FROM #)');
+      final QueryTable table = run(dinner, 'SELECT a + 2 AS b FROM (SELECT 3 AS a FROM #)');
       expect(table.rows.first.values.single, const QueryValue.integer(5));
     });
 
     test('in list', () {
-      final table = run(dinner, "SELECT DISTINCT year WHERE year IN (2012, 2013) ORDER BY year");
-      expect(table.rows.map((row) => (row.values.single as QueryInteger).value).toList(), [2012, 2013]);
+      final QueryTable table = run(dinner, 'SELECT DISTINCT year WHERE year IN (2012, 2013) ORDER BY year');
+      expect(table.rows.map((QueryRow row) => (row.values.single as QueryInteger).value).toList(), <int>[2012, 2013]);
     });
 
     test('in subquery', () {
-      final table = run(dinner, "SELECT DISTINCT account WHERE account IN (SELECT account WHERE account ~ 'Expenses')");
+      final QueryTable table = run(
+        dinner,
+        "SELECT DISTINCT account WHERE account IN (SELECT account WHERE account ~ 'Expenses')",
+      );
       expect(
         table.rows.single.values.single,
         QueryValue.account(Account(name: 'Expenses:Restaurant', type: AccountType.expenses)),
@@ -280,36 +289,36 @@ void main() {
     });
 
     test('any list', () {
-      final table = run(dinner, 'SELECT DISTINCT year WHERE year = any((2012, 2014)) ORDER BY year');
-      expect(table.rows.map((row) => (row.values.single as QueryInteger).value).toList(), [2012, 2014]);
+      final QueryTable table = run(dinner, 'SELECT DISTINCT year WHERE year = any((2012, 2014)) ORDER BY year');
+      expect(table.rows.map((QueryRow row) => (row.values.single as QueryInteger).value).toList(), <int>[2012, 2014]);
     });
 
     test('meta subscript', () {
-      final table = run(fundamentals, "SELECT meta['int']");
+      final QueryTable table = run(fundamentals, "SELECT meta['int']");
       expect((table.rows.first.values.single as QueryMetaCell).value, isA<MetaNumber>());
     });
 
     test('placeholders', () {
-      final table =
+      final QueryTable table =
           Query(
                 clock: () => DateTime.utc(2022, 4, 5),
-              ).run(dinner, 'SELECT DISTINCT year WHERE year = %(year)s', params: {'year': 2012})
+              ).run(dinner, 'SELECT DISTINCT year WHERE year = %(year)s', params: <String, int>{'year': 2012})
               as QueryTable;
       expect((table.rows.single.values.single as QueryInteger).value, 2012);
     });
 
     test('today uses injectable clock', () {
-      final table = run(dinner, 'SELECT DISTINCT today()');
+      final QueryTable table = run(dinner, 'SELECT DISTINCT today()');
       expect(table.rows.single.values.single, QueryValue.date(BeanDate(year: 2022, month: 4, day: 5)));
     });
 
     test('account functions', () {
-      final table = run(dinner, "SELECT DISTINCT root(account, 1) WHERE account ~ 'Expenses'");
+      final QueryTable table = run(dinner, "SELECT DISTINCT root(account, 1) WHERE account ~ 'Expenses'");
       expect(table.rows.single.values.single, const QueryValue.text('Expenses'));
     });
 
     test('pivot by year and account', () {
-      final table = run(dinner, 'SELECT year, account, count(*) GROUP BY 1, 2 PIVOT BY 1, 2');
+      final QueryTable table = run(dinner, 'SELECT year, account, count(*) GROUP BY 1, 2 PIVOT BY 1, 2');
       expect(table.columns, isNotEmpty);
       expect(table.rows, isNotEmpty);
     });
@@ -345,14 +354,14 @@ void main() {
     Decimal usd(QueryValue value) => (value as QueryInventory).value.currencyUnits(Currency(name: 'USD')).number;
 
     test('where only includes matching postings in the running total', () {
-      final table = run(streams, "SELECT date, balance WHERE account = 'Assets:Cash' ORDER BY date");
+      final QueryTable table = run(streams, "SELECT date, balance WHERE account = 'Assets:Cash' ORDER BY date");
       expect(table.rows, hasLength(2));
       expect(usd(table.rows[0].values[1]), Decimal.parse('10.00'));
       expect(usd(table.rows[1].values[1]), Decimal.parse('15.00'));
     });
 
     test('last(balance) group by account is per-account', () {
-      final table = run(
+      final QueryTable table = run(
         streams,
         "SELECT account, last(balance) WHERE account ~ 'Assets' GROUP BY account ORDER BY account",
       );
@@ -361,7 +370,7 @@ void main() {
     });
 
     test('last(balance) group by year month account carries across months', () {
-      final table = run(streams, '''
+      final QueryTable table = run(streams, '''
 SELECT year, month, account, last(balance)
 WHERE account ~ 'Assets'
 GROUP BY year, month, account
@@ -377,7 +386,7 @@ ORDER BY account, month
 
   group('convert', () {
     test('defaults to operating_currency', () {
-      final ledger = book('''
+      final Ledger ledger = book('''
 option "operating_currency" "USD"
 2010-01-01 open Assets:Cash
 2010-01-01 open Equity:Opening-Balances
@@ -386,8 +395,8 @@ option "operating_currency" "USD"
   Assets:Cash  10.00 CAD
   Equity:Opening-Balances
 ''');
-      final table = run(ledger, 'SELECT convert(position) WHERE account ~ "Assets"');
-      final amount = table.rows.single.values.single as QueryAmount;
+      final QueryTable table = run(ledger, 'SELECT convert(position) WHERE account ~ "Assets"');
+      final QueryAmount amount = table.rows.single.values.single as QueryAmount;
       expect(amount.value.currency.name, 'USD');
       expect(amount.value.number, Decimal.parse('8.00'));
     });
@@ -395,8 +404,10 @@ option "operating_currency" "USD"
 
   group('error ledger', () {
     test('querying errors yields errors', () {
-      final ledger = Ledger.errors(
-        errors: [ProcessingError(message: 'boom', location: BeanLocation(linenoBegin: 1, linenoEnd: 1))],
+      final Ledger ledger = Ledger.errors(
+        errors: <ProcessingError>[
+          ProcessingError(message: 'boom', location: BeanLocation(linenoBegin: 1, linenoEnd: 1)),
+        ],
         options: LedgerOptions(),
       );
       expectError(ledger, 'SELECT account');

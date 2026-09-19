@@ -5,9 +5,9 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _header =
-    'plugin "beancount_reds_plugins.capital_gains_classifier.gain_loss" "'
-    '{\'Income.*:Capital-Gains.*\' : [\':Capital-Gains\', \':Capital-Gains:Gains\', \':Capital-Gains:Losses\']}"\n';
+const String _header =
+    'plugin "beancount_reds_plugins.capital_gains_classifier.gain_loss" '
+    '"{\'Income.*:Capital-Gains.*\' : [\':Capital-Gains\', \':Capital-Gains:Gains\', \':Capital-Gains:Losses\']}"\n';
 
 void main() {
   test('empty entries', () {
@@ -15,7 +15,7 @@ void main() {
   });
 
   test('classifies gains and losses', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       '$_header'
       '2014-01-01 open Assets:Brokerage\n'
       '2014-01-01 open Assets:Bank\n'
@@ -35,12 +35,12 @@ void main() {
       '  Assets:Bank                50 USD\n'
       '  Income:Capital-Gains\n',
     );
-    expect(opens(directives), containsAll(['Income:Capital-Gains:Gains', 'Income:Capital-Gains:Losses']));
-    final sells = [
-      for (final directive in directives)
-        if (directive.body case TransactionBody(:final value) when value.narration == 'Sell') value,
+    expect(opens(directives), containsAll(<dynamic>['Income:Capital-Gains:Gains', 'Income:Capital-Gains:Losses']));
+    final List<Transaction> sells = <Transaction>[
+      for (final Directive directive in directives)
+        if (directive.body case TransactionBody(:final Transaction value) when value.narration == 'Sell') value,
     ];
-    expect(sells[0].postings.map((p) => p.account.name), contains('Income:Capital-Gains:Gains'));
-    expect(sells[1].postings.map((p) => p.account.name), contains('Income:Capital-Gains:Losses'));
+    expect(sells[0].postings.map((Posting p) => p.account.name), contains('Income:Capital-Gains:Gains'));
+    expect(sells[1].postings.map((Posting p) => p.account.name), contains('Income:Capital-Gains:Losses'));
   });
 }

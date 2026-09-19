@@ -43,7 +43,7 @@ void main() {
           '2019-01-01 close Assets:Something:Cash\n',
         ),
       ),
-      ['2019-01-02 Assets:Something:Cash 0 USD', '2019-01-02 Assets:Something:Cash 0 CAD'],
+      <String>['2019-01-02 Assets:Something:Cash 0 USD', '2019-01-02 Assets:Something:Cash 0 CAD'],
     );
   });
 
@@ -57,7 +57,7 @@ void main() {
           '2019-01-01 close Assets:Something:Cash\n',
         ),
       ),
-      ['2019-01-02 Assets:Something:Cash 0 USD', '2019-01-02 Assets:Something:Cash 0 CAD'],
+      <String>['2019-01-02 Assets:Something:Cash 0 USD', '2019-01-02 Assets:Something:Cash 0 CAD'],
     );
   });
 
@@ -75,7 +75,7 @@ void main() {
           '2019-01-01 close Assets:Something:Cash\n',
         ),
       ),
-      ['2019-01-02 Assets:Something:Cash 0 CAD', '2019-01-01 Assets:Something:Cash 1 USD'],
+      <String>['2019-01-02 Assets:Something:Cash 0 CAD', '2019-01-01 Assets:Something:Cash 1 USD'],
     );
   });
 

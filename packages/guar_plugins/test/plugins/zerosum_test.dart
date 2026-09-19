@@ -1,18 +1,19 @@
 // Port of beancount_reds_plugins.zerosum tests.
+// ignore_for_file: missing_whitespace_between_adjacent_strings, python dict literals have no space after {
 
 import 'package:guar_domain/guar_domain.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _config =
+const String _config =
     "{'zerosum_accounts': {"
     "'Assets:Zero-Sum-Accounts:Returns-and-Temporary': ('', 90), "
     "'Assets:Zero-Sum-Accounts:Checkings': ('', 90), "
     "'Assets:Zero-Sum-Accounts:Retirement': ('', 90)"
     "}, 'account_name_replace': ('Zero-Sum-Accounts', 'ZSA-Matched'), 'tolerance': 0.0098}";
 
-const _plugin = 'plugin "beancount_reds_plugins.zerosum.zerosum" "$_config"\n';
+const String _plugin = 'plugin "beancount_reds_plugins.zerosum.zerosum" "$_config"\n';
 
 void main() {
   test('empty entries', () {
@@ -20,7 +21,7 @@ void main() {
   });
 
   test('empty config leaves postings unchanged', () {
-    final names = _matched(
+    final List<String> names = _matched(
       booked(
         'plugin "beancount_reds_plugins.zerosum.zerosum" "{}"\n'
         '2014-01-01 open Assets:Account1\n'
@@ -35,7 +36,7 @@ void main() {
   });
 
   test('matches a pair of zerosum refunds', () {
-    final matched = _matchedTxns(_furniture(twoRefunds: true), ':ZSA-Matched');
+    final List<Transaction> matched = _matchedTxns(_furniture(twoRefunds: true), ':ZSA-Matched');
     expect(matched, hasLength(3));
     expect(matched[0].postings[1].account.name, 'Assets:ZSA-Matched:Returns-and-Temporary');
     expect(matched[0].postings[2].account.name, 'Assets:ZSA-Matched:Returns-and-Temporary');
@@ -50,7 +51,7 @@ void main() {
   });
 
   test('matches lookalike zero postings in one transaction', () {
-    final matched = _matchedTxns(
+    final List<Transaction> matched = _matchedTxns(
       '$_plugin'
           '2015-01-01 open Assets:Zero-Sum-Accounts:Returns-and-Temporary\n'
           '2020-06-01 * "Match two lookalike postings in one txn"\n'
@@ -59,11 +60,11 @@ void main() {
       ':ZSA-Matched',
     );
     expect(matched, hasLength(1));
-    expect(matched.single.postings.every((p) => p.account.name.contains('ZSA-Matched')), isTrue);
+    expect(matched.single.postings.every((Posting p) => p.account.name.contains('ZSA-Matched')), isTrue);
   });
 
   test('matches both postings in one transaction', () {
-    final matched = _matchedTxns(
+    final List<Transaction> matched = _matchedTxns(
       '$_plugin'
           '2015-01-01 open Assets:Zero-Sum-Accounts:Returns-and-Temporary\n'
           '2020-01-01 * "Match both postings in one txn"\n'
@@ -75,7 +76,7 @@ void main() {
   });
 
   test('matches two same-sign postings that sum under tolerance', () {
-    final matched = _matchedTxns(
+    final List<Transaction> matched = _matchedTxns(
       '$_plugin'
           '2015-01-01 open Liabilities:Credit-Cards:Green\n'
           '2015-01-01 open Assets:Zero-Sum-Accounts:Returns-and-Temporary\n'
@@ -86,7 +87,7 @@ void main() {
       ':ZSA-Matched',
     );
     expect(matched, hasLength(1));
-    expect(matched.single.postings.where((p) => p.account.name.contains('ZSA-Matched')), hasLength(2));
+    expect(matched.single.postings.where((Posting p) => p.account.name.contains('ZSA-Matched')), hasLength(2));
   });
 
   test('does not match two same-sign postings that sum above tolerance', () {
@@ -106,17 +107,17 @@ void main() {
   });
 
   test('does not add match metadata by default', () {
-    final matched = _matchedTxns(_furniture(twoRefunds: false), ':ZSA-Matched');
+    final List<Transaction> matched = _matchedTxns(_furniture(twoRefunds: false), ':ZSA-Matched');
     expect(matched, hasLength(2));
-    for (final txn in matched) {
-      for (final posting in txn.postings) {
-        expect(posting.meta.entries.any((e) => e.key == 'match_id'), isFalse);
+    for (final Transaction txn in matched) {
+      for (final Posting posting in txn.postings) {
+        expect(posting.meta.entries.any((MetaEntry e) => e.key == 'match_id'), isFalse);
       }
     }
   });
 
   test('adds matching metadata when configured', () {
-    final matched = _payStub(matchMetadata: true);
+    final Map<String, Transaction> matched = _payStub(matchMetadata: true);
     expect(matched, hasLength(3));
     expect(
       _meta(matched['Pay stub']!.postings[1], 'match_id'),
@@ -129,42 +130,42 @@ void main() {
   });
 
   test('uses a custom metadata name', () {
-    final matched = _payStub(matchMetadata: true, matchName: 'MATCH');
+    final Map<String, Transaction> matched = _payStub(matchMetadata: true, matchName: 'MATCH');
     expect(_meta(matched['Pay stub']!.postings[1], 'MATCH'), _meta(matched['Bank account']!.postings[1], 'MATCH'));
   });
 
   test('does not add links by default', () {
-    for (final txn in _matchedTxns(_furniture(twoRefunds: false), ':ZSA-Matched')) {
-      expect(txn.links.any((link) => link.name.startsWith('ZeroSum.')), isFalse);
+    for (final Transaction txn in _matchedTxns(_furniture(twoRefunds: false), ':ZSA-Matched')) {
+      expect(txn.links.any((Link link) => link.name.startsWith('ZeroSum.')), isFalse);
     }
   });
 
   test('adds transaction links when configured', () {
-    final matched = _payStub(linkTransactions: true);
+    final Map<String, Transaction> matched = _payStub(linkTransactions: true);
     expect(_shareLink(matched['Pay stub']!, matched['Bank account']!, 'ZeroSum.'), isTrue);
     expect(_shareLink(matched['Pay stub']!, matched['401k statement']!, 'ZeroSum.'), isTrue);
     expect(_shareLink(matched['Bank account']!, matched['401k statement']!, 'ZeroSum.'), isFalse);
   });
 
   test('uses a custom link prefix', () {
-    final matched = _payStub(linkTransactions: true, linkPrefix: 'ZSM');
+    final Map<String, Transaction> matched = _payStub(linkTransactions: true, linkPrefix: 'ZSM');
     expect(_shareLink(matched['Pay stub']!, matched['Bank account']!, 'ZSM'), isTrue);
   });
 }
 
-List<String> _matched(List<Directive> directives, String pattern) => [
-  for (final txn in _matchedTxns(directives, pattern))
-    for (final posting in txn.postings)
+List<String> _matched(List<Directive> directives, String pattern) => <String>[
+  for (final Transaction txn in _matchedTxns(directives, pattern))
+    for (final Posting posting in txn.postings)
       if (posting.account.name.contains(pattern.substring(1))) posting.account.name,
 ];
 
 List<Transaction> _matchedTxns(Object source, String pattern) {
-  final directives = source is String ? booked(source) : source as List<Directive>;
-  return [
-    for (final directive in directives)
+  final List<Directive> directives = source is String ? booked(source) : source as List<Directive>;
+  return <Transaction>[
+    for (final Directive directive in directives)
       if (directive.body case TransactionBody(
-        :final value,
-      ) when value.postings.any((p) => p.account.name.contains(pattern.substring(1))))
+        :final Transaction value,
+      ) when value.postings.any((Posting p) => p.account.name.contains(pattern.substring(1))))
         value,
   ];
 }
@@ -201,14 +202,14 @@ Map<String, Transaction> _payStub({
   bool linkTransactions = false,
   String? linkPrefix,
 }) {
-  final extra = [
+  final String extra = <String>[
     if (matchMetadata) "'match_metadata': True",
     if (matchName != null) "'match_metadata_name': '$matchName'",
     if (linkTransactions) "'link_transactions': True",
     if (linkPrefix != null) "'link_prefix': '$linkPrefix'",
   ].join(', ');
-  final config = extra.isEmpty ? _config : '${_config.substring(0, _config.length - 1)}, $extra}';
-  final directives = booked(
+  final String config = extra.isEmpty ? _config : '${_config.substring(0, _config.length - 1)}, $extra}';
+  final List<Directive> directives = booked(
     'plugin "beancount_reds_plugins.zerosum.zerosum" "$config"\n'
     '2023-01-01 open Income:Salary\n'
     '2023-01-01 open Assets:Bank:Checkings\n'
@@ -226,14 +227,16 @@ Map<String, Transaction> _payStub({
     '  Assets:Brokerage:Retirement                   100.59 USD\n'
     '  Assets:Zero-Sum-Accounts:Retirement\n',
   );
-  return {for (final txn in _matchedTxns(directives, ':ZSA-Matched')) txn.narration: txn};
+  return <String, Transaction>{
+    for (final Transaction txn in _matchedTxns(directives, ':ZSA-Matched')) txn.narration: txn,
+  };
 }
 
 String? _meta(Posting posting, String key) {
-  for (final entry in posting.meta.entries) {
+  for (final MetaEntry entry in posting.meta.entries) {
     if (entry.key == key) {
       return switch (entry.value) {
-        MetaText(:final value) => value,
+        MetaText(:final String value) => value,
         _ => entry.value?.toString(),
       };
     }
@@ -242,6 +245,9 @@ String? _meta(Posting posting, String key) {
 }
 
 bool _shareLink(Transaction left, Transaction right, String prefix) {
-  final names = left.links.map((l) => l.name).toSet().intersection(right.links.map((l) => l.name).toSet());
-  return names.any((name) => name.startsWith(prefix));
+  final Set<String> names = left.links
+      .map((Link l) => l.name)
+      .toSet()
+      .intersection(right.links.map((Link l) => l.name).toSet());
+  return names.any((String name) => name.startsWith(prefix));
 }

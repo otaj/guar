@@ -18,7 +18,7 @@ void main() {
         '  Expenses:Restaurant   1.00 CAD\n'
         '  Assets:Other         -1.00 USD @ 1.00 CAD\n',
       ),
-      ["More than one currency in account 'Expenses:Restaurant': USD,CAD"],
+      <String>["More than one currency in account 'Expenses:Restaurant': USD,CAD"],
     );
   });
 
@@ -33,7 +33,7 @@ void main() {
         '  Assets:Other         -1.00 USD\n'
         '2012-01-01 balance Expenses:Restaurant   0.00 CAD\n',
       ),
-      ["More than one currency in account 'Expenses:Restaurant': USD,CAD"],
+      <String>["More than one currency in account 'Expenses:Restaurant': USD,CAD"],
     );
   });
 

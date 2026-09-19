@@ -2,23 +2,22 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
-
-import '../plugin.dart';
-import '../config_literal.dart';
-import '../helpers.dart';
+import 'package:guar_plugins/src/config_literal.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 BookPluginResult configError(List<Directive> directives, String message) =>
-    (directives: directives, errors: [ProcessingError(message: message, location: nowhereLocation())]);
+    (directives: directives, errors: <ProcessingError>[ProcessingError(message: message, location: nowhereLocation())]);
 
 ({Map<Object?, Object?>? map, String? error}) parseConfigMap(String? config) {
   if (config == null || config.trim().isEmpty) {
-    return (map: const {}, error: null);
+    return (map: const <Object?, Object?>{}, error: null);
   }
-  final parsed = parseConfigLiteral(config);
+  final ConfigLiteral parsed = parseConfigLiteral(config);
   if (parsed.error != null) {
     return (map: null, error: parsed.error);
   }
-  final value = parsed.value;
+  final Object? value = parsed.value;
   if (value is! Map<Object?, Object?>) {
     return (map: null, error: 'Expected a dict configuration');
   }
@@ -26,13 +25,13 @@ BookPluginResult configError(List<Directive> directives, String message) =>
 }
 
 RegExp pythonRegExp(String pattern) {
-  final converted = pattern.replaceAllMapped(RegExp(r'\(\?P<([^>]+)>'), (match) => '(?<${match[1]}>');
+  final String converted = pattern.replaceAllMapped(RegExp(r'\(\?P<([^>]+)>'), (Match match) => '(?<${match[1]}>');
   return RegExp(converted);
 }
 
 ({String result, int count}) pythonSub(RegExp pattern, String replacement, String input) {
-  var count = 0;
-  final result = input.replaceAllMapped(pattern, (match) {
+  int count = 0;
+  final String result = input.replaceAllMapped(pattern, (Match match) {
     count++;
     return expandPythonReplacement(replacement, match);
   });
@@ -40,8 +39,8 @@ RegExp pythonRegExp(String pattern) {
 }
 
 String expandPythonReplacement(String replacement, Match match) {
-  final buffer = StringBuffer();
-  for (var i = 0; i < replacement.length; i++) {
+  final StringBuffer buffer = StringBuffer();
+  for (int i = 0; i < replacement.length; i++) {
     if (replacement[i] != r'\') {
       buffer.write(replacement[i]);
       continue;
@@ -50,30 +49,30 @@ String expandPythonReplacement(String replacement, Match match) {
       buffer.write(r'\');
       break;
     }
-    final next = replacement[i + 1];
+    final String next = replacement[i + 1];
     if (next == r'\') {
       buffer.write(r'\');
       i++;
       continue;
     }
     if (next == 'g' && i + 2 < replacement.length && replacement[i + 2] == '<') {
-      final end = replacement.indexOf('>', i + 3);
+      final int end = replacement.indexOf('>', i + 3);
       if (end < 0) {
         buffer.write(r'\');
         continue;
       }
-      final name = replacement.substring(i + 3, end);
-      final index = int.tryParse(name);
+      final String name = replacement.substring(i + 3, end);
+      final int? index = int.tryParse(name);
       buffer.write(index != null ? (match.group(index) ?? '') : ((match as RegExpMatch).namedGroup(name) ?? ''));
       i = end;
       continue;
     }
     if (_isDigit(next)) {
-      var j = i + 1;
+      int j = i + 1;
       while (j < replacement.length && _isDigit(replacement[j])) {
         j++;
       }
-      final index = int.parse(replacement.substring(i + 1, j));
+      final int index = int.parse(replacement.substring(i + 1, j));
       buffer.write(match.group(index) ?? '');
       i = j - 1;
       continue;
@@ -87,38 +86,38 @@ String expandPythonReplacement(String replacement, Match match) {
 bool _isDigit(String char) => char.codeUnitAt(0) >= 0x30 && char.codeUnitAt(0) <= 0x39;
 
 String formatMap(String template, Map<String, String> values) =>
-    template.replaceAllMapped(RegExp(r'\{(\w+)\}'), (match) => values[match[1]] ?? match[0]!);
+    template.replaceAllMapped(RegExp(r'\{(\w+)\}'), (Match match) => values[match[1]] ?? match[0]!);
 
 Account rewriteAccount(String name, LedgerOptions options) => generatedAccount(name, options);
 
 BeanDate? parseIsoDate(Object? value) {
   if (value is BeanDate) return value;
   if (value is! String) return null;
-  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
+  final RegExpMatch? match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
   if (match == null) return null;
   return BeanDate(year: int.parse(match[1]!), month: int.parse(match[2]!), day: int.parse(match[3]!));
 }
 
 BeanDate? metaDate(Meta meta, String key) {
-  final value = meta.lookup(key);
+  final MetaValue? value = meta.lookup(key);
   return switch (value) {
-    MetaDate(:final value) => value,
-    MetaText(:final value) => parseIsoDate(value),
+    MetaDate(:final BeanDate value) => value,
+    MetaText(:final String value) => parseIsoDate(value),
     _ => null,
   };
 }
 
 Meta metaWith(Meta meta, String key, MetaValue value) => Meta(
-  entries: [
-    for (final entry in meta.entries)
+  entries: <MetaEntry>[
+    for (final MetaEntry entry in meta.entries)
       if (entry.key != key) entry,
     MetaEntry(key: key, value: value),
   ],
 );
 
 bool metaFlag(Meta meta, String key) => switch (meta.lookup(key)) {
-  MetaBoolean(:final value) => value,
-  MetaText(:final value) => value == 'TRUE' || value == 'true',
+  MetaBoolean(:final bool value) => value,
+  MetaText(:final String value) => value == 'TRUE' || value == 'true',
   _ => false,
 };
 
@@ -128,15 +127,15 @@ List<Directive> createOpenDirectives(
   LedgerOptions options,
   ProcessingInfo info,
 ) {
-  if (entries.isEmpty) return const [];
-  final existing = {
-    for (final directive in entries)
-      if (directive.body case OpenBody(:final account)) account.name,
+  if (entries.isEmpty) return const <Directive>[];
+  final Set<String> existing = <String>{
+    for (final Directive directive in entries)
+      if (directive.body case OpenBody(:final Account account)) account.name,
   };
-  final date = entries.first.date;
-  final names = newAccounts.toSet().toList()..sort();
-  return [
-    for (final name in names)
+  final BeanDate date = entries.first.date;
+  final List<String> names = newAccounts.toSet().toList()..sort();
+  return <Directive>[
+    for (final String name in names)
       if (!existing.contains(name))
         Directive(
           origin: insertOrigin(
@@ -153,22 +152,24 @@ List<Directive> createOpenDirectives(
 
 Directive rewriteDirectiveAccounts(Directive directive, String Function(String name) rename, LedgerOptions options) {
   Account mapAccount(Account account) {
-    final name = rename(account.name);
+    final String name = rename(account.name);
     if (name == account.name) return account;
     return generatedAccount(name, options);
   }
 
   Account mapBudgetAccount(Account account) {
-    final name = rename(account.name);
+    final String name = rename(account.name);
     if (name == account.name) return account;
     return options.accountPrefixes.budgetAccount(name);
   }
 
   switch (directive.body) {
-    case TransactionBody(:final value):
-      final postings = [for (final posting in value.postings) posting.copyWith(account: mapAccount(posting.account))];
-      var changed = false;
-      for (var i = 0; i < postings.length; i++) {
+    case TransactionBody(:final Transaction value):
+      final List<Posting> postings = <Posting>[
+        for (final Posting posting in value.postings) posting.copyWith(account: mapAccount(posting.account)),
+      ];
+      bool changed = false;
+      for (int i = 0; i < postings.length; i++) {
         if (postings[i].account != value.postings[i].account) {
           changed = true;
           break;
@@ -177,46 +178,46 @@ Directive rewriteDirectiveAccounts(Directive directive, String Function(String n
       return changed
           ? directive.copyWith(body: DirectiveBody.transaction(value.copyWith(postings: postings)))
           : directive;
-    case PadBody(:final account, :final sourceAccount):
+    case PadBody(:final Account account, :final Account sourceAccount):
       return directive.copyWith(
         body: DirectiveBody.pad(account: mapAccount(account), sourceAccount: mapAccount(sourceAccount)),
       );
-    case OpenBody(:final account, :final currencies, :final booking):
+    case OpenBody(:final Account account, :final List<Currency> currencies, :final BookingMethod? booking):
       return directive.copyWith(
         body: DirectiveBody.open(account: mapAccount(account), currencies: currencies, booking: booking),
       );
-    case CloseBody(:final account):
+    case CloseBody(:final Account account):
       return directive.copyWith(body: DirectiveBody.close(account: mapAccount(account)));
-    case BalanceBody(:final account, :final amount, :final tolerance):
+    case BalanceBody(:final Account account, :final Amount amount, :final Decimal? tolerance):
       return directive.copyWith(
         body: DirectiveBody.balance(account: mapAccount(account), amount: amount, tolerance: tolerance),
       );
-    case NoteBody(:final account, :final comment, :final tags, :final links):
+    case NoteBody(:final Account account, :final String comment, :final List<Tag> tags, :final List<Link> links):
       return directive.copyWith(
         body: DirectiveBody.note(account: mapAccount(account), comment: comment, tags: tags, links: links),
       );
-    case DocumentBody(:final account, :final filename, :final tags, :final links):
+    case DocumentBody(:final Account account, :final String filename, :final List<Tag> tags, :final List<Link> links):
       return directive.copyWith(
         body: DirectiveBody.document(account: mapAccount(account), filename: filename, tags: tags, links: links),
       );
-    case CustomBody(:final type, :final values):
+    case CustomBody(:final String type, :final List<CustomValue> values):
       return directive.copyWith(
         body: DirectiveBody.custom(
           type: type,
-          values: [
-            for (final value in values)
+          values: <CustomValue>[
+            for (final CustomValue value in values)
               switch (value) {
-                CustomAccount(:final value) => CustomValue.account(mapAccount(value)),
+                CustomAccount(:final Account value) => CustomValue.account(mapAccount(value)),
                 _ => value,
               },
           ],
         ),
       );
-    case BudgetBody(:final account, :final interval, :final amount):
+    case BudgetBody(:final Account account, :final BudgetInterval interval, :final Amount amount):
       return directive.copyWith(
         body: DirectiveBody.budget(account: mapBudgetAccount(account), interval: interval, amount: amount),
       );
-    case BudgetOffBody(:final account, :final currency):
+    case BudgetOffBody(:final Account account, :final Currency? currency):
       return directive.copyWith(
         body: DirectiveBody.budgetOff(account: mapBudgetAccount(account), currency: currency),
       );
@@ -234,8 +235,8 @@ Decimal toDecimal(Object? value) {
 }
 
 int daysInclusive(BeanDate start, BeanDate end) {
-  final a = DateTime.utc(start.year, start.month, start.day);
-  final b = DateTime.utc(end.year, end.month, end.day);
+  final DateTime a = DateTime.utc(start.year, start.month, start.day);
+  final DateTime b = DateTime.utc(end.year, end.month, end.day);
   return b.difference(a).inDays + 1;
 }
 
@@ -243,7 +244,7 @@ bool isLongTermHolding(BeanDate acquired, BeanDate sold) =>
     compareBeanDate(sold, addDelta(acquired, const DateDelta(years: 1))) > 0;
 
 Transaction? transactionOf(Directive directive) => switch (directive.body) {
-  TransactionBody(:final value) => value,
+  TransactionBody(:final Transaction value) => value,
   _ => null,
 };
 

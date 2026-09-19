@@ -1,9 +1,8 @@
 // Reject commodities that are posted both at cost and without cost.
 
 import 'package:guar_domain/guar_domain.dart';
-
-import 'plugin.dart';
-import 'helpers.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 BookPluginResult validateCoherentCost(
   List<Directive> directives,
@@ -11,20 +10,19 @@ BookPluginResult validateCoherentCost(
   ProcessingInfo info,
   String? config,
 ) {
-  final withCost = <String, Directive>{};
-  final withoutCost = <String, Directive>{};
-  for (final directive in directives) {
-    if (directive.body case TransactionBody(:final value)) {
-      for (final posting in value.postings) {
-        final target = posting.cost == null ? withoutCost : withCost;
-        target.putIfAbsent(posting.units.currency.name, () => directive);
+  final Map<String, Directive> withCost = <String, Directive>{};
+  final Map<String, Directive> withoutCost = <String, Directive>{};
+  for (final Directive directive in directives) {
+    if (directive.body case TransactionBody(:final Transaction value)) {
+      for (final Posting posting in value.postings) {
+        (posting.cost == null ? withoutCost : withCost).putIfAbsent(posting.units.currency.name, () => directive);
       }
     }
   }
 
-  final errors = <ProcessingError>[];
-  for (final currency in withCost.keys) {
-    final plain = withoutCost[currency];
+  final List<ProcessingError> errors = <ProcessingError>[];
+  for (final String currency in withCost.keys) {
+    final Directive? plain = withoutCost[currency];
     if (plain == null) continue;
     errors.add(
       ProcessingError(

@@ -1,5 +1,6 @@
 // Port of beancount.plugins.close_tree tests.
 
+import 'package:guar_domain/src/directive.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
@@ -15,7 +16,7 @@ void main() {
           '2015-01-01 close Assets:XBank\n',
         ),
       ),
-      ['2015-01-01 Assets:XBank:AAPL', '2015-01-01 Assets:XBank'],
+      <String>['2015-01-01 Assets:XBank:AAPL', '2015-01-01 Assets:XBank'],
     );
   });
 
@@ -32,7 +33,7 @@ void main() {
           '2015-01-01 close Assets:XBank\n',
         ),
       ),
-      ['2015-01-01 Assets:XBank:AAPL', '2015-01-01 Assets:XBank:ORNG', '2015-01-01 Assets:XBank'],
+      <String>['2015-01-01 Assets:XBank:AAPL', '2015-01-01 Assets:XBank:ORNG', '2015-01-01 Assets:XBank'],
     );
   });
 
@@ -48,18 +49,18 @@ void main() {
           '2016-01-01 close Assets:XBank\n',
         ),
       ),
-      ['2015-01-01 Assets:XBank:AAPL:Fuji', '2015-01-01 Assets:XBank:AAPL', '2016-01-01 Assets:XBank'],
+      <String>['2015-01-01 Assets:XBank:AAPL:Fuji', '2015-01-01 Assets:XBank:AAPL', '2016-01-01 Assets:XBank'],
     );
   });
 
   test('drops the close of a parent that was never opened', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.close_tree"\n'
       '2017-11-10 open Assets:Brokerage:AAPL\n'
       '2017-11-10 open Assets:Brokerage:ORNG\n'
       '2018-11-10 close Assets:Brokerage\n',
     );
-    expect(closes(directives), ['2018-11-10 Assets:Brokerage:AAPL', '2018-11-10 Assets:Brokerage:ORNG']);
+    expect(closes(directives), <String>['2018-11-10 Assets:Brokerage:AAPL', '2018-11-10 Assets:Brokerage:ORNG']);
   });
 
   test('only matches on full account components', () {
@@ -73,7 +74,10 @@ void main() {
           '2018-11-10 close Liabilities:Credit-Cards:Spouse:Citi\n',
         ),
       ),
-      ['2018-11-10 Liabilities:Credit-Cards:Spouse:Citi:Addon', '2018-11-10 Liabilities:Credit-Cards:Spouse:Citi'],
+      <String>[
+        '2018-11-10 Liabilities:Credit-Cards:Spouse:Citi:Addon',
+        '2018-11-10 Liabilities:Credit-Cards:Spouse:Citi',
+      ],
     );
   });
 }

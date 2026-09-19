@@ -3,9 +3,11 @@
 import 'package:guar_domain/guar_domain.dart';
 
 DateDelta? parseInterval(String text) {
-  final match = RegExp(r'^([+-]?\d+)\s+(day|week|month|year|decade|century|millennium)s?$').firstMatch(text.trim());
+  final RegExpMatch? match = RegExp(
+    r'^([+-]?\d+)\s+(day|week|month|year|decade|century|millennium)s?$',
+  ).firstMatch(text.trim());
   if (match == null) return null;
-  final number = int.parse(match.group(1)!);
+  final int number = int.parse(match.group(1)!);
   return switch (match.group(2)!) {
     'day' => DateDelta(days: number),
     'week' => DateDelta(days: number * 7),
@@ -26,7 +28,7 @@ int accountSign(Account account) => switch (account.type) {
 };
 
 String accountSortKey(Account account) {
-  final index = switch (account.type) {
+  final int index = switch (account.type) {
     AccountType.assets => 1,
     AccountType.liabilities => 2,
     AccountType.equity => 3,
@@ -37,17 +39,17 @@ String accountSortKey(Account account) {
 }
 
 String parentAccount(String name) {
-  final index = name.lastIndexOf(':');
+  final int index = name.lastIndexOf(':');
   return index < 0 ? '' : name.substring(0, index);
 }
 
 String leafAccount(String name) {
-  final index = name.lastIndexOf(':');
+  final int index = name.lastIndexOf(':');
   return index < 0 ? name : name.substring(index + 1);
 }
 
 String rootAccount(String name, int n) {
-  final parts = name.split(':');
+  final List<String> parts = name.split(':');
   if (n <= 0) return '';
   return parts.take(n).join(':');
 }

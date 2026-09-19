@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _plugin = 'plugin "beancount_reds_plugins.effective_date.effective_date"\n';
+const String _plugin = 'plugin "beancount_reds_plugins.effective_date.effective_date"\n';
 
 void main() {
   test('empty entries', () {
@@ -13,20 +13,20 @@ void main() {
   });
 
   test('leaves transactions without effective dates unchanged', () {
-    final source =
+    const String source =
         '$_plugin'
         '2014-01-01 open Liabilities:Mastercard\n'
         '2014-01-01 open Expenses:Taxes:Federal\n'
         '2014-02-01 * "Estimated taxes for 2013"\n'
         '  Liabilities:Mastercard        -2000 USD\n'
         '  Expenses:Taxes:Federal\n';
-    final txns = _txns(booked(source));
+    final List<({BeanDate date, Transaction value})> txns = _txns(booked(source));
     expect(txns, hasLength(1));
     expect(txns.single.date.toString(), '2014-02-01');
   });
 
   test('books an earlier expense onto a holding account', () {
-    final txns = _txns(
+    final List<({BeanDate date, Transaction value})> txns = _txns(
       booked(
         '$_plugin'
         '2014-01-01 open Liabilities:Mastercard\n'
@@ -46,7 +46,7 @@ void main() {
   });
 
   test('splits multiple later expense postings', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       '$_plugin'
       '2014-01-01 open Liabilities:Mastercard\n'
       '2014-01-01 open Expenses:Car:Insurance\n'
@@ -79,7 +79,7 @@ void main() {
   });
 }
 
-List<({BeanDate date, Transaction value})> _txns(List<Directive> directives) => [
-  for (final directive in directives)
-    if (directive.body case TransactionBody(:final value)) (date: directive.date, value: value),
+List<({BeanDate date, Transaction value})> _txns(List<Directive> directives) => <({BeanDate date, Transaction value})>[
+  for (final Directive directive in directives)
+    if (directive.body case TransactionBody(:final Transaction value)) (date: directive.date, value: value),
 ];

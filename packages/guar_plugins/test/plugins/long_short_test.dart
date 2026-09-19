@@ -5,9 +5,9 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _plugin =
-    'plugin "beancount_reds_plugins.capital_gains_classifier.long_short" "'
-    '{\'Income.*:Capital-Gains\': [\':Capital-Gains\', \':Capital-Gains:Short\', \':Capital-Gains:Long\']}"\n';
+const String _plugin =
+    'plugin "beancount_reds_plugins.capital_gains_classifier.long_short" '
+    '"{\'Income.*:Capital-Gains\': [\':Capital-Gains\', \':Capital-Gains:Short\', \':Capital-Gains:Long\']}"\n';
 
 void main() {
   test('empty entries', () {
@@ -15,7 +15,7 @@ void main() {
   });
 
   test('leaves already classified sales untouched', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.auto"\n'
       '$_plugin'
       '2014-02-01 * "Buy"\n'
@@ -28,13 +28,13 @@ void main() {
       '  Income:Capital-Gains       -30 USD\n'
       '  Expenses:Fees              10 USD\n',
     );
-    final sell = [
-      for (final directive in directives)
-        if (directive.body case TransactionBody(:final value) when value.narration == 'Sell') value,
+    final Transaction sell = <Transaction>[
+      for (final Directive directive in directives)
+        if (directive.body case TransactionBody(:final Transaction value) when value.narration == 'Sell') value,
     ].single;
     expect(
-      sell.postings.map((p) => p.account.name),
-      containsAll(['Income:Capital-Gains:Short', 'Income:Capital-Gains']),
+      sell.postings.map((Posting p) => p.account.name),
+      containsAll(<dynamic>['Income:Capital-Gains:Short', 'Income:Capital-Gains']),
     );
   });
 
@@ -51,7 +51,7 @@ void main() {
   });
 
   test('splits mixed long and short lots', () {
-    final sell = _sell(
+    final Transaction sell = _sell(
       booked(
         '$_plugin'
         '2014-01-01 open Assets:Brokerage\n'
@@ -70,7 +70,9 @@ void main() {
         '  Income:Capital-Gains\n',
       ),
     );
-    final byAccount = {for (final posting in sell.postings) posting.account.name: posting.units.number.toString()};
+    final Map<String, String> byAccount = <String, String>{
+      for (final Posting posting in sell.postings) posting.account.name: posting.units.number.toString(),
+    };
     expect(byAccount['Income:Capital-Gains:Short'], '-50');
     expect(byAccount['Income:Capital-Gains:Long'], '-150');
   });
@@ -95,7 +97,7 @@ void main() {
   });
 
   test('keeps fees on the original sale', () {
-    final sell = _sell(
+    final Transaction sell = _sell(
       booked(
         '$_plugin'
         '2014-01-01 open Assets:Brokerage\n'
@@ -112,7 +114,10 @@ void main() {
         '  Expenses:Fees              10 USD\n',
       ),
     );
-    expect(sell.postings.map((p) => p.account.name), containsAll(['Income:Capital-Gains:Short', 'Expenses:Fees']));
+    expect(
+      sell.postings.map((Posting p) => p.account.name),
+      containsAll(<dynamic>['Income:Capital-Gains:Short', 'Expenses:Fees']),
+    );
   });
 
   test('classifies covering a short position', () {
@@ -137,7 +142,7 @@ void main() {
   });
 
   test('ignores reductions that omitted a price', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       '$_plugin'
       '2014-01-01 open Assets:Brokerage\n'
       '2014-01-01 open Assets:Bank\n'
@@ -153,12 +158,18 @@ void main() {
       '  Assets:Bank               100 USD\n'
       '  Income:Capital-Gains\n',
     );
-    final named = {
-      for (final directive in directives)
-        if (directive.body case TransactionBody(:final value)) value.narration: value,
+    final Map<String, Transaction> named = <String, Transaction>{
+      for (final Directive directive in directives)
+        if (directive.body case TransactionBody(:final Transaction value)) value.narration: value,
     };
-    expect(named['Sell at complete loss']!.postings.map((p) => p.account.name), contains('Income:Capital-Gains:Long'));
-    expect(named['Sell but forgot price']!.postings.map((p) => p.account.name), contains('Income:Capital-Gains'));
+    expect(
+      named['Sell at complete loss']!.postings.map((Posting p) => p.account.name),
+      contains('Income:Capital-Gains:Long'),
+    );
+    expect(
+      named['Sell but forgot price']!.postings.map((Posting p) => p.account.name),
+      contains('Income:Capital-Gains'),
+    );
   });
 }
 
@@ -178,9 +189,9 @@ String _longSource(String sellDate) =>
 String _gainAccount(String source, {String narration = 'Sell'}) => _sell(
   booked(source),
   narration: narration,
-).postings.firstWhere((p) => p.account.name.contains('Capital-Gains')).account.name;
+).postings.firstWhere((Posting p) => p.account.name.contains('Capital-Gains')).account.name;
 
-Transaction _sell(List<Directive> directives, {String narration = 'Sell'}) => [
-  for (final directive in directives)
-    if (directive.body case TransactionBody(:final value) when value.narration == narration) value,
+Transaction _sell(List<Directive> directives, {String narration = 'Sell'}) => <Transaction>[
+  for (final Directive directive in directives)
+    if (directive.body case TransactionBody(:final Transaction value) when value.narration == narration) value,
 ].single;

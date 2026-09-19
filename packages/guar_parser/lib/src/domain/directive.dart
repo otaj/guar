@@ -2,13 +2,13 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'amount.dart';
-import 'date.dart';
-import 'location.dart';
-import 'meta.dart';
-import 'number.dart';
-import 'transaction.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/amount.dart';
+import 'package:guar_parser/src/domain/date.dart';
+import 'package:guar_parser/src/domain/location.dart';
+import 'package:guar_parser/src/domain/meta.dart';
+import 'package:guar_parser/src/domain/number.dart';
+import 'package:guar_parser/src/domain/transaction.dart';
 
 part 'directive.freezed.dart';
 
@@ -19,6 +19,7 @@ sealed class CustomValue with _$CustomValue {
   const factory CustomValue.text(String value) = CustomText;
   const factory CustomValue.account(Account value) = CustomAccount;
   const factory CustomValue.date(BeanDate value) = CustomDate;
+  // ignore: avoid_positional_boolean_parameters, bool is the stored payload
   const factory CustomValue.boolean(bool value) = CustomBoolean;
   const factory CustomValue.number(BeanNumber value) = CustomNumber;
   const factory CustomValue.amount(Amount value) = CustomAmount;
@@ -33,7 +34,7 @@ sealed class DirectiveBody with _$DirectiveBody {
       BalanceBody;
   const factory DirectiveBody.open({
     required Account account,
-    @Default([]) List<Currency> currencies,
+    @Default(<dynamic>[]) List<Currency> currencies,
     BookingMethod? booking,
   }) = OpenBody;
   const factory DirectiveBody.close({required Account account}) = CloseBody;
@@ -42,18 +43,19 @@ sealed class DirectiveBody with _$DirectiveBody {
   const factory DirectiveBody.document({
     required Account account,
     required String filename,
-    @Default([]) List<Tag> tags,
-    @Default([]) List<Link> links,
+    @Default(<dynamic>[]) List<Tag> tags,
+    @Default(<dynamic>[]) List<Link> links,
   }) = DocumentBody;
   const factory DirectiveBody.note({
     required Account account,
     required String comment,
-    @Default([]) List<Tag> tags,
-    @Default([]) List<Link> links,
+    @Default(<dynamic>[]) List<Tag> tags,
+    @Default(<dynamic>[]) List<Link> links,
   }) = NoteBody;
   const factory DirectiveBody.event({required String name, required String description}) = EventBody;
   const factory DirectiveBody.query({required String name, required String queryString}) = QueryBody;
-  const factory DirectiveBody.custom({required String type, @Default([]) List<CustomValue> values}) = CustomBody;
+  const factory DirectiveBody.custom({required String type, @Default(<dynamic>[]) List<CustomValue> values}) =
+      CustomBody;
 }
 
 @freezed
@@ -61,8 +63,8 @@ abstract class ParsedDirective with _$ParsedDirective {
   const factory ParsedDirective({
     required BeanLocation location,
     required BeanDate date,
-    @Default(Meta()) Meta meta,
     required DirectiveBody body,
+    @Default(Meta()) Meta meta,
   }) = _ParsedDirective;
 }
 

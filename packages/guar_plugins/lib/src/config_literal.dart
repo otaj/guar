@@ -3,10 +3,10 @@
 typedef ConfigLiteral = ({Object? value, String? error});
 
 ConfigLiteral parseConfigLiteral(String source) {
-  final parser = _LiteralParser(source);
+  final _LiteralParser parser = _LiteralParser(source);
   try {
     parser._skipSpace();
-    final value = parser._value();
+    final Object? value = parser._value();
     parser._skipSpace();
     if (!parser._atEnd) {
       return (value: null, error: 'Unexpected trailing input at offset ${parser._offset}');
@@ -62,10 +62,10 @@ class _LiteralParser {
 
   Map<Object?, Object?> _dict() {
     _offset++;
-    final map = <Object?, Object?>{};
+    final Map<Object?, Object?> map = <Object?, Object?>{};
     _skipSpace();
     while (!_atEnd && _current != '}') {
-      final key = _value();
+      final Object? key = _value();
       _skipSpace();
       if (_atEnd || _current != ':') _fail('Expected ":" in dict at offset $_offset');
       _offset++;
@@ -88,7 +88,7 @@ class _LiteralParser {
 
   List<Object?> _sequence(String open, String close) {
     _offset++;
-    final items = <Object?>[];
+    final List<Object?> items = <Object?>[];
     _skipSpace();
     while (!_atEnd && _current != close) {
       items.add(_value());
@@ -104,9 +104,9 @@ class _LiteralParser {
   }
 
   String _string() {
-    final quote = _current;
+    final String quote = _current;
     _offset++;
-    final buffer = StringBuffer();
+    final StringBuffer buffer = StringBuffer();
     while (!_atEnd && _current != quote) {
       if (_current == r'\') {
         _offset++;
@@ -129,12 +129,12 @@ class _LiteralParser {
   }
 
   num _number() {
-    final start = _offset;
+    final int start = _offset;
     if (!_atEnd && (_current == '-' || _current == '+')) _offset++;
-    var digits = false;
-    var fractional = false;
+    bool digits = false;
+    bool fractional = false;
     while (!_atEnd) {
-      final char = _current;
+      final String char = _current;
       if (char.codeUnitAt(0) >= 0x30 && char.codeUnitAt(0) <= 0x39) {
         digits = true;
         _offset++;
@@ -150,7 +150,7 @@ class _LiteralParser {
       }
     }
     if (!digits) _fail('Unexpected character "${_source[start]}" at offset $start');
-    final text = _source.substring(start, _offset);
+    final String text = _source.substring(start, _offset);
     return fractional ? double.parse(text) : int.parse(text);
   }
 }

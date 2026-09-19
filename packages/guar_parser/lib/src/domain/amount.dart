@@ -2,8 +2,8 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'number.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/number.dart';
 
 part 'amount.freezed.dart';
 

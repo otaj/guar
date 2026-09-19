@@ -3,21 +3,20 @@
 import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'date.dart';
+import 'package:guar_domain/src/account.dart';
+import 'package:guar_domain/src/date.dart';
 
 part 'cost.freezed.dart';
 
 @freezed
 abstract class Cost with _$Cost {
-  const Cost._();
-
   const factory Cost({required Decimal number, required Currency currency, required BeanDate date, String? label}) =
       _Cost;
+  const Cost._();
 
   @override
   String toString({bool detail = true}) {
-    final parts = <String>['$number ${currency.name}'];
+    final List<String> parts = <String>['$number ${currency.name}'];
     if (detail) {
       parts.add('$date');
       if (label != null) {

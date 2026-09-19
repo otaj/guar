@@ -25,39 +25,37 @@ final class IncludeLoaded extends IncludeOutcome {
 class IncludeController {
   IncludeController({required this.readFile});
 
+  factory IncludeController.io() => IncludeController(
+    readFile: (String path) {
+      final File file = File(path);
+      if (!file.existsSync()) {
+        return null;
+      }
+      return file.readAsStringSync();
+    },
+  );
+
   final String? Function(String absolutePath) readFile;
 
-  final Map<String, String> _contexts = {};
-  final List<String> includeLog = [];
-
-  factory IncludeController.io() {
-    return IncludeController(
-      readFile: (path) {
-        final file = File(path);
-        if (!file.existsSync()) {
-          return null;
-        }
-        return file.readAsStringSync();
-      },
-    );
-  }
+  final Map<String, String> _contexts = <String, String>{};
+  final List<String> includeLog = <String>[];
 
   IncludeOutcome open({required String pattern, required String fromFilename, required String contextKey}) {
-    final matches = _expand(pattern, fromFilename);
+    final List<String> matches = _expand(pattern, fromFilename);
     if (matches.isEmpty) {
       return IncludeFailed();
     }
-    final loaded = <IncludeHit>[];
-    for (final path in matches) {
-      final absolute = File(path).absolute.path;
-      final prior = _contexts[absolute];
+    final List<IncludeHit> loaded = <IncludeHit>[];
+    for (final String path in matches) {
+      final String absolute = File(path).absolute.path;
+      final String? prior = _contexts[absolute];
       if (prior != null) {
         if (prior == contextKey) {
           continue;
         }
         return IncludeDuplicate();
       }
-      final source = readFile(absolute);
+      final String? source = readFile(absolute);
       if (source == null) {
         return IncludeFailed();
       }
@@ -72,25 +70,25 @@ class IncludeController {
   }
 
   List<String> _expand(String pattern, String fromFilename) {
-    final baseDir = fromFilename.isEmpty ? Directory.current.path : File(fromFilename).parent.path;
-    final sep = Platform.pathSeparator;
-    final combined = pattern.startsWith('/') ? pattern : '$baseDir$sep$pattern';
+    final String baseDir = fromFilename.isEmpty ? Directory.current.path : File(fromFilename).parent.path;
+    final String sep = Platform.pathSeparator;
+    final String combined = pattern.startsWith('/') ? pattern : '$baseDir$sep$pattern';
     if (!_isGlob(pattern)) {
-      return [combined];
+      return <String>[combined];
     }
-    final slash = combined.lastIndexOf(sep);
-    final dirPath = slash < 0 ? baseDir : combined.substring(0, slash);
-    final nameGlob = slash < 0 ? combined : combined.substring(slash + 1);
-    final dir = Directory(dirPath);
+    final int slash = combined.lastIndexOf(sep);
+    final String dirPath = slash < 0 ? baseDir : combined.substring(0, slash);
+    final String nameGlob = slash < 0 ? combined : combined.substring(slash + 1);
+    final Directory dir = Directory(dirPath);
     if (!dir.existsSync()) {
-      return [];
+      return <String>[];
     }
-    final out = <String>[];
-    for (final entity in dir.listSync()) {
+    final List<String> out = <String>[];
+    for (final FileSystemEntity entity in dir.listSync()) {
       if (entity is! File) {
         continue;
       }
-      final name = entity.uri.pathSegments.isEmpty ? entity.path : entity.uri.pathSegments.last;
+      final String name = entity.uri.pathSegments.isEmpty ? entity.path : entity.uri.pathSegments.last;
       if (_globMatch(name, nameGlob)) {
         out.add(entity.path);
       }
@@ -102,15 +100,15 @@ class IncludeController {
   bool _isGlob(String pattern) => pattern.contains('*') || pattern.contains('?') || pattern.contains('[');
 
   bool _globMatch(String name, String glob) {
-    final buf = StringBuffer('^');
-    for (var i = 0; i < glob.length; i++) {
-      final ch = glob[i];
+    final StringBuffer buf = StringBuffer('^');
+    for (int i = 0; i < glob.length; i++) {
+      final String ch = glob[i];
       if (ch == '*') {
         buf.write('.*');
       } else if (ch == '?') {
         buf.write('.');
       } else if (ch == '[') {
-        final end = glob.indexOf(']', i + 1);
+        final int end = glob.indexOf(']', i + 1);
         if (end < 0) {
           buf.write(r'\[');
         } else {

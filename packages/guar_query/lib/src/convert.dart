@@ -6,17 +6,17 @@ import 'package:guar_domain/guar_domain.dart';
 Amount unitsOf(Position position) => position.units;
 
 Amount costOf(Position position) {
-  final cost = position.cost;
+  final Cost? cost = position.cost;
   if (cost == null) return position.units;
   return Amount(number: position.units.number * cost.number, currency: cost.currency);
 }
 
 Amount weightOf(Posting posting) {
-  final cost = posting.cost;
+  final Cost? cost = posting.cost;
   if (cost != null) {
     return Amount(number: posting.units.number * cost.number, currency: cost.currency);
   }
-  final price = posting.price;
+  final Amount? price = posting.price;
   if (price != null) {
     return Amount(number: posting.units.number * price.number, currency: price.currency);
   }
@@ -25,41 +25,40 @@ Amount weightOf(Posting posting) {
 
 Amount? convertAmount(Amount amount, Currency target, PriceMap prices, [BeanDate? date]) {
   if (amount.currency == target) return amount;
-  final quote = prices.priceAt(CurrencyPair(base: amount.currency, quote: target), date);
+  final PriceQuote? quote = prices.priceAt(CurrencyPair(base: amount.currency, quote: target), date);
   if (quote == null) return null;
   return Amount(number: amount.number * quote.rate, currency: target);
 }
 
-Amount? convertPosition(Position position, Currency target, PriceMap prices, [BeanDate? date]) {
-  return convertAmount(costOf(position), target, prices, date) ?? convertAmount(position.units, target, prices, date);
-}
+Amount? convertPosition(Position position, Currency target, PriceMap prices, [BeanDate? date]) =>
+    convertAmount(costOf(position), target, prices, date) ?? convertAmount(position.units, target, prices, date);
 
 Amount? marketValue(Position position, PriceMap prices, [BeanDate? date]) {
-  final cost = position.cost;
+  final Cost? cost = position.cost;
   if (cost == null) return position.units;
   return convertAmount(position.units, cost.currency, prices, date) ?? costOf(position);
 }
 
 Inventory reduceUnits(Inventory inventory) {
-  var result = const Inventory();
-  for (final position in inventory.positions) {
+  Inventory result = const Inventory();
+  for (final Position position in inventory.positions) {
     result = result.addAmount(position.units).inventory;
   }
   return result;
 }
 
 Inventory reduceCost(Inventory inventory) {
-  var result = const Inventory();
-  for (final position in inventory.positions) {
+  Inventory result = const Inventory();
+  for (final Position position in inventory.positions) {
     result = result.addAmount(costOf(position)).inventory;
   }
   return result;
 }
 
 Inventory reduceValue(Inventory inventory, PriceMap prices, [BeanDate? date]) {
-  var result = const Inventory();
-  for (final position in inventory.positions) {
-    final value = marketValue(position, prices, date);
+  Inventory result = const Inventory();
+  for (final Position position in inventory.positions) {
+    final Amount? value = marketValue(position, prices, date);
     if (value != null) {
       result = result.addAmount(value).inventory;
     }
@@ -68,9 +67,9 @@ Inventory reduceValue(Inventory inventory, PriceMap prices, [BeanDate? date]) {
 }
 
 Inventory reduceConvert(Inventory inventory, Currency target, PriceMap prices, [BeanDate? date]) {
-  var result = const Inventory();
-  for (final position in inventory.positions) {
-    final converted = convertPosition(position, target, prices, date);
+  Inventory result = const Inventory();
+  for (final Position position in inventory.positions) {
+    final Amount? converted = convertPosition(position, target, prices, date);
     if (converted != null) {
       result = result.addAmount(converted).inventory;
     }
@@ -83,7 +82,7 @@ Inventory inventoryFromAmount(Amount amount) => const Inventory().addAmount(amou
 Inventory inventoryFromPosition(Position position) => const Inventory().addPosition(position).inventory;
 
 Decimal? getPrice(PriceMap prices, String base, String quote, [BeanDate? date]) {
-  final pair = CurrencyPair(
+  final CurrencyPair pair = CurrencyPair(
     base: Currency(name: base.toUpperCase()),
     quote: Currency(name: quote.toUpperCase()),
   );

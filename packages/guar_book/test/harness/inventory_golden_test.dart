@@ -9,28 +9,29 @@ import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
 void main() {
-  final skips = _loadSkips(File('test/harness/skips.yaml'));
-  final fixtures = <File>[
-    for (final root in [Directory('test/cases')])
-      if (root.existsSync()) ...root.listSync().whereType<File>().where((file) => file.path.endsWith('.inventory')),
-  ]..sort((a, b) => a.path.compareTo(b.path));
+  final Map<String, String> skips = _loadSkips(File('test/harness/skips.yaml'));
+  final List<File> fixtures = <File>[
+    for (final Directory root in <Directory>[Directory('test/cases')])
+      if (root.existsSync())
+        ...root.listSync().whereType<File>().where((File file) => file.path.endsWith('.inventory')),
+  ]..sort((File a, File b) => a.path.compareTo(b.path));
 
-  for (final inventoryFile in fixtures) {
-    final beanFile = File(
+  for (final File inventoryFile in fixtures) {
+    final File beanFile = File(
       '${inventoryFile.path.substring(0, inventoryFile.path.length - '.inventory'.length)}.beancount',
     );
-    final stem = _stemFor(beanFile);
-    final skipReason = skips[stem];
+    final String stem = _stemFor(beanFile);
+    final String? skipReason = skips[stem];
     test(stem, () async {
       if (!beanFile.existsSync()) {
         fail('missing ledger ${beanFile.path}');
       }
-      final source = await beanFile.readAsString();
-      final expected = (await inventoryFile.readAsString()).trimRight();
-      final parsed = BeancountParser().parse(source, filename: beanFile.path);
-      final booked = Book().process(parsed);
+      final String source = await beanFile.readAsString();
+      final String expected = (await inventoryFile.readAsString()).trimRight();
+      final ParsedLedger parsed = const BeancountParser().parse(source, filename: beanFile.path);
+      final Ledger booked = Book().process(parsed);
       expect(booked, isA<LedgerDirectives>(), reason: booked.toString());
-      final actual = formatLedgerInventory(inventoryFromLedger(booked));
+      final String actual = formatLedgerInventory(inventoryFromLedger(booked));
       expect(actual, expected);
     }, skip: skipReason);
   }
@@ -38,23 +39,23 @@ void main() {
 
 Map<String, String> _loadSkips(File file) {
   if (!file.existsSync()) {
-    return {};
+    return <String, String>{};
   }
-  final yaml = loadYaml(file.readAsStringSync()) as YamlMap;
-  final unmigrated = yaml['unmigrated'] as YamlList? ?? YamlList();
-  final product = yaml['product'] as YamlList? ?? YamlList();
-  final skips = <String, String>{};
-  for (final entry in unmigrated) {
+  final YamlMap yaml = loadYaml(file.readAsStringSync()) as YamlMap;
+  final YamlList unmigrated = yaml['unmigrated'] as YamlList? ?? YamlList();
+  final YamlList product = yaml['product'] as YamlList? ?? YamlList();
+  final Map<String, String> skips = <String, String>{};
+  for (final dynamic entry in unmigrated) {
     skips[entry as String] = 'unmigrated prototxt';
   }
-  for (final entry in product) {
-    final map = entry as YamlMap;
+  for (final dynamic entry in product) {
+    final YamlMap map = entry as YamlMap;
     skips[map['case'] as String] = map['reason'] as String;
   }
   return skips;
 }
 
 String _stemFor(File beanFile) {
-  final relative = beanFile.path.replaceFirst(RegExp(r'^test/'), '');
+  final String relative = beanFile.path.replaceFirst(RegExp('^test/'), '');
   return relative.substring(0, relative.length - '.beancount'.length);
 }

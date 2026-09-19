@@ -18,7 +18,7 @@ void main() {
         '  Expenses:Restaurant   1.00 CAD\n'
         '  Assets:Other         -1.00 USD @ 1.00 CAD\n',
       ),
-      [
+      <String>[
         "Missing Commodity directive for 'CAD' in 'Assets:Other'",
         "Missing Commodity directive for 'USD' in 'Assets:Other'",
       ],
@@ -37,7 +37,7 @@ void main() {
         '  Assets:Other         -1.00 USD\n'
         '2012-01-01 balance Expenses:Restaurant   0.00 CAD\n',
       ),
-      ["Missing Commodity directive for 'CAD' in 'Expenses:Restaurant'"],
+      <String>["Missing Commodity directive for 'CAD' in 'Expenses:Restaurant'"],
     );
   });
 
@@ -59,11 +59,11 @@ void main() {
   });
 
   test('honours the account/currency ignore patterns, including prices', () {
-    for (final pair in [
+    for (final (String, String) pair in <(String, String)>[
       ('.*', '.*'),
       ('Assets:Options', '.*'),
       ('.*', 'QQQ_.*'),
-      ('Assets:.*Options', r'QQQ_[0-9]{6}[CP][0-9]+'),
+      ('Assets:.*Options', 'QQQ_[0-9]{6}[CP][0-9]+'),
     ]) {
       expect(
         messages(
@@ -88,7 +88,7 @@ void main() {
         'plugin "beancount.plugins.check_commodity" "[1, 2]"\n'
         '2000-01-01 commodity USD\n',
       ),
-      ['Invalid configuration for check_commodity plugin; skipping.'],
+      <String>['Invalid configuration for check_commodity plugin; skipping.'],
     );
   });
 }

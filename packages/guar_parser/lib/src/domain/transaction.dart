@@ -2,9 +2,9 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'flag.dart';
-import 'posting.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/flag.dart';
+import 'package:guar_parser/src/domain/posting.dart';
 
 part 'transaction.freezed.dart';
 
@@ -14,8 +14,8 @@ abstract class ParsedTransaction with _$ParsedTransaction {
     required Flag flag,
     String? payee,
     @Default('') String narration,
-    @Default([]) List<Tag> tags,
-    @Default([]) List<Link> links,
-    @Default([]) List<ParsedPosting> postings,
+    @Default(<dynamic>[]) List<Tag> tags,
+    @Default(<dynamic>[]) List<Link> links,
+    @Default(<dynamic>[]) List<ParsedPosting> postings,
   }) = _ParsedTransaction;
 }

@@ -2,77 +2,86 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-import '../plugin.dart';
-import 'common.dart';
+import 'package:guar_plugins/src/plugin.dart';
+import 'package:guar_plugins/src/reds/common.dart';
 
-const _accountPattern = r'(?P<root>[^:]*):(?P<subroot>[^:]*):(?P<taxability>[^:]*):(?P<account_name>.*)';
+const String _accountPattern = '(?P<root>[^:]*):(?P<subroot>[^:]*):(?P<taxability>[^:]*):(?P<account_name>.*)';
 
-final Map<String, ({String pattern, List<(String account, String currencies)> inserts})> _defaultRules = {
-  'cash_and_fees': (
-    pattern: _accountPattern,
-    inserts: [
-      ('{f_acct}:{f_ticker}', '{f_opcurr}'),
-      ('Expenses:Fees-and-Charges:Brokerage-Fees:{taxability}:{account_name}', '{f_opcurr}'),
-    ],
-  ),
-  'commodity_leaves_income': (
-    pattern: _accountPattern,
-    inserts: [
-      ('Income:{subroot}:{taxability}:Dividends:{account_name}:{f_ticker}', '{f_opcurr}'),
-      ('Income:{subroot}:{taxability}:Interest:{account_name}:{f_ticker}', '{f_opcurr}'),
-      ('Income:{subroot}:{taxability}:Capital-Gains:{account_name}:{f_ticker}', '{f_opcurr}'),
-    ],
-  ),
-  'commodity_leaves_income_and_asset': (
-    pattern: _accountPattern,
-    inserts: [
-      ('{f_acct}:{f_ticker}', '{f_ticker}'),
-      ('Income:{subroot}:{taxability}:Dividends:{account_name}:{f_ticker}', '{f_opcurr}'),
-      ('Income:{subroot}:{taxability}:Interest:{account_name}:{f_ticker}', '{f_opcurr}'),
-      ('Income:{subroot}:{taxability}:Capital-Gains:{account_name}:{f_ticker}', '{f_opcurr}'),
-    ],
-  ),
-  'commodity_leaves_cgdists': (
-    pattern: _accountPattern,
-    inserts: [
-      ('Income:{subroot}:{taxability}:Capital-Gains-Distributions:Long:{account_name}:{f_ticker}', '{f_opcurr}'),
-      ('Income:{subroot}:{taxability}:Capital-Gains-Distributions:Short:{account_name}:{f_ticker}', '{f_opcurr}'),
-    ],
-  ),
-};
+final Map<String, ({String pattern, List<(String account, String currencies)> inserts})> _defaultRules =
+    <String, ({List<(String, String)> inserts, String pattern})>{
+      'cash_and_fees': (
+        pattern: _accountPattern,
+        inserts: <(String, String)>[
+          ('{f_acct}:{f_ticker}', '{f_opcurr}'),
+          ('Expenses:Fees-and-Charges:Brokerage-Fees:{taxability}:{account_name}', '{f_opcurr}'),
+        ],
+      ),
+      'commodity_leaves_income': (
+        pattern: _accountPattern,
+        inserts: <(String, String)>[
+          ('Income:{subroot}:{taxability}:Dividends:{account_name}:{f_ticker}', '{f_opcurr}'),
+          ('Income:{subroot}:{taxability}:Interest:{account_name}:{f_ticker}', '{f_opcurr}'),
+          ('Income:{subroot}:{taxability}:Capital-Gains:{account_name}:{f_ticker}', '{f_opcurr}'),
+        ],
+      ),
+      'commodity_leaves_income_and_asset': (
+        pattern: _accountPattern,
+        inserts: <(String, String)>[
+          ('{f_acct}:{f_ticker}', '{f_ticker}'),
+          ('Income:{subroot}:{taxability}:Dividends:{account_name}:{f_ticker}', '{f_opcurr}'),
+          ('Income:{subroot}:{taxability}:Interest:{account_name}:{f_ticker}', '{f_opcurr}'),
+          ('Income:{subroot}:{taxability}:Capital-Gains:{account_name}:{f_ticker}', '{f_opcurr}'),
+        ],
+      ),
+      'commodity_leaves_cgdists': (
+        pattern: _accountPattern,
+        inserts: <(String, String)>[
+          ('Income:{subroot}:{taxability}:Capital-Gains-Distributions:Long:{account_name}:{f_ticker}', '{f_opcurr}'),
+          ('Income:{subroot}:{taxability}:Capital-Gains-Distributions:Short:{account_name}:{f_ticker}', '{f_opcurr}'),
+        ],
+      ),
+    };
 
 BookPluginResult opengroup(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) {
-  final parsed = parseConfigMap(config);
+  final ({String? error, Map<Object?, Object?>? map}) parsed = parseConfigMap(config);
   if (parsed.error != null) {
     return configError(directives, 'Invalid configuration for opengroup plugin; skipping.');
   }
-  final rules = parsed.map!.isEmpty ? _defaultRules : _parseRules(parsed.map!);
+  final Map<String, ({List<(String, String)> inserts, String pattern})>? rules = parsed.map!.isEmpty
+      ? _defaultRules
+      : _parseRules(parsed.map!);
   if (rules == null) {
     return configError(directives, 'Invalid configuration for opengroup plugin; skipping.');
   }
-  final opCurrency = options.operatingCurrency.isNotEmpty ? options.operatingCurrency.first.name : 'USD';
-  final inserted = <Directive>[];
-  for (final directive in directives) {
-    final account = switch (directive.body) {
-      OpenBody(:final account) || CloseBody(:final account) => account.name,
+  final String opCurrency = options.operatingCurrency.isNotEmpty ? options.operatingCurrency.first.name : 'USD';
+  final List<Directive> inserted = <Directive>[];
+  for (final Directive directive in directives) {
+    final String? account = switch (directive.body) {
+      OpenBody(:final Account account) || CloseBody(:final Account account) => account.name,
       _ => null,
     };
     if (account == null) continue;
-    for (final entry in directive.meta.entries) {
-      final open = entry.key.startsWith('opengroup_');
-      final close = entry.key.startsWith('closegroup_');
+    for (final MetaEntry entry in directive.meta.entries) {
+      final bool open = entry.key.startsWith('opengroup_');
+      final bool close = entry.key.startsWith('closegroup_');
       if (!open && !close) continue;
-      final ruleName = entry.key.split('_').skip(1).join('_');
-      final leaves = switch (entry.value) {
-        MetaText(:final value) => value.split(','),
+      final String ruleName = entry.key.split('_').skip(1).join('_');
+      final List<String> leaves = switch (entry.value) {
+        MetaText(:final String value) => value.split(','),
         _ => const <String>[],
       };
-      for (final leaf in leaves) {
-        for (final acc in _runRule(rules, ruleName, account, leaf.trim(), opCurrency)) {
+      for (final String leaf in leaves) {
+        for (final ({String account, List<String> currencies}) acc in _runRule(
+          rules,
+          ruleName,
+          account,
+          leaf.trim(),
+          opCurrency,
+        )) {
           if (open) {
-            final body = DirectiveBody.open(
+            final DirectiveBody body = DirectiveBody.open(
               account: rewriteAccount(acc.account, options),
-              currencies: [for (final currency in acc.currencies) Currency(name: currency)],
+              currencies: <Currency>[for (final String currency in acc.currencies) Currency(name: currency)],
             );
             inserted.add(
               Directive(
@@ -82,7 +91,7 @@ BookPluginResult opengroup(List<Directive> directives, LedgerOptions options, Pr
               ),
             );
           } else {
-            final body = DirectiveBody.close(account: rewriteAccount(acc.account, options));
+            final DirectiveBody body = DirectiveBody.close(account: rewriteAccount(acc.account, options));
             inserted.add(
               Directive(
                 origin: insertOrigin(date: directive.date, body: body, existing: directives, info: info),
@@ -95,19 +104,20 @@ BookPluginResult opengroup(List<Directive> directives, LedgerOptions options, Pr
       }
     }
   }
-  return (directives: [...directives, ...inserted], errors: const []);
+  return (directives: <Directive>[...directives, ...inserted], errors: const <ProcessingError>[]);
 }
 
 Map<String, ({String pattern, List<(String account, String currencies)> inserts})>? _parseRules(
   Map<Object?, Object?> config,
 ) {
-  final rules = <String, ({String pattern, List<(String account, String currencies)> inserts})>{};
-  for (final entry in config.entries) {
+  final Map<String, ({List<(String, String)> inserts, String pattern})> rules =
+      <String, ({String pattern, List<(String account, String currencies)> inserts})>{};
+  for (final MapEntry<Object?, Object?> entry in config.entries) {
     if (entry.key is! String || entry.value is! List) return null;
-    final spec = entry.value! as List<Object?>;
+    final List<Object?> spec = entry.value! as List<Object?>;
     if (spec.length < 2 || spec[0] is! String || spec[1] is! List) return null;
-    final inserts = <(String, String)>[];
-    for (final item in spec[1]! as List<Object?>) {
+    final List<(String, String)> inserts = <(String, String)>[];
+    for (final Object? item in spec[1]! as List<Object?>) {
       if (item is! List || item.length < 2 || item[0] is! String || item[1] is! String) return null;
       inserts.add((item[0]! as String, item[1]! as String));
     }
@@ -123,18 +133,18 @@ List<({String account, List<String> currencies})> _runRule(
   String ticker,
   String opCurrency,
 ) {
-  final rule = rules[ruleName];
-  if (rule == null) return const [];
-  final match = pythonRegExp(rule.pattern).firstMatch(account);
-  if (match == null) return const [];
-  final values = {
+  final ({List<(String, String)> inserts, String pattern})? rule = rules[ruleName];
+  if (rule == null) return const <({String account, List<String> currencies})>[];
+  final RegExpMatch? match = pythonRegExp(rule.pattern).firstMatch(account);
+  if (match == null) return const <({String account, List<String> currencies})>[];
+  final Map<String, String> values = <String, String>{
     'f_acct': account,
     'f_ticker': ticker,
     'f_opcurr': opCurrency,
-    for (final name in match.groupNames) name: match.namedGroup(name) ?? '',
+    for (final String name in match.groupNames) name: match.namedGroup(name) ?? '',
   };
-  return [
-    for (final insert in rule.inserts)
+  return <({String account, List<String> currencies})>[
+    for (final (String, String) insert in rule.inserts)
       (account: formatMap(insert.$1, values), currencies: formatMap(insert.$2, values).split(',')),
   ];
 }

@@ -5,17 +5,18 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-List<String> _postings(List<Directive> directives) => [
-  for (final directive in directives)
-    if (directive.body case TransactionBody(:final value))
-      for (final posting in value.postings) '${posting.account.name} ${posting.units}',
+List<String> _postings(List<Directive> directives) => <String>[
+  for (final Directive directive in directives)
+    if (directive.body case TransactionBody(:final Transaction value))
+      for (final Posting posting in value.postings) '${posting.account.name} ${posting.units}',
 ];
 
-bool _processed(Directive directive) => directive.meta.entries.any((e) => e.key == 'currency_accounts_processed');
+bool _processed(Directive directive) =>
+    directive.meta.entries.any((MetaEntry e) => e.key == 'currency_accounts_processed');
 
 void main() {
   test('neutralizes a currency conversion under the default base account', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.currency_accounts" ""\n'
       '2018-01-01 open Assets:Checking\n'
       '2018-01-01 open Income:Salary\n'
@@ -23,8 +24,8 @@ void main() {
       '  Assets:Checking    1200.00 CAD\n'
       '  Income:Salary     -1000.00 USD @ 1.2 CAD\n',
     );
-    expect(opens(directives), containsAll(['Equity:CurrencyAccounts:CAD', 'Equity:CurrencyAccounts:USD']));
-    expect(_postings(directives), [
+    expect(opens(directives), containsAll(<dynamic>['Equity:CurrencyAccounts:CAD', 'Equity:CurrencyAccounts:USD']));
+    expect(_postings(directives), <String>[
       'Assets:Checking 1200 CAD',
       'Equity:CurrencyAccounts:CAD -1200 CAD',
       'Income:Salary -1000 USD',
@@ -33,7 +34,7 @@ void main() {
   });
 
   test('uses a valid base account from the configuration', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.currency_accounts" "Assets:TradingAccounts"\n'
       '2018-01-01 open Assets:Checking\n'
       '2018-01-01 open Income:Salary\n'
@@ -41,11 +42,11 @@ void main() {
       '  Assets:Checking    1200.00 CAD\n'
       '  Income:Salary     -1000.00 USD @ 1.2 CAD\n',
     );
-    expect(opens(directives), containsAll(['Assets:TradingAccounts:CAD', 'Assets:TradingAccounts:USD']));
+    expect(opens(directives), containsAll(<dynamic>['Assets:TradingAccounts:CAD', 'Assets:TradingAccounts:USD']));
   });
 
   test('marks only the transactions it rewrites', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.currency_accounts" ""\n'
       '2018-01-01 open Assets:Checking\n'
       '2018-01-01 open Income:Salary\n'
@@ -56,15 +57,15 @@ void main() {
       '  Assets:Checking    1200.00 CAD\n'
       '  Income:Salary     -1000.00 USD @ 1.2 CAD\n',
     );
-    for (final directive in directives) {
-      if (directive.body case TransactionBody(:final value)) {
-        expect(_processed(directive), value.tags.any((tag) => tag.name == 'processed'));
+    for (final Directive directive in directives) {
+      if (directive.body case TransactionBody(:final Transaction value)) {
+        expect(_processed(directive), value.tags.any((Tag tag) => tag.name == 'processed'));
       }
     }
   });
 
   test('leaves single-currency transactions held at cost alone', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.currency_accounts" ""\n'
       '2018-01-01 open Assets:Invest\n'
       '2018-01-01 open Assets:Cash\n'
@@ -77,7 +78,7 @@ void main() {
       '  Assets:Cash      2020.00 USD\n'
       '  Income:Profits    -20.00 USD\n',
     );
-    expect(opens(directives), ['Assets:Invest', 'Assets:Cash', 'Income:Profits']);
-    expect(directives.every((directive) => !_processed(directive)), isTrue);
+    expect(opens(directives), <String>['Assets:Invest', 'Assets:Cash', 'Income:Profits']);
+    expect(directives.every((Directive directive) => !_processed(directive)), isTrue);
   });
 }

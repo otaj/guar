@@ -2,10 +2,10 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'directive.dart';
-import 'location.dart';
-import 'number.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/directive.dart';
+import 'package:guar_parser/src/domain/location.dart';
+import 'package:guar_parser/src/domain/number.dart';
 
 part 'options.freezed.dart';
 
@@ -24,7 +24,7 @@ abstract class AccountPrefixes with _$AccountPrefixes {
 
 @freezed
 abstract class Plugin with _$Plugin {
-  const factory Plugin({required String name, String? config, required BeanLocation location}) = _Plugin;
+  const factory Plugin({required String name, required BeanLocation location, String? config}) = _Plugin;
 }
 
 @freezed
@@ -58,18 +58,18 @@ abstract class InferredTolerance with _$InferredTolerance {
 
 @freezed
 abstract class DisplayContext with _$DisplayContext {
-  const factory DisplayContext({@Default([]) List<DisplayPrecision> precisions}) = _DisplayContext;
+  const factory DisplayContext({@Default(<dynamic>[]) List<DisplayPrecision> precisions}) = _DisplayContext;
 }
 
 @freezed
 abstract class ProcessingInfo with _$ProcessingInfo {
   const factory ProcessingInfo({
     String? filename,
-    @Default([]) List<String> include,
-    @Default([]) List<Currency> commodities,
-    @Default([]) List<Plugin> plugin,
+    @Default(<dynamic>[]) List<String> include,
+    @Default(<dynamic>[]) List<Currency> commodities,
+    @Default(<dynamic>[]) List<Plugin> plugin,
     @Default(DisplayContext()) DisplayContext displayContext,
-    @Default([]) List<OptionSetting> optionSettings,
+    @Default(<dynamic>[]) List<OptionSetting> optionSettings,
   }) = _ProcessingInfo;
 }
 
@@ -86,13 +86,13 @@ abstract class LedgerOptions with _$LedgerOptions {
     Account? accountUnrealizedGains,
     Account? accountRounding,
     Currency? conversionCurrency,
-    @Default([]) List<DisplayPrecision> displayPrecision,
-    @Default([]) List<InferredTolerance> inferredToleranceDefault,
+    @Default(<dynamic>[]) List<DisplayPrecision> displayPrecision,
+    @Default(<dynamic>[]) List<InferredTolerance> inferredToleranceDefault,
     BeanNumber? inferredToleranceMultiplier,
     BeanNumber? toleranceMultiplier,
     bool? inferToleranceFromCost,
-    @Default([]) List<String> documents,
-    @Default([]) List<Currency> operatingCurrency,
+    @Default(<dynamic>[]) List<String> documents,
+    @Default(<dynamic>[]) List<Currency> operatingCurrency,
     bool? renderCommas,
     PluginProcessingMode? pluginProcessingMode,
     int? longStringMaxlines,

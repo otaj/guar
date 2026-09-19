@@ -3,9 +3,9 @@
 import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'directive.dart';
-import 'location.dart';
+import 'package:guar_domain/src/account.dart';
+import 'package:guar_domain/src/directive.dart';
+import 'package:guar_domain/src/location.dart';
 
 part 'options.freezed.dart';
 
@@ -13,8 +13,6 @@ enum PluginProcessingMode { defaultMode, raw }
 
 @freezed
 abstract class AccountPrefixes with _$AccountPrefixes {
-  const AccountPrefixes._();
-
   const factory AccountPrefixes({
     @Default('Assets') String assets,
     @Default('Liabilities') String liabilities,
@@ -22,6 +20,7 @@ abstract class AccountPrefixes with _$AccountPrefixes {
     @Default('Income') String income,
     @Default('Expenses') String expenses,
   }) = _AccountPrefixes;
+  const AccountPrefixes._();
 
   AccountType typeFor(String name) {
     if (isAccountOrSubaccount(name, assets)) return AccountType.assets;
@@ -39,7 +38,7 @@ abstract class AccountPrefixes with _$AccountPrefixes {
 
 @freezed
 abstract class Plugin with _$Plugin {
-  const factory Plugin({required String name, String? config, required BeanLocation location}) = _Plugin;
+  const factory Plugin({required String name, required BeanLocation location, String? config}) = _Plugin;
 }
 
 @freezed
@@ -73,23 +72,24 @@ abstract class InferredTolerance with _$InferredTolerance {
 
 @freezed
 abstract class DisplayContext with _$DisplayContext {
-  const factory DisplayContext({@Default([]) List<DisplayPrecision> precisions}) = _DisplayContext;
+  const factory DisplayContext({@Default(<dynamic>[]) List<DisplayPrecision> precisions}) = _DisplayContext;
 }
 
 @freezed
 abstract class ProcessingInfo with _$ProcessingInfo {
   const factory ProcessingInfo({
     String? filename,
-    @Default([]) List<String> include,
-    @Default([]) List<Currency> commodities,
-    @Default([]) List<Plugin> plugin,
+    @Default(<dynamic>[]) List<String> include,
+    @Default(<dynamic>[]) List<Currency> commodities,
+    @Default(<dynamic>[]) List<Plugin> plugin,
     @Default(DisplayContext()) DisplayContext displayContext,
-    @Default([]) List<OptionSetting> optionSettings,
+    @Default(<dynamic>[]) List<OptionSetting> optionSettings,
   }) = _ProcessingInfo;
 }
 
+@immutable
 class OptionNumber {
-  OptionNumber({required this.verbatim, required this.value});
+  const OptionNumber({required this.verbatim, required this.value});
 
   final String verbatim;
   final Decimal value;
@@ -104,40 +104,10 @@ class OptionNumber {
   String toString() => verbatim;
 }
 
-final _defaultMultiplier = OptionNumber(verbatim: '0.5', value: Decimal.parse('0.5'));
+final OptionNumber _defaultMultiplier = OptionNumber(verbatim: '0.5', value: Decimal.parse('0.5'));
 
 @Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class LedgerOptions with _$LedgerOptions {
-  const LedgerOptions._();
-
-  const factory LedgerOptions._create({
-    @Default(AccountPrefixes()) AccountPrefixes accountPrefixes,
-    @Default('Beancount') String title,
-    required Account accountPreviousBalances,
-    required Account accountPreviousEarnings,
-    required Account accountPreviousConversions,
-    required Account accountCurrentEarnings,
-    required Account accountCurrentConversions,
-    required Account accountUnrealizedGains,
-    Account? accountRounding,
-    required Currency conversionCurrency,
-    @Default([]) List<DisplayPrecision> displayPrecision,
-    @Default([]) List<InferredTolerance> inferredToleranceDefault,
-    required OptionNumber inferredToleranceMultiplier,
-    required OptionNumber toleranceMultiplier,
-    @Default(false) bool inferToleranceFromCost,
-    @Default([]) List<String> documents,
-    @Default([]) List<Currency> operatingCurrency,
-    @Default(false) bool renderCommas,
-    @Default(PluginProcessingMode.defaultMode) PluginProcessingMode pluginProcessingMode,
-    @Default(64) int longStringMaxlines,
-    @Default(BookingMethod.strict) BookingMethod bookingMethod,
-    @Default(false) bool usePreciseInterpolation,
-    @Default(false) bool insertPythonpath,
-    @Default(false) bool allowPipeSeparator,
-    @Default(false) bool allowDeprecatedNoneForTagsAndLinks,
-  }) = _LedgerOptions;
-
   factory LedgerOptions({
     AccountPrefixes accountPrefixes = const AccountPrefixes(),
     String? title,
@@ -149,13 +119,13 @@ abstract class LedgerOptions with _$LedgerOptions {
     Account? accountUnrealizedGains,
     Account? accountRounding,
     Currency? conversionCurrency,
-    List<DisplayPrecision> displayPrecision = const [],
-    List<InferredTolerance> inferredToleranceDefault = const [],
+    List<DisplayPrecision> displayPrecision = const <DisplayPrecision>[],
+    List<InferredTolerance> inferredToleranceDefault = const <InferredTolerance>[],
     OptionNumber? inferredToleranceMultiplier,
     OptionNumber? toleranceMultiplier,
     bool? inferToleranceFromCost,
-    List<String> documents = const [],
-    List<Currency> operatingCurrency = const [],
+    List<String> documents = const <String>[],
+    List<Currency> operatingCurrency = const <Currency>[],
     bool? renderCommas,
     PluginProcessingMode? pluginProcessingMode,
     int? longStringMaxlines,
@@ -165,7 +135,7 @@ abstract class LedgerOptions with _$LedgerOptions {
     bool? allowPipeSeparator,
     bool? allowDeprecatedNoneForTagsAndLinks,
   }) {
-    final equity = accountPrefixes.equity;
+    final String equity = accountPrefixes.equity;
     return LedgerOptions._create(
       accountPrefixes: accountPrefixes,
       title: title ?? 'Beancount',
@@ -201,4 +171,33 @@ abstract class LedgerOptions with _$LedgerOptions {
       allowDeprecatedNoneForTagsAndLinks: allowDeprecatedNoneForTagsAndLinks ?? false,
     );
   }
+  const LedgerOptions._();
+
+  const factory LedgerOptions._create({
+    required Account accountPreviousBalances,
+    required Account accountPreviousEarnings,
+    required Account accountPreviousConversions,
+    required Account accountCurrentEarnings,
+    required Account accountCurrentConversions,
+    required Account accountUnrealizedGains,
+    required Currency conversionCurrency,
+    required OptionNumber inferredToleranceMultiplier,
+    required OptionNumber toleranceMultiplier,
+    @Default(AccountPrefixes()) AccountPrefixes accountPrefixes,
+    @Default('Beancount') String title,
+    Account? accountRounding,
+    @Default(<dynamic>[]) List<DisplayPrecision> displayPrecision,
+    @Default(<dynamic>[]) List<InferredTolerance> inferredToleranceDefault,
+    @Default(false) bool inferToleranceFromCost,
+    @Default(<dynamic>[]) List<String> documents,
+    @Default(<dynamic>[]) List<Currency> operatingCurrency,
+    @Default(false) bool renderCommas,
+    @Default(PluginProcessingMode.defaultMode) PluginProcessingMode pluginProcessingMode,
+    @Default(64) int longStringMaxlines,
+    @Default(BookingMethod.strict) BookingMethod bookingMethod,
+    @Default(false) bool usePreciseInterpolation,
+    @Default(false) bool insertPythonpath,
+    @Default(false) bool allowPipeSeparator,
+    @Default(false) bool allowDeprecatedNoneForTagsAndLinks,
+  }) = _LedgerOptions;
 }

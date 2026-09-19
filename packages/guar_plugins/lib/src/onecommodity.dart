@@ -1,9 +1,8 @@
 // Restrict each account to a single units commodity and a single cost commodity.
 
 import 'package:guar_domain/guar_domain.dart';
-
-import 'plugin.dart';
-import 'helpers.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 BookPluginResult validateOneCommodity(
   List<Directive> directives,
@@ -11,48 +10,46 @@ BookPluginResult validateOneCommodity(
   ProcessingInfo info,
   String? config,
 ) {
-  final accountsRe = (config == null || config.isEmpty) ? null : RegExp(config);
+  final RegExp? accountsRe = (config == null || config.isEmpty) ? null : RegExp(config);
 
-  final unitsMap = <String, Set<String>>{};
-  final costMap = <String, Set<String>>{};
-  final unitsSource = <String, Directive>{};
-  final costSource = <String, Directive>{};
-  final skip = <String>{};
+  final Map<String, Set<String>> unitsMap = <String, Set<String>>{};
+  final Map<String, Set<String>> costMap = <String, Set<String>>{};
+  final Map<String, Directive> unitsSource = <String, Directive>{};
+  final Map<String, Directive> costSource = <String, Directive>{};
+  final Set<String> skip = <String>{};
 
-  for (final directive in directives) {
-    if (directive.body case OpenBody(:final account, :final currencies)) {
-      final disabled = directive.meta.lookup('onecommodity') == MetaValue.boolean(false);
-      final unmatched = accountsRe != null && accountsRe.matchAsPrefix(account.name) == null;
+  for (final Directive directive in directives) {
+    if (directive.body case OpenBody(:final Account account, :final List<Currency> currencies)) {
+      final bool disabled = directive.meta.lookup('onecommodity') == const MetaValue.boolean(false);
+      final bool unmatched = accountsRe != null && accountsRe.matchAsPrefix(account.name) == null;
       if (disabled || unmatched || currencies.length > 1) {
         skip.add(account.name);
       }
     }
   }
 
-  for (final directive in directives) {
+  for (final Directive directive in directives) {
     switch (directive.body) {
-      case TransactionBody(:final value):
-        for (final posting in value.postings) {
-          final name = posting.account.name;
+      case TransactionBody(:final Transaction value):
+        for (final Posting posting in value.postings) {
+          final String name = posting.account.name;
           if (skip.contains(name)) continue;
-          final units = unitsMap.putIfAbsent(name, () => <String>{});
-          units.add(posting.units.currency.name);
+          final Set<String> units = unitsMap.putIfAbsent(name, () => <String>{})..add(posting.units.currency.name);
           if (units.length > 1) {
             unitsSource[name] = directive;
           }
-          final cost = posting.cost;
+          final Cost? cost = posting.cost;
           if (cost != null) {
-            final costs = costMap.putIfAbsent(name, () => <String>{});
-            costs.add(cost.currency.name);
+            final Set<String> costs = costMap.putIfAbsent(name, () => <String>{})..add(cost.currency.name);
             if (costs.length > 1) {
               costSource[name] = directive;
             }
           }
         }
-      case BalanceBody(:final account, :final amount):
-        final name = account.name;
+      case BalanceBody(:final Account account, :final Amount amount):
+        final String name = account.name;
         if (skip.contains(name)) continue;
-        final units = unitsMap.putIfAbsent(name, () => <String>{});
+        final Set<String> units = unitsMap.putIfAbsent(name, () => <String>{});
         units.add(amount.currency.name);
         if (units.length > 1) {
           unitsSource[name] = directive;
@@ -62,8 +59,8 @@ BookPluginResult validateOneCommodity(
     }
   }
 
-  final errors = <ProcessingError>[];
-  for (final entry in unitsMap.entries) {
+  final List<ProcessingError> errors = <ProcessingError>[];
+  for (final MapEntry<String, Set<String>> entry in unitsMap.entries) {
     if (skip.contains(entry.key) || entry.value.length < 2) continue;
     errors.add(
       ProcessingError(
@@ -72,7 +69,7 @@ BookPluginResult validateOneCommodity(
       ),
     );
   }
-  for (final entry in costMap.entries) {
+  for (final MapEntry<String, Set<String>> entry in costMap.entries) {
     if (skip.contains(entry.key) || entry.value.length < 2) continue;
     errors.add(
       ProcessingError(

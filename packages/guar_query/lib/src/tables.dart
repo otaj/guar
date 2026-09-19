@@ -2,11 +2,11 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-import 'ast.dart';
-import 'convert.dart';
-import 'helpers.dart';
-import 'summarize.dart';
-import 'value.dart';
+import 'package:guar_query/src/ast.dart';
+import 'package:guar_query/src/convert.dart';
+import 'package:guar_query/src/helpers.dart';
+import 'package:guar_query/src/summarize.dart';
+import 'package:guar_query/src/value.dart';
 
 class PostingRow {
   PostingRow({
@@ -45,13 +45,13 @@ class TableEnv {
   final DateTime Function() clock;
 
   static List<Directive> _directivesOf(Ledger ledger) => switch (ledger) {
-    LedgerDirectives(:final directives) => directives,
-    LedgerErrors() => const [],
+    LedgerDirectives(:final List<Directive> directives) => directives,
+    LedgerErrors() => const <Directive>[],
   };
 
   static LedgerOptions _optionsOf(Ledger ledger) => switch (ledger) {
-    LedgerDirectives(:final options) => options,
-    LedgerErrors(:final options) => options,
+    LedgerDirectives(:final LedgerOptions options) => options,
+    LedgerErrors(:final LedgerOptions options) => options,
   };
 
   TableEnv withDirectives(List<Directive> next) => TableEnv(ledger, clock: clock, directives: next);
@@ -60,8 +60,9 @@ class TableEnv {
 abstract class BqlTable {
   String get name;
   Map<String, ColumnSpec> get columns;
-  List<String> get wildcardColumns => columns.keys.where((name) => name != 'meta').toList();
+  List<String> get wildcardColumns => columns.keys.where((String name) => name != 'meta').toList();
   Iterable<Object> rows();
+  // ignore: avoid_returning_this, identity evolve; subclasses return a filtered copy
   BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) => this;
 }
 
@@ -83,7 +84,7 @@ class PostingsTable extends BqlTable {
   String get name => 'postings';
 
   @override
-  List<String> get wildcardColumns => const ['date', 'flag', 'payee', 'narration', 'position'];
+  List<String> get wildcardColumns => const <String>['date', 'flag', 'payee', 'narration', 'position'];
 
   List<Directive> get _entries {
     if (open == null && close == null && clear != true) return env.directives;
@@ -91,88 +92,101 @@ class PostingsTable extends BqlTable {
   }
 
   @override
-  BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) {
-    return PostingsTable(env, open: open ?? this.open, close: close ?? this.close, clear: clear ?? this.clear);
-  }
+  BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) =>
+      PostingsTable(env, open: open ?? this.open, close: close ?? this.close, clear: clear ?? this.clear);
 
   @override
-  late final Map<String, ColumnSpec> columns = {
+  late final Map<String, ColumnSpec> columns = <String, ColumnSpec>{
     'type': ColumnSpec(QueryType.text, (_) => const QueryValue.text('transaction')),
-    'id': ColumnSpec(QueryType.text, (row) => QueryValue.text(_entryId((row as PostingRow).directive))),
-    'date': ColumnSpec(QueryType.date, (row) => QueryValue.date((row as PostingRow).directive.date)),
-    'year': ColumnSpec(QueryType.integer, (row) => QueryValue.integer((row as PostingRow).directive.date.year)),
-    'month': ColumnSpec(QueryType.integer, (row) => QueryValue.integer((row as PostingRow).directive.date.month)),
-    'day': ColumnSpec(QueryType.integer, (row) => QueryValue.integer((row as PostingRow).directive.date.day)),
-    'filename': ColumnSpec(QueryType.text, (row) => _filename((row as PostingRow).posting.origin)),
-    'lineno': ColumnSpec(QueryType.integer, (row) => _lineno((row as PostingRow).posting.origin)),
-    'location': ColumnSpec(QueryType.text, (row) => _location((row as PostingRow).posting.origin)),
-    'flag': ColumnSpec(QueryType.flag, (row) => QueryValue.flag((row as PostingRow).transaction.flag)),
-    'payee': ColumnSpec(QueryType.text, (row) {
-      final payee = (row as PostingRow).transaction.payee;
+    'id': ColumnSpec(QueryType.text, (Object row) => QueryValue.text(_entryId((row as PostingRow).directive))),
+    'date': ColumnSpec(QueryType.date, (Object row) => QueryValue.date((row as PostingRow).directive.date)),
+    'year': ColumnSpec(QueryType.integer, (Object row) => QueryValue.integer((row as PostingRow).directive.date.year)),
+    'month': ColumnSpec(
+      QueryType.integer,
+      (Object row) => QueryValue.integer((row as PostingRow).directive.date.month),
+    ),
+    'day': ColumnSpec(QueryType.integer, (Object row) => QueryValue.integer((row as PostingRow).directive.date.day)),
+    'filename': ColumnSpec(QueryType.text, (Object row) => _filename((row as PostingRow).posting.origin)),
+    'lineno': ColumnSpec(QueryType.integer, (Object row) => _lineno((row as PostingRow).posting.origin)),
+    'location': ColumnSpec(QueryType.text, (Object row) => _location((row as PostingRow).posting.origin)),
+    'flag': ColumnSpec(QueryType.flag, (Object row) => QueryValue.flag((row as PostingRow).transaction.flag)),
+    'payee': ColumnSpec(QueryType.text, (Object row) {
+      final String? payee = (row as PostingRow).transaction.payee;
       return payee == null ? const QueryValue.null_() : QueryValue.text(payee);
     }),
-    'narration': ColumnSpec(QueryType.text, (row) => QueryValue.text((row as PostingRow).transaction.narration)),
-    'description': ColumnSpec(QueryType.text, (row) {
-      final tx = (row as PostingRow).transaction;
-      return QueryValue.text([if (tx.payee != null) tx.payee!, if (tx.narration.isNotEmpty) tx.narration].join(' | '));
+    'narration': ColumnSpec(QueryType.text, (Object row) => QueryValue.text((row as PostingRow).transaction.narration)),
+    'description': ColumnSpec(QueryType.text, (Object row) {
+      final Transaction tx = (row as PostingRow).transaction;
+      return QueryValue.text(
+        <String>[if (tx.payee != null) tx.payee!, if (tx.narration.isNotEmpty) tx.narration].join(' | '),
+      );
     }),
-    'tags': ColumnSpec(QueryType.tags, (row) => QueryValue.tags((row as PostingRow).transaction.tags.toSet())),
-    'links': ColumnSpec(QueryType.links, (row) => QueryValue.links((row as PostingRow).transaction.links.toSet())),
-    'posting_flag': ColumnSpec(QueryType.flag, (row) {
-      final flag = (row as PostingRow).posting.flag;
+    'tags': ColumnSpec(QueryType.tags, (Object row) => QueryValue.tags((row as PostingRow).transaction.tags.toSet())),
+    'links': ColumnSpec(
+      QueryType.links,
+      (Object row) => QueryValue.links((row as PostingRow).transaction.links.toSet()),
+    ),
+    'posting_flag': ColumnSpec(QueryType.flag, (Object row) {
+      final Flag? flag = (row as PostingRow).posting.flag;
       return flag == null ? const QueryValue.null_() : QueryValue.flag(flag);
     }),
-    'account': ColumnSpec(QueryType.account, (row) => QueryValue.account((row as PostingRow).posting.account)),
-    'other_accounts': ColumnSpec(QueryType.accounts, (row) {
-      final postingRow = row as PostingRow;
-      return QueryValue.accounts({
-        for (final posting in postingRow.transaction.postings)
+    'account': ColumnSpec(QueryType.account, (Object row) => QueryValue.account((row as PostingRow).posting.account)),
+    'other_accounts': ColumnSpec(QueryType.accounts, (Object row) {
+      final PostingRow postingRow = row as PostingRow;
+      return QueryValue.accounts(<Account>{
+        for (final Posting posting in postingRow.transaction.postings)
           if (!identical(posting, postingRow.posting)) posting.account,
       });
     }),
-    'number': ColumnSpec(QueryType.number, (row) => QueryValue.number((row as PostingRow).posting.units.number)),
+    'number': ColumnSpec(QueryType.number, (Object row) => QueryValue.number((row as PostingRow).posting.units.number)),
     'currency': ColumnSpec(
       QueryType.currency,
-      (row) => QueryValue.currency((row as PostingRow).posting.units.currency),
+      (Object row) => QueryValue.currency((row as PostingRow).posting.units.currency),
     ),
-    'cost_number': ColumnSpec(QueryType.number, (row) {
-      final cost = (row as PostingRow).posting.cost;
+    'cost_number': ColumnSpec(QueryType.number, (Object row) {
+      final Cost? cost = (row as PostingRow).posting.cost;
       return cost == null ? const QueryValue.null_() : QueryValue.number(cost.number);
     }),
-    'cost_currency': ColumnSpec(QueryType.currency, (row) {
-      final cost = (row as PostingRow).posting.cost;
+    'cost_currency': ColumnSpec(QueryType.currency, (Object row) {
+      final Cost? cost = (row as PostingRow).posting.cost;
       return cost == null ? const QueryValue.null_() : QueryValue.currency(cost.currency);
     }),
-    'cost_date': ColumnSpec(QueryType.date, (row) {
-      final cost = (row as PostingRow).posting.cost;
+    'cost_date': ColumnSpec(QueryType.date, (Object row) {
+      final Cost? cost = (row as PostingRow).posting.cost;
       return cost == null ? const QueryValue.null_() : QueryValue.date(cost.date);
     }),
-    'cost_label': ColumnSpec(QueryType.text, (row) => QueryValue.text((row as PostingRow).posting.cost?.label ?? '')),
-    'position': ColumnSpec(QueryType.position, (row) {
-      final posting = (row as PostingRow).posting;
+    'cost_label': ColumnSpec(
+      QueryType.text,
+      (Object row) => QueryValue.text((row as PostingRow).posting.cost?.label ?? ''),
+    ),
+    'position': ColumnSpec(QueryType.position, (Object row) {
+      final Posting posting = (row as PostingRow).posting;
       return QueryValue.position(Position(units: posting.units, cost: posting.cost));
     }),
-    'price': ColumnSpec(QueryType.amount, (row) {
-      final price = (row as PostingRow).posting.price;
+    'price': ColumnSpec(QueryType.amount, (Object row) {
+      final Amount? price = (row as PostingRow).posting.price;
       return price == null ? const QueryValue.null_() : QueryValue.amount(price);
     }),
-    'weight': ColumnSpec(QueryType.amount, (row) => QueryValue.amount(weightOf((row as PostingRow).posting))),
-    'balance': ColumnSpec(QueryType.inventory, (row) => QueryValue.inventory((row as PostingRow).balance)),
-    'meta': ColumnSpec(QueryType.meta, (row) => QueryValue.meta((row as PostingRow).posting.meta)),
-    'entry': ColumnSpec(QueryType.transaction, (row) => QueryValue.transaction((row as PostingRow).transaction)),
-    'accounts': ColumnSpec(QueryType.accounts, (row) {
-      return QueryValue.accounts({for (final posting in (row as PostingRow).transaction.postings) posting.account});
-    }),
+    'weight': ColumnSpec(QueryType.amount, (Object row) => QueryValue.amount(weightOf((row as PostingRow).posting))),
+    'balance': ColumnSpec(QueryType.inventory, (Object row) => QueryValue.inventory((row as PostingRow).balance)),
+    'meta': ColumnSpec(QueryType.meta, (Object row) => QueryValue.meta((row as PostingRow).posting.meta)),
+    'entry': ColumnSpec(QueryType.transaction, (Object row) => QueryValue.transaction((row as PostingRow).transaction)),
+    'accounts': ColumnSpec(
+      QueryType.accounts,
+      (Object row) => QueryValue.accounts(<Account>{
+        for (final Posting posting in (row as PostingRow).transaction.postings) posting.account,
+      }),
+    ),
   };
 
   @override
   Iterable<Object> rows() sync* {
-    var rowid = 0;
-    var balance = const Inventory();
-    for (final directive in _entries) {
-      final body = directive.body;
+    int rowid = 0;
+    Inventory balance = const Inventory();
+    for (final Directive directive in _entries) {
+      final DirectiveBody body = directive.body;
       if (body is! TransactionBody) continue;
-      for (final posting in body.value.postings) {
+      for (final Posting posting in body.value.postings) {
         rowid += 1;
         balance = balance.addPosition(Position(units: posting.units, cost: posting.cost)).inventory;
         yield PostingRow(
@@ -204,54 +218,55 @@ class EntriesTable extends BqlTable {
   }
 
   @override
-  BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) {
-    return EntriesTable(env, open: open ?? this.open, close: close ?? this.close, clear: clear ?? this.clear);
-  }
+  BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) =>
+      EntriesTable(env, open: open ?? this.open, close: close ?? this.close, clear: clear ?? this.clear);
 
   @override
-  late final Map<String, ColumnSpec> columns = {
-    'id': ColumnSpec(QueryType.text, (row) => QueryValue.text(_entryId(row as Directive))),
-    'type': ColumnSpec(QueryType.text, (row) => QueryValue.text(_entryType(row as Directive))),
-    'filename': ColumnSpec(QueryType.text, (row) => _filename((row as Directive).origin)),
-    'lineno': ColumnSpec(QueryType.integer, (row) => _lineno((row as Directive).origin)),
-    'date': ColumnSpec(QueryType.date, (row) => QueryValue.date((row as Directive).date)),
-    'year': ColumnSpec(QueryType.integer, (row) => QueryValue.integer((row as Directive).date.year)),
-    'month': ColumnSpec(QueryType.integer, (row) => QueryValue.integer((row as Directive).date.month)),
-    'day': ColumnSpec(QueryType.integer, (row) => QueryValue.integer((row as Directive).date.day)),
-    'flag': ColumnSpec(QueryType.flag, (row) {
-      final body = (row as Directive).body;
+  late final Map<String, ColumnSpec> columns = <String, ColumnSpec>{
+    'id': ColumnSpec(QueryType.text, (Object row) => QueryValue.text(_entryId(row as Directive))),
+    'type': ColumnSpec(QueryType.text, (Object row) => QueryValue.text(_entryType(row as Directive))),
+    'filename': ColumnSpec(QueryType.text, (Object row) => _filename((row as Directive).origin)),
+    'lineno': ColumnSpec(QueryType.integer, (Object row) => _lineno((row as Directive).origin)),
+    'date': ColumnSpec(QueryType.date, (Object row) => QueryValue.date((row as Directive).date)),
+    'year': ColumnSpec(QueryType.integer, (Object row) => QueryValue.integer((row as Directive).date.year)),
+    'month': ColumnSpec(QueryType.integer, (Object row) => QueryValue.integer((row as Directive).date.month)),
+    'day': ColumnSpec(QueryType.integer, (Object row) => QueryValue.integer((row as Directive).date.day)),
+    'flag': ColumnSpec(QueryType.flag, (Object row) {
+      final DirectiveBody body = (row as Directive).body;
       if (body is! TransactionBody) return const QueryValue.null_();
       return QueryValue.flag(body.value.flag);
     }),
-    'payee': ColumnSpec(QueryType.text, (row) {
-      final body = (row as Directive).body;
+    'payee': ColumnSpec(QueryType.text, (Object row) {
+      final DirectiveBody body = (row as Directive).body;
       if (body is! TransactionBody) return const QueryValue.null_();
-      final payee = body.value.payee;
+      final String? payee = body.value.payee;
       return payee == null ? const QueryValue.null_() : QueryValue.text(payee);
     }),
-    'narration': ColumnSpec(QueryType.text, (row) {
-      final body = (row as Directive).body;
+    'narration': ColumnSpec(QueryType.text, (Object row) {
+      final DirectiveBody body = (row as Directive).body;
       if (body is! TransactionBody) return const QueryValue.null_();
       return QueryValue.text(body.value.narration);
     }),
-    'description': ColumnSpec(QueryType.text, (row) {
-      final body = (row as Directive).body;
+    'description': ColumnSpec(QueryType.text, (Object row) {
+      final DirectiveBody body = (row as Directive).body;
       if (body is! TransactionBody) return const QueryValue.null_();
-      final tx = body.value;
-      return QueryValue.text([if (tx.payee != null) tx.payee!, if (tx.narration.isNotEmpty) tx.narration].join(' | '));
+      final Transaction tx = body.value;
+      return QueryValue.text(
+        <String>[if (tx.payee != null) tx.payee!, if (tx.narration.isNotEmpty) tx.narration].join(' | '),
+      );
     }),
-    'tags': ColumnSpec(QueryType.tags, (row) {
-      final body = (row as Directive).body;
+    'tags': ColumnSpec(QueryType.tags, (Object row) {
+      final DirectiveBody body = (row as Directive).body;
       if (body is TransactionBody) return QueryValue.tags(body.value.tags.toSet());
       return const QueryValue.null_();
     }),
-    'links': ColumnSpec(QueryType.links, (row) {
-      final body = (row as Directive).body;
+    'links': ColumnSpec(QueryType.links, (Object row) {
+      final DirectiveBody body = (row as Directive).body;
       if (body is TransactionBody) return QueryValue.links(body.value.links.toSet());
       return const QueryValue.null_();
     }),
-    'meta': ColumnSpec(QueryType.meta, (row) => QueryValue.meta((row as Directive).meta)),
-    'accounts': ColumnSpec(QueryType.accounts, (row) => QueryValue.accounts(_entryAccounts(row as Directive))),
+    'meta': ColumnSpec(QueryType.meta, (Object row) => QueryValue.meta((row as Directive).meta)),
+    'accounts': ColumnSpec(QueryType.accounts, (Object row) => QueryValue.accounts(_entryAccounts(row as Directive))),
   };
 
   @override
@@ -265,12 +280,11 @@ class TransactionsTable extends EntriesTable {
   String get name => 'transactions';
 
   @override
-  BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) {
-    return TransactionsTable(env, open: open ?? this.open, close: close ?? this.close, clear: clear ?? this.clear);
-  }
+  BqlTable evolve({BeanDate? open, CloseSpec? close, bool? clear}) =>
+      TransactionsTable(env, open: open ?? this.open, close: close ?? this.close, clear: clear ?? this.clear);
 
   @override
-  Iterable<Object> rows() => _entries.where((entry) => entry.body is TransactionBody);
+  Iterable<Object> rows() => _entries.where((Directive entry) => entry.body is TransactionBody);
 }
 
 class AccountsTable extends BqlTable {
@@ -281,35 +295,35 @@ class AccountsTable extends BqlTable {
   String get name => 'accounts';
 
   @override
-  late final Map<String, ColumnSpec> columns = {
-    'account': ColumnSpec(QueryType.account, (row) => QueryValue.account((row as AccountRow).account)),
-    'open': ColumnSpec(QueryType.directive, (row) {
-      final open = (row as AccountRow).open;
+  late final Map<String, ColumnSpec> columns = <String, ColumnSpec>{
+    'account': ColumnSpec(QueryType.account, (Object row) => QueryValue.account((row as AccountRow).account)),
+    'open': ColumnSpec(QueryType.directive, (Object row) {
+      final Directive? open = (row as AccountRow).open;
       return open == null ? const QueryValue.null_() : QueryValue.directive(open);
     }),
-    'close': ColumnSpec(QueryType.directive, (row) {
-      final close = (row as AccountRow).close;
+    'close': ColumnSpec(QueryType.directive, (Object row) {
+      final Directive? close = (row as AccountRow).close;
       return close == null ? const QueryValue.null_() : QueryValue.directive(close);
     }),
   };
 
   @override
   Iterable<Object> rows() {
-    final opens = <String, Directive>{};
-    final closes = <String, Directive>{};
-    for (final entry in env.directives) {
+    final Map<String, Directive> opens = <String, Directive>{};
+    final Map<String, Directive> closes = <String, Directive>{};
+    for (final Directive entry in env.directives) {
       switch (entry.body) {
-        case OpenBody(:final account):
+        case OpenBody(:final Account account):
           opens[account.name] = entry;
-        case CloseBody(:final account):
+        case CloseBody(:final Account account):
           closes[account.name] = entry;
         default:
           break;
       }
     }
-    final names = {...opens.keys, ...closes.keys}.toList()..sort();
-    return [
-      for (final name in names)
+    final List<String> names = <String>{...opens.keys, ...closes.keys}.toList()..sort();
+    return <Object>[
+      for (final String name in names)
         AccountRow(account: accountFor(name, env.options), open: opens[name], close: closes[name]),
     ];
   }
@@ -326,37 +340,35 @@ class TypedEntriesTable extends BqlTable {
   late final Map<String, ColumnSpec> columns = EntriesTable(env).columns;
 
   @override
-  Iterable<Object> rows() => env.directives.where((entry) => _match(entry.body));
+  Iterable<Object> rows() => env.directives.where((Directive entry) => _match(entry.body));
 }
 
-Map<String, BqlTable> beancountTables(TableEnv env) {
-  return {
-    'postings': PostingsTable(env),
-    'entries': EntriesTable(env),
-    'transactions': TransactionsTable(env),
-    'accounts': AccountsTable(env),
-    'prices': TypedEntriesTable(env, 'prices', (body) => body is PriceBody),
-    'balances': TypedEntriesTable(env, 'balances', (body) => body is BalanceBody),
-    'notes': TypedEntriesTable(env, 'notes', (body) => body is NoteBody),
-    'events': TypedEntriesTable(env, 'events', (body) => body is EventBody),
-    'documents': TypedEntriesTable(env, 'documents', (body) => body is DocumentBody),
-    'commodities': TypedEntriesTable(env, 'commodities', (body) => body is CommodityBody),
-    '': PostingsTable(env),
-  };
-}
+Map<String, BqlTable> beancountTables(TableEnv env) => <String, BqlTable>{
+  'postings': PostingsTable(env),
+  'entries': EntriesTable(env),
+  'transactions': TransactionsTable(env),
+  'accounts': AccountsTable(env),
+  'prices': TypedEntriesTable(env, 'prices', (DirectiveBody body) => body is PriceBody),
+  'balances': TypedEntriesTable(env, 'balances', (DirectiveBody body) => body is BalanceBody),
+  'notes': TypedEntriesTable(env, 'notes', (DirectiveBody body) => body is NoteBody),
+  'events': TypedEntriesTable(env, 'events', (DirectiveBody body) => body is EventBody),
+  'documents': TypedEntriesTable(env, 'documents', (DirectiveBody body) => body is DocumentBody),
+  'commodities': TypedEntriesTable(env, 'commodities', (DirectiveBody body) => body is CommodityBody),
+  '': PostingsTable(env),
+};
 
 QueryValue _filename(Origin origin) => switch (origin) {
-  SourceOrigin(:final location) => QueryValue.text(location.filename),
+  SourceOrigin(:final BeanLocation location) => QueryValue.text(location.filename),
   GeneratedOrigin() => const QueryValue.null_(),
 };
 
 QueryValue _lineno(Origin origin) => switch (origin) {
-  SourceOrigin(:final location) => QueryValue.integer(location.linenoBegin),
+  SourceOrigin(:final BeanLocation location) => QueryValue.integer(location.linenoBegin),
   GeneratedOrigin() => const QueryValue.null_(),
 };
 
 QueryValue _location(Origin origin) => switch (origin) {
-  SourceOrigin(:final location) => QueryValue.text('${location.filename}:${location.linenoBegin}:'),
+  SourceOrigin(:final BeanLocation location) => QueryValue.text('${location.filename}:${location.linenoBegin}:'),
   GeneratedOrigin() => const QueryValue.null_(),
 };
 
@@ -377,9 +389,9 @@ String _entryType(Directive directive) => switch (directive.body) {
 };
 
 String _entryId(Directive directive) {
-  final body = directive.body;
-  final payload = switch (body) {
-    TransactionBody(:final value) =>
+  final DirectiveBody body = directive.body;
+  final String payload = switch (body) {
+    TransactionBody(:final Transaction value) =>
       '${directive.date}|${flagChar(value.flag)}|${value.narration}|${value.postings.length}',
     _ => '${directive.date}|${_entryType(directive)}',
   };
@@ -387,13 +399,13 @@ String _entryId(Directive directive) {
 }
 
 Set<Account> _entryAccounts(Directive directive) => switch (directive.body) {
-  TransactionBody(:final value) => {for (final posting in value.postings) posting.account},
-  OpenBody(:final account) => {account},
-  CloseBody(:final account) => {account},
-  BalanceBody(:final account) => {account},
-  PadBody(:final account, :final sourceAccount) => {account, sourceAccount},
-  NoteBody(:final account) => {account},
-  DocumentBody(:final account) => {account},
-  BudgetBody(:final account) || BudgetOffBody(:final account) => {account},
-  _ => {},
+  TransactionBody(:final Transaction value) => <Account>{for (final Posting posting in value.postings) posting.account},
+  OpenBody(:final Account account) => <Account>{account},
+  CloseBody(:final Account account) => <Account>{account},
+  BalanceBody(:final Account account) => <Account>{account},
+  PadBody(:final Account account, :final Account sourceAccount) => <Account>{account, sourceAccount},
+  NoteBody(:final Account account) => <Account>{account},
+  DocumentBody(:final Account account) => <Account>{account},
+  BudgetBody(:final Account account) || BudgetOffBody(:final Account account) => <Account>{account},
+  _ => <Account>{},
 };

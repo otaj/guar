@@ -3,9 +3,9 @@
 import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'amount.dart';
-import 'date.dart';
+import 'package:guar_domain/src/account.dart';
+import 'package:guar_domain/src/amount.dart';
+import 'package:guar_domain/src/date.dart';
 
 part 'meta.freezed.dart';
 
@@ -16,6 +16,7 @@ sealed class MetaValue with _$MetaValue {
   const factory MetaValue.currency(Currency value) = MetaCurrency;
   const factory MetaValue.tag(Tag value) = MetaTag;
   const factory MetaValue.date(BeanDate value) = MetaDate;
+  // ignore: avoid_positional_boolean_parameters, bool is the stored payload
   const factory MetaValue.boolean(bool value) = MetaBoolean;
   const factory MetaValue.number(Decimal value) = MetaNumber;
   const factory MetaValue.amount(Amount value) = MetaAmount;
@@ -28,12 +29,11 @@ abstract class MetaEntry with _$MetaEntry {
 
 @freezed
 abstract class Meta with _$Meta {
+  const factory Meta({@Default(<dynamic>[]) List<MetaEntry> entries}) = _Meta;
   const Meta._();
 
-  const factory Meta({@Default([]) List<MetaEntry> entries}) = _Meta;
-
   MetaValue? lookup(String key) {
-    for (final entry in entries) {
+    for (final MetaEntry entry in entries) {
       if (entry.key == key) return entry.value;
     }
     return null;

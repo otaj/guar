@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 void main() {
   group('Account', () {
     test('carries name and account type', () {
-      final account = Account(name: 'Assets:Bank:Current', type: AccountType.assets);
+      final Account account = Account(name: 'Assets:Bank:Current', type: AccountType.assets);
       expect(account.name, 'Assets:Bank:Current');
       expect(account.type, AccountType.assets);
       expect(Account(name: 'Income:Salary', type: AccountType.income), isNot(account));
@@ -16,7 +16,7 @@ void main() {
 
   group('Cost', () {
     test('toString includes detail by default', () {
-      final cost = Cost(
+      final Cost cost = Cost(
         number: Decimal.parse('101.23'),
         currency: Currency(name: 'USD'),
         date: BeanDate(year: 2015, month: 9, day: 6),
@@ -28,11 +28,11 @@ void main() {
   });
 
   group('Position', () {
-    final hool = Amount(
+    final Amount hool = Amount(
       number: Decimal.parse('2.2'),
       currency: Currency(name: 'HOOL'),
     );
-    final cost = Cost(
+    final Cost cost = Cost(
       number: Decimal.parse('532.43'),
       currency: Currency(name: 'USD'),
       date: BeanDate(year: 2014, month: 6, day: 15),
@@ -44,13 +44,13 @@ void main() {
     });
 
     test('toString renders units and cost', () {
-      final pos = Position(units: hool, cost: cost);
+      final Position pos = Position(units: hool, cost: cost);
       expect(pos.toString(), '2.2 HOOL {532.43 USD, 2014-06-15}');
       expect(pos.toString(detail: false), '2.2 HOOL {532.43 USD}');
     });
 
     test('neg and abs preserve cost', () {
-      final pos = Position(
+      final Position pos = Position(
         units: Amount(
           number: Decimal.parse('7'),
           currency: Currency(name: 'CAD'),
@@ -70,7 +70,7 @@ void main() {
     });
 
     test('mul scales units and keeps cost', () {
-      final pos = Position(
+      final Position pos = Position(
         units: Amount(
           number: Decimal.parse('2'),
           currency: Currency(name: 'HOOL'),
@@ -98,7 +98,7 @@ void main() {
     });
 
     test('sort is currency then cost then units', () {
-      final positions = [
+      final List<Position> positions = <Position>[
         Position(
           units: Amount(
             number: Decimal.parse('50'),
@@ -130,11 +130,17 @@ void main() {
           ),
         ),
       ]..sort(Position.compare);
-      expect(positions.map((p) => p.units.toString()).toList(), ['100 CAD', '101 CAD', '200 USD', '201 USD', '50 ZZZ']);
+      expect(positions.map((Position p) => p.units.toString()).toList(), <String>[
+        '100 CAD',
+        '101 CAD',
+        '200 USD',
+        '201 USD',
+        '50 ZZZ',
+      ]);
     });
 
     test('isNegativeAtCost and currencyPair', () {
-      final long = Position(
+      final Position long = Position(
         units: Amount(
           number: Decimal.parse('1'),
           currency: Currency(name: 'USD'),
@@ -145,7 +151,7 @@ void main() {
           date: BeanDate(year: 2014, month: 6, day: 15),
         ),
       );
-      final short = Position(units: -long.units, cost: long.cost);
+      final Position short = Position(units: -long.units, cost: long.cost);
       expect(long.isNegativeAtCost, isFalse);
       expect(short.isNegativeAtCost, isTrue);
       expect(long.currencyPair, ('USD', 'AUD'));

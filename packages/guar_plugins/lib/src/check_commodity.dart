@@ -1,14 +1,13 @@
 // Require a Commodity directive for every commodity the ledger uses.
 
 import 'package:guar_domain/guar_domain.dart';
+import 'package:guar_plugins/src/config_literal.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
-import 'plugin.dart';
-import 'config_literal.dart';
-import 'helpers.dart';
-
-const _priceContext = 'Price Directive Context';
-const _metadataContext = 'Metadata Value Context';
-const _anonymous = {_priceContext, _metadataContext};
+const String _priceContext = 'Price Directive Context';
+const String _metadataContext = 'Metadata Value Context';
+const Set<String> _anonymous = <String>{_priceContext, _metadataContext};
 
 BookPluginResult validateCommodityDirectives(
   List<Directive> directives,
@@ -16,15 +15,15 @@ BookPluginResult validateCommodityDirectives(
   ProcessingInfo info,
   String? config,
 ) {
-  final errors = <ProcessingError>[];
-  var configObject = const <Object?, Object?>{};
+  final List<ProcessingError> errors = <ProcessingError>[];
+  Map<Object?, Object?> configObject = const <Object?, Object?>{};
   if (config != null && config.isNotEmpty) {
-    final parsed = parseConfigLiteral(config);
-    final value = parsed.value;
+    final ConfigLiteral parsed = parseConfigLiteral(config);
+    final Object? value = parsed.value;
     if (parsed.error != null || value is! Map<Object?, Object?>) {
       return (
         directives: directives,
-        errors: [
+        errors: <ProcessingError>[
           ProcessingError(
             message: 'Invalid configuration for check_commodity plugin; skipping.',
             location: nowhereLocation('<commodity_attr>'),
@@ -35,10 +34,10 @@ BookPluginResult validateCommodityDirectives(
     configObject = value;
   }
 
-  final ignore = <(RegExp, RegExp)>[];
-  for (final entry in configObject.entries) {
-    final patterns = <RegExp>[];
-    for (final pattern in ['${entry.key}', '${entry.value}']) {
+  final List<(RegExp, RegExp)> ignore = <(RegExp, RegExp)>[];
+  for (final MapEntry<Object?, Object?> entry in configObject.entries) {
+    final List<RegExp> patterns = <RegExp>[];
+    for (final String pattern in <String>['${entry.key}', '${entry.value}']) {
       try {
         patterns.add(RegExp(pattern));
       } on FormatException {
@@ -55,31 +54,31 @@ BookPluginResult validateCommodityDirectives(
     }
   }
 
-  final declared = <String>{};
-  final occurrences = <(String, String)>{};
-  for (final directive in directives) {
+  final Set<String> declared = <String>{};
+  final Set<(String, String)> occurrences = <(String, String)>{};
+  for (final Directive directive in directives) {
     switch (directive.body) {
-      case CommodityBody(:final currency):
+      case CommodityBody(:final Currency currency):
         declared.add(currency.name);
-      case OpenBody(:final account, :final currencies):
-        for (final currency in currencies) {
+      case OpenBody(:final Account account, :final List<Currency> currencies):
+        for (final Currency currency in currencies) {
           occurrences.add((account.name, currency.name));
         }
-      case TransactionBody(:final value):
-        for (final posting in value.postings) {
+      case TransactionBody(:final Transaction value):
+        for (final Posting posting in value.postings) {
           occurrences.add((posting.account.name, posting.units.currency.name));
-          final cost = posting.cost;
+          final Cost? cost = posting.cost;
           if (cost != null) {
             occurrences.add((posting.account.name, cost.currency.name));
           }
-          final price = posting.price;
+          final Amount? price = posting.price;
           if (price != null) {
             occurrences.add((posting.account.name, price.currency.name));
           }
         }
-      case BalanceBody(:final account, :final amount):
+      case BalanceBody(:final Account account, :final Amount amount):
         occurrences.add((account.name, amount.currency.name));
-      case PriceBody(:final currency, :final amount):
+      case PriceBody(:final Currency currency, :final Amount amount):
         occurrences.add((_priceContext, currency.name));
         occurrences.add((_priceContext, amount.currency.name));
       default:
@@ -87,22 +86,24 @@ BookPluginResult validateCommodityDirectives(
     }
   }
 
-  final sorted = occurrences.toList()
-    ..sort((a, b) {
-      final byContext = a.$1.compareTo(b.$1);
+  final List<(String, String)> sorted = occurrences.toList()
+    ..sort(((String, String) a, (String, String) b) {
+      final int byContext = a.$1.compareTo(b.$1);
       return byContext != 0 ? byContext : a.$2.compareTo(b.$2);
     });
 
-  final issued = <String>{};
-  final ignored = <String>{};
-  final anonymous = <(String, String)>[];
-  for (final (context, currency) in sorted) {
+  final Set<String> issued = <String>{};
+  final Set<String> ignored = <String>{};
+  final List<(String, String)> anonymous = <(String, String)>[];
+  for (final (String context, String currency) in sorted) {
     if (_anonymous.contains(context)) {
       anonymous.add((context, currency));
       continue;
     }
     if (declared.contains(currency) || issued.contains(currency)) continue;
-    if (ignore.any((pair) => pair.$1.matchAsPrefix(context) != null && pair.$2.matchAsPrefix(currency) != null)) {
+    if (ignore.any(
+      ((RegExp, RegExp) pair) => pair.$1.matchAsPrefix(context) != null && pair.$2.matchAsPrefix(currency) != null,
+    )) {
       ignored.add(currency);
       continue;
     }
@@ -115,7 +116,7 @@ BookPluginResult validateCommodityDirectives(
     issued.add(currency);
   }
 
-  for (final (context, currency) in anonymous) {
+  for (final (String context, String currency) in anonymous) {
     if (declared.contains(currency) || issued.contains(currency) || ignored.contains(currency)) continue;
     errors.add(
       ProcessingError(

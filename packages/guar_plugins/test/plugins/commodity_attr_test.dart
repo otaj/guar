@@ -19,7 +19,7 @@ void main() {
         '2018-08-02 commodity VNQ\n'
         '  strategy: "bond"\n',
       ),
-      [
+      <String>[
         "Missing attribute 'strategy' for Commodity directive BNDX",
         "Invalid value 'bond' for attribute strategy, Commodity directive VNQ; valid options: bigtech, bonds",
       ],
@@ -36,7 +36,7 @@ void main() {
         '  strategy: "bigtech"\n'
         '2018-08-02 commodity BND\n',
       ),
-      ["Missing attribute 'strategy' for Commodity directive BND"],
+      <String>["Missing attribute 'strategy' for Commodity directive BND"],
     );
   });
 
@@ -46,7 +46,7 @@ void main() {
         'plugin "beancount.plugins.commodity_attr" "[1, 2]"\n'
         '2018-08-02 commodity AAPL\n',
       ),
-      ['Invalid configuration for commodity_attr plugin; skipping.'],
+      <String>['Invalid configuration for commodity_attr plugin; skipping.'],
     );
   });
 }

@@ -1,9 +1,8 @@
 // Reject ledgers containing two identical directives (metadata excluded).
 
 import 'package:guar_domain/guar_domain.dart';
-
-import 'plugin.dart';
-import 'helpers.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 BookPluginResult validateNoDuplicates(
   List<Directive> directives,
@@ -11,11 +10,11 @@ BookPluginResult validateNoDuplicates(
   ProcessingInfo info,
   String? config,
 ) {
-  final seen = <String, Directive>{};
-  final errors = <ProcessingError>[];
-  for (final directive in directives) {
-    final hash = directive.hash;
-    final other = seen[hash];
+  final Map<String, Directive> seen = <String, Directive>{};
+  final List<ProcessingError> errors = <ProcessingError>[];
+  for (final Directive directive in directives) {
+    final String hash = directive.hash;
+    final Directive? other = seen[hash];
     // Exact duplicate price directives are legal: repeated fetches are common.
     if (other != null && directive.body is! PriceBody) {
       errors.add(ProcessingError(message: 'Duplicate entry: $hash', location: directiveLocation(directive)));

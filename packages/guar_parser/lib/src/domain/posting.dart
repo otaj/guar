@@ -2,12 +2,12 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'amount.dart';
-import 'cost.dart';
-import 'flag.dart';
-import 'location.dart';
-import 'meta.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/amount.dart';
+import 'package:guar_parser/src/domain/cost.dart';
+import 'package:guar_parser/src/domain/flag.dart';
+import 'package:guar_parser/src/domain/location.dart';
+import 'package:guar_parser/src/domain/meta.dart';
 
 part 'posting.freezed.dart';
 
@@ -15,9 +15,9 @@ part 'posting.freezed.dart';
 abstract class ParsedPosting with _$ParsedPosting {
   const factory ParsedPosting({
     required BeanLocation location,
+    required Account account,
     @Default(Meta()) Meta meta,
     Flag? flag,
-    required Account account,
     IncompleteAmount? units,
     ParsedCost? cost,
     ParsedPrice? price,

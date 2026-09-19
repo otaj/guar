@@ -1,18 +1,18 @@
 // Meta-plugin bundling every strict stock validation in one directive.
 
-import 'plugin.dart';
-import 'check_commodity.dart';
-import 'check_drained.dart';
-import 'coherent_cost.dart';
-import 'combine.dart';
-import 'leafonly.dart';
-import 'noduplicates.dart';
-import 'nounused.dart';
-import 'onecommodity.dart';
-import 'sellgains.dart';
-import 'unique_prices.dart';
+import 'package:guar_plugins/src/check_commodity.dart';
+import 'package:guar_plugins/src/check_drained.dart';
+import 'package:guar_plugins/src/coherent_cost.dart';
+import 'package:guar_plugins/src/combine.dart';
+import 'package:guar_plugins/src/leafonly.dart';
+import 'package:guar_plugins/src/noduplicates.dart';
+import 'package:guar_plugins/src/nounused.dart';
+import 'package:guar_plugins/src/onecommodity.dart';
+import 'package:guar_plugins/src/plugin.dart';
+import 'package:guar_plugins/src/sellgains.dart';
+import 'package:guar_plugins/src/unique_prices.dart';
 
-final BookPlugin pedanticPlugin = combinePlugins([
+final BookPlugin pedanticPlugin = combinePlugins(<BookPlugin>[
   validateCommodityDirectives,
   validateCoherentCost,
   validateLeafOnly,

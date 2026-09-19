@@ -2,8 +2,8 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'directive.dart';
-import 'options.dart';
+import 'package:guar_parser/src/domain/directive.dart';
+import 'package:guar_parser/src/domain/options.dart';
 
 part 'parsed_ledger.freezed.dart';
 
@@ -11,15 +11,15 @@ part 'parsed_ledger.freezed.dart';
 sealed class ParsedLedger with _$ParsedLedger {
   const factory ParsedLedger.directives({
     required List<ParsedDirective> directives,
-    @Default([]) List<ParseError> errors,
-    @Default([]) List<ParseWarning> warnings,
+    @Default(<dynamic>[]) List<ParseError> errors,
+    @Default(<dynamic>[]) List<ParseWarning> warnings,
     @Default(LedgerOptions()) LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = ParsedLedgerDirectives;
 
   const factory ParsedLedger.errors({
     required List<ParseError> errors,
-    @Default([]) List<ParseWarning> warnings,
+    @Default(<dynamic>[]) List<ParseWarning> warnings,
     @Default(LedgerOptions()) LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = ParsedLedgerErrors;

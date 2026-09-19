@@ -3,7 +3,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:guar_domain/guar_domain.dart';
 
-import 'value.dart';
+import 'package:guar_query/src/value.dart';
 
 part 'result.freezed.dart';
 

@@ -2,12 +2,12 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'amount.dart';
-import 'cost.dart';
-import 'flag.dart';
-import 'meta.dart';
-import 'origin.dart';
+import 'package:guar_domain/src/account.dart';
+import 'package:guar_domain/src/amount.dart';
+import 'package:guar_domain/src/cost.dart';
+import 'package:guar_domain/src/flag.dart';
+import 'package:guar_domain/src/meta.dart';
+import 'package:guar_domain/src/origin.dart';
 
 part 'posting.freezed.dart';
 
@@ -15,10 +15,10 @@ part 'posting.freezed.dart';
 abstract class Posting with _$Posting {
   const factory Posting({
     required Origin origin,
-    @Default(Meta()) Meta meta,
-    Flag? flag,
     required Account account,
     required Amount units,
+    @Default(Meta()) Meta meta,
+    Flag? flag,
     Cost? cost,
     Amount? price,
   }) = _Posting;

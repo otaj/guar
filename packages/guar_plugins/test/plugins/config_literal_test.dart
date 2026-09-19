@@ -17,16 +17,16 @@ void main() {
   });
 
   test('parses lists and nested dicts', () {
-    expect(parseConfigLiteral("['a', 'b',]").value, ['a', 'b']);
-    expect(parseConfigLiteral("{'sector': ['Tech'], 'name': None}").value, {
-      'sector': ['Tech'],
+    expect(parseConfigLiteral("['a', 'b',]").value, <String>['a', 'b']);
+    expect(parseConfigLiteral("{'sector': ['Tech'], 'name': None}").value, <String, List<String>?>{
+      'sector': <String>['Tech'],
       'name': null,
     });
   });
 
   test('tolerates the whitespace of a multi-line configuration', () {
-    expect(parseConfigLiteral("{\n  'strategy': ['bigtech', 'bonds'],\n}").value, {
-      'strategy': ['bigtech', 'bonds'],
+    expect(parseConfigLiteral("{\n  'strategy': ['bigtech', 'bonds'],\n}").value, <String, List<String>>{
+      'strategy': <String>['bigtech', 'bonds'],
     });
   });
 

@@ -2,10 +2,10 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'account.dart';
-import 'amount.dart';
-import 'date.dart';
-import 'number.dart';
+import 'package:guar_parser/src/domain/account.dart';
+import 'package:guar_parser/src/domain/amount.dart';
+import 'package:guar_parser/src/domain/date.dart';
+import 'package:guar_parser/src/domain/number.dart';
 
 part 'meta.freezed.dart';
 
@@ -16,6 +16,7 @@ sealed class MetaValue with _$MetaValue {
   const factory MetaValue.currency(Currency value) = MetaCurrency;
   const factory MetaValue.tag(Tag value) = MetaTag;
   const factory MetaValue.date(BeanDate value) = MetaDate;
+  // ignore: avoid_positional_boolean_parameters, bool is the stored payload
   const factory MetaValue.boolean(bool value) = MetaBoolean;
   const factory MetaValue.number(BeanNumber value) = MetaNumber;
   const factory MetaValue.amount(Amount value) = MetaAmount;
@@ -28,5 +29,5 @@ abstract class MetaEntry with _$MetaEntry {
 
 @freezed
 abstract class Meta with _$Meta {
-  const factory Meta({@Default([]) List<MetaEntry> entries}) = _Meta;
+  const factory Meta({@Default(<dynamic>[]) List<MetaEntry> entries}) = _Meta;
 }

@@ -1,9 +1,8 @@
 // Insert Open directives for accounts first used without an open.
 
 import 'package:guar_domain/guar_domain.dart';
-
-import 'plugin.dart';
-import 'helpers.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 BookPluginResult autoInsertOpen(
   List<Directive> directives,
@@ -11,16 +10,16 @@ BookPluginResult autoInsertOpen(
   ProcessingInfo info,
   String? config,
 ) {
-  final opened = {
-    for (final directive in directives)
-      if (directive.body case OpenBody(:final account)) account.name,
+  final Set<String> opened = <String>{
+    for (final Directive directive in directives)
+      if (directive.body case OpenBody(:final Account account)) account.name,
   };
-  final firstUse = accountFirstUse(directives);
-  final inserts = <Directive>[];
-  final accounts = firstUse.keys.toList()..sort();
-  for (final account in accounts) {
+  final Map<String, BeanDate> firstUse = accountFirstUse(directives);
+  final List<Directive> inserts = <Directive>[];
+  final List<String> accounts = firstUse.keys.toList()..sort();
+  for (final String account in accounts) {
     if (opened.contains(account)) continue;
-    final date = firstUse[account]!;
+    final BeanDate date = firstUse[account]!;
     inserts.add(
       Directive(
         origin: insertOrigin(
@@ -35,8 +34,8 @@ BookPluginResult autoInsertOpen(
     );
   }
   if (inserts.isEmpty) {
-    return (directives: directives, errors: const []);
+    return (directives: directives, errors: const <ProcessingError>[]);
   }
-  final merged = [...inserts, ...directives]..sort(compareDirectiveDate);
-  return (directives: merged, errors: const []);
+  final List<Directive> merged = <Directive>[...inserts, ...directives]..sort(compareDirectiveDate);
+  return (directives: merged, errors: const <ProcessingError>[]);
 }

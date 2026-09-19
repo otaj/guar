@@ -1,9 +1,8 @@
 // Warn about accounts that are opened but never referenced anywhere else.
 
 import 'package:guar_domain/guar_domain.dart';
-
-import 'plugin.dart';
-import 'helpers.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
 BookPluginResult validateUnusedAccounts(
   List<Directive> directives,
@@ -11,16 +10,16 @@ BookPluginResult validateUnusedAccounts(
   ProcessingInfo info,
   String? config,
 ) {
-  final opens = <String, Directive>{};
-  for (final directive in directives) {
-    if (directive.body case OpenBody(:final account)) {
+  final Map<String, Directive> opens = <String, Directive>{};
+  for (final Directive directive in directives) {
+    if (directive.body case OpenBody(:final Account account)) {
       opens[account.name] = directive;
     }
   }
-  final referenced = usedAccounts(directives);
+  final Set<String> referenced = usedAccounts(directives);
 
-  final errors = <ProcessingError>[];
-  for (final entry in opens.entries) {
+  final List<ProcessingError> errors = <ProcessingError>[];
+  for (final MapEntry<String, Directive> entry in opens.entries) {
     if (referenced.contains(entry.key)) continue;
     errors.add(ProcessingError(message: "Unused account '${entry.key}'", location: directiveLocation(entry.value)));
   }

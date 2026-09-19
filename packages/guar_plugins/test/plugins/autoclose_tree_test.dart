@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _plugin = 'plugin "beancount_reds_plugins.autoclose_tree.autoclose_tree"\n';
+const String _plugin = 'plugin "beancount_reds_plugins.autoclose_tree.autoclose_tree"\n';
 
 void main() {
   test('empty entries', () {
@@ -21,7 +21,7 @@ void main() {
           '2015-01-01 close Assets:XBank\n',
         ),
       ),
-      ['2015-01-01 Assets:XBank:AAPL', '2015-01-01 Assets:XBank'],
+      <String>['2015-01-01 Assets:XBank:AAPL', '2015-01-01 Assets:XBank'],
     );
   });
 
@@ -41,7 +41,7 @@ void main() {
           '2015-01-01 close Assets:XBank\n',
         ),
       ),
-      unorderedEquals([
+      unorderedEquals(<dynamic>[
         '2015-01-01 Assets:XBank:AAPL',
         '2015-01-01 Assets:XBank:AAPL:Fuji',
         '2015-01-01 Assets:XBank:AAPL:Gala',
@@ -64,7 +64,7 @@ void main() {
           '2016-01-01 close Assets:XBank\n',
         ),
       ),
-      ['2015-01-01 Assets:XBank:AAPL:Fuji', '2015-01-01 Assets:XBank:AAPL', '2016-01-01 Assets:XBank'],
+      <String>['2015-01-01 Assets:XBank:AAPL:Fuji', '2015-01-01 Assets:XBank:AAPL', '2016-01-01 Assets:XBank'],
     );
   });
 
@@ -79,7 +79,10 @@ void main() {
           '2018-11-10 close Liabilities:Credit-Cards:Spouse:Citi\n',
         ),
       ),
-      ['2018-11-10 Liabilities:Credit-Cards:Spouse:Citi:Addon', '2018-11-10 Liabilities:Credit-Cards:Spouse:Citi'],
+      <String>[
+        '2018-11-10 Liabilities:Credit-Cards:Spouse:Citi:Addon',
+        '2018-11-10 Liabilities:Credit-Cards:Spouse:Citi',
+      ],
     );
   });
 
@@ -93,7 +96,7 @@ void main() {
           '2018-11-10 close Assets:Brokerage\n',
         ),
       ),
-      ['2018-11-10 Assets:Brokerage:AAPL', '2018-11-10 Assets:Brokerage:ORNG'],
+      <String>['2018-11-10 Assets:Brokerage:AAPL', '2018-11-10 Assets:Brokerage:ORNG'],
     );
   });
 
@@ -110,7 +113,7 @@ void main() {
           '2021-06-17 close Expenses:Non-Retirement:Auto:Fit\n',
         ),
       ),
-      unorderedEquals([
+      unorderedEquals(<dynamic>[
         '2021-06-17 Expenses:Non-Retirement:Auto:Fit:Insurance',
         '2021-06-17 Expenses:Non-Retirement:Auto:Fit:Gas',
         '2021-06-17 Expenses:Non-Retirement:Auto:Fit',

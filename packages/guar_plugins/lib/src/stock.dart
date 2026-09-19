@@ -1,26 +1,26 @@
 // Default map of beancount.plugins.* names to Dart BookPlugin implementations.
 
-import 'plugin.dart';
-import 'auto.dart';
-import 'auto_accounts.dart';
-import 'check_average_cost.dart';
-import 'check_closing.dart';
-import 'check_commodity.dart';
-import 'check_drained.dart';
-import 'close_tree.dart';
-import 'coherent_cost.dart';
-import 'commodity_attr.dart';
-import 'currency_accounts.dart';
-import 'implicit_prices.dart';
-import 'leafonly.dart';
-import 'noduplicates.dart';
-import 'nounused.dart';
-import 'onecommodity.dart';
-import 'pedantic.dart';
-import 'sellgains.dart';
-import 'unique_prices.dart';
+import 'package:guar_plugins/src/auto.dart';
+import 'package:guar_plugins/src/auto_accounts.dart';
+import 'package:guar_plugins/src/check_average_cost.dart';
+import 'package:guar_plugins/src/check_closing.dart';
+import 'package:guar_plugins/src/check_commodity.dart';
+import 'package:guar_plugins/src/check_drained.dart';
+import 'package:guar_plugins/src/close_tree.dart';
+import 'package:guar_plugins/src/coherent_cost.dart';
+import 'package:guar_plugins/src/commodity_attr.dart';
+import 'package:guar_plugins/src/currency_accounts.dart';
+import 'package:guar_plugins/src/implicit_prices.dart';
+import 'package:guar_plugins/src/leafonly.dart';
+import 'package:guar_plugins/src/noduplicates.dart';
+import 'package:guar_plugins/src/nounused.dart';
+import 'package:guar_plugins/src/onecommodity.dart';
+import 'package:guar_plugins/src/pedantic.dart';
+import 'package:guar_plugins/src/plugin.dart';
+import 'package:guar_plugins/src/sellgains.dart';
+import 'package:guar_plugins/src/unique_prices.dart';
 
-final Map<String, BookPlugin> stockPlugins = {
+final Map<String, BookPlugin> stockPlugins = <String, BookPlugin>{
   'beancount.plugins.auto': autoPlugin,
   'beancount.plugins.auto_accounts': autoInsertOpen,
   'beancount.plugins.check_average_cost': validateAverageCost,

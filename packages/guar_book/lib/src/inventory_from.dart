@@ -2,21 +2,19 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-LedgerInventory inventoryFromLedger(Ledger ledger) {
-  return switch (ledger) {
-    LedgerErrors() => LedgerInventory(),
-    LedgerDirectives(:final directives) => inventoryFromDirectives(directives),
-  };
-}
+LedgerInventory inventoryFromLedger(Ledger ledger) => switch (ledger) {
+  LedgerErrors() => const LedgerInventory(),
+  LedgerDirectives(:final List<Directive> directives) => inventoryFromDirectives(directives),
+};
 
 LedgerInventory inventoryFromDirectives(Iterable<Directive> directives) {
-  var inventory = LedgerInventory();
-  for (final directive in directives) {
-    final body = directive.body;
+  LedgerInventory inventory = const LedgerInventory();
+  for (final Directive directive in directives) {
+    final DirectiveBody body = directive.body;
     if (body is! TransactionBody) {
       continue;
     }
-    for (final posting in body.value.postings) {
+    for (final Posting posting in body.value.postings) {
       inventory = inventory.addPosition(posting.account, Position(units: posting.units, cost: posting.cost));
     }
   }
@@ -24,15 +22,15 @@ LedgerInventory inventoryFromDirectives(Iterable<Directive> directives) {
 }
 
 String formatLedgerInventory(LedgerInventory inventory) {
-  final buffer = StringBuffer();
-  for (final entry in inventory.accounts) {
-    final account = entry.account.name;
-    final positions = entry.inventory.positions;
+  final StringBuffer buffer = StringBuffer();
+  for (final AccountInventory entry in inventory.accounts) {
+    final String account = entry.account.name;
+    final List<Position> positions = entry.inventory.positions;
     if (positions.isEmpty) {
       continue;
     }
-    for (var i = 0; i < positions.length; i++) {
-      final position = positions[i];
+    for (int i = 0; i < positions.length; i++) {
+      final Position position = positions[i];
       if (i == 0) {
         buffer.writeln('$account\t${_formatPosition(position)}');
       } else {
@@ -47,7 +45,7 @@ String _formatPosition(Position position) {
   if (position.cost == null) {
     return '${position.units.number} ${position.units.currency.name}';
   }
-  final cost = position.cost!;
-  final date = '${cost.date}';
+  final Cost cost = position.cost!;
+  final String date = '${cost.date}';
   return '${position.units.number} ${position.units.currency.name} {$date ${cost.currency.name} ${cost.number}}';
 }

@@ -2,9 +2,9 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-import 'plugin.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
-const _implicitPricesField = '__implicit_prices__';
+const String _implicitPricesField = '__implicit_prices__';
 
 BookPluginResult addImplicitPrices(
   List<Directive> directives,
@@ -12,20 +12,20 @@ BookPluginResult addImplicitPrices(
   ProcessingInfo info,
   String? config,
 ) {
-  final out = <Directive>[];
-  final seen = <String>{};
-  final balances = <String, Inventory>{};
+  final List<Directive> out = <Directive>[];
+  final Set<String> seen = <String>{};
+  final Map<String, Inventory> balances = <String, Inventory>{};
 
-  for (final directive in directives) {
+  for (final Directive directive in directives) {
     out.add(directive);
-    final body = directive.body;
+    final DirectiveBody body = directive.body;
     if (body is! TransactionBody) continue;
 
-    for (final posting in body.value.postings) {
-      final units = posting.units;
-      final cost = posting.cost;
-      final balance = balances[posting.account.name] ?? const Inventory();
-      final added = balance.addPosition(Position(units: units, cost: cost));
+    for (final Posting posting in body.value.postings) {
+      final Amount units = posting.units;
+      final Cost? cost = posting.cost;
+      final Inventory balance = balances[posting.account.name] ?? const Inventory();
+      final InventoryAdd added = balance.addPosition(Position(units: units, cost: cost));
       balances[posting.account.name] = added.inventory;
 
       Directive? priceEntry;
@@ -50,8 +50,8 @@ BookPluginResult addImplicitPrices(
       }
 
       if (priceEntry == null) continue;
-      final priceBody = priceEntry.body as PriceBody;
-      final key =
+      final PriceBody priceBody = priceEntry.body as PriceBody;
+      final String key =
           '${priceEntry.date}|'
           '${priceBody.currency.name}|${priceBody.amount.number}|${priceBody.amount.currency.name}';
       if (seen.add(key)) {
@@ -60,7 +60,7 @@ BookPluginResult addImplicitPrices(
     }
   }
 
-  return (directives: out, errors: const []);
+  return (directives: out, errors: const <ProcessingError>[]);
 }
 
 Directive _priceDirective({
@@ -71,12 +71,12 @@ Directive _priceDirective({
   required List<Directive> existing,
   required ProcessingInfo info,
 }) {
-  final body = DirectiveBody.price(currency: currency, amount: amount);
+  final DirectiveBody body = DirectiveBody.price(currency: currency, amount: amount);
   return Directive(
     origin: insertOrigin(date: date, body: body, existing: existing, info: info),
     date: date,
     meta: Meta(
-      entries: [MetaEntry(key: _implicitPricesField, value: MetaValue.text(tag))],
+      entries: <MetaEntry>[MetaEntry(key: _implicitPricesField, value: MetaValue.text(tag))],
     ),
     body: body,
   );

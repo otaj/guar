@@ -3,7 +3,7 @@
 import 'package:guar_domain/guar_domain.dart';
 
 class StageResult {
-  StageResult({required this.directives, this.errors = const []});
+  StageResult({required this.directives, this.errors = const <ProcessingError>[]});
 
   final List<Directive> directives;
   final List<ProcessingError> errors;

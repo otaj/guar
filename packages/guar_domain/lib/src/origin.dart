@@ -2,7 +2,7 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'location.dart';
+import 'package:guar_domain/src/location.dart';
 
 part 'origin.freezed.dart';
 

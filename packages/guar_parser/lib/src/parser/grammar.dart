@@ -1,12 +1,11 @@
 // Line-oriented Beancount document parser built on petitparser fragments.
 
+import 'package:guar_parser/src/domain/domain.dart';
+import 'package:guar_parser/src/parser/include.dart';
+import 'package:guar_parser/src/parser/observation.dart';
+import 'package:guar_parser/src/parser/option_apply.dart';
+import 'package:guar_parser/src/parser/tokens.dart';
 import 'package:petitparser/petitparser.dart';
-
-import '../domain/domain.dart';
-import 'include.dart';
-import 'observation.dart';
-import 'option_apply.dart';
-import 'tokens.dart';
 
 class BeancountGrammar {
   BeancountGrammar({this.filename = '', this.firstLine = 1, IncludeController? includes, this.recover = false})
@@ -18,7 +17,7 @@ class BeancountGrammar {
   final bool recover;
 
   ParsedLedger parse(String source, {LedgerOptions? initialOptions, bool isRoot = true, bool honorOptions = true}) {
-    final state = _ParseState();
+    final _ParseState state = _ParseState();
     if (initialOptions != null) {
       state.options = initialOptions;
     }
@@ -26,21 +25,23 @@ class BeancountGrammar {
   }
 
   ParsedLedger _parseInto(String source, _ParseState state, {required bool isRoot, bool honorOptions = true}) {
-    final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    final lines = normalized.split('\n');
+    final String normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final List<String> lines = normalized.split('\n');
     ProcessingInfo info() {
-      final observed = observeDirectives(state.directives);
+      final ({List<Currency> commodities, DisplayContext displayContext}) observed = observeDirectives(
+        state.directives,
+      );
       return ProcessingInfo(
         filename: filename.isEmpty ? null : filename,
-        include: List.unmodifiable(includes.includeLog),
+        include: List<String>.unmodifiable(includes.includeLog),
         commodities: observed.commodities,
-        plugin: List.unmodifiable(state.plugins),
+        plugin: List<Plugin>.unmodifiable(state.plugins),
         displayContext: observed.displayContext,
-        optionSettings: List.unmodifiable(state.optionSettings),
+        optionSettings: List<OptionSetting>.unmodifiable(state.optionSettings),
       );
     }
 
-    List<ParseWarning> warnings() => List.unmodifiable(state.warnings);
+    List<ParseWarning> warnings() => List<ParseWarning>.unmodifiable(state.warnings);
 
     void noteWarning(String message, int lineNo) {
       state.warnings.add(
@@ -60,15 +61,15 @@ class BeancountGrammar {
       );
     }
 
-    var index = 0;
+    int index = 0;
     void skipIndentedBlock() {
       while (index < lines.length) {
-        final blockRaw = lines[index];
+        final String blockRaw = lines[index];
         if (blockRaw.trimLeft().startsWith(';')) {
           index += 1;
           continue;
         }
-        final blockCode = _stripTrailingComment(blockRaw).trimRight();
+        final String blockCode = _stripTrailingComment(blockRaw).trimRight();
         if (blockCode.trim().isEmpty) {
           index += 1;
           continue;
@@ -81,7 +82,7 @@ class BeancountGrammar {
     }
 
     ParsedLedger? fail(String message, int lineNo) {
-      final error = ParseError(
+      final ParseError error = ParseError(
         message: message,
         location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
       );
@@ -94,14 +95,19 @@ class BeancountGrammar {
       state.errors
         ..clear()
         ..add(error);
-      return ParsedLedger.errors(errors: [error], warnings: warnings(), options: state.options, info: info());
+      return ParsedLedger.errors(
+        errors: <ParseError>[error],
+        warnings: warnings(),
+        options: state.options,
+        info: info(),
+      );
     }
 
     while (index < lines.length && !state.aborted) {
-      final raw = lines[index];
-      final lineNo = index + firstLine;
+      final String raw = lines[index];
+      final int lineNo = index + firstLine;
       index += 1;
-      var code = _stripTrailingComment(raw).trimRight();
+      String code = _stripTrailingComment(raw).trimRight();
       if (code.trim().isEmpty) {
         continue;
       }
@@ -112,19 +118,22 @@ class BeancountGrammar {
         continue;
       }
       if (code.startsWith(' ') || code.startsWith('\t')) {
-        final halted = fail(_foundExpected(code.trimLeft(), 0), lineNo);
+        final ParsedLedger? halted = fail(_foundExpected(code.trimLeft(), 0), lineNo);
         if (halted != null) {
           return halted;
         }
         continue;
       }
       while (_hasUnclosedQuote(code) && index < lines.length) {
-        code = '$code\n${lines[index]}';
+        final StringBuffer buffer = StringBuffer(code)
+          ..write('\n')
+          ..write(lines[index]);
+        code = buffer.toString();
         index += 1;
       }
-      final includePattern = _parseInclude(code);
+      final String? includePattern = _parseInclude(code);
       if (includePattern != null) {
-        final outcome = includes.open(
+        final IncludeOutcome outcome = includes.open(
           pattern: includePattern,
           fromFilename: filename,
           contextKey: _includeContextKey(state.tagStack, state.metaStack),
@@ -133,19 +142,19 @@ class BeancountGrammar {
           case IncludeSkip():
             continue;
           case IncludeDuplicate():
-            final halted = fail('duplicate include', lineNo);
+            final ParsedLedger? halted = fail('duplicate include', lineNo);
             if (halted != null) {
               return halted;
             }
             continue;
           case IncludeFailed():
-            final halted = fail('include failed', lineNo);
+            final ParsedLedger? halted = fail('include failed', lineNo);
             if (halted != null) {
               return halted;
             }
             continue;
-          case IncludeLoaded(:final files):
-            for (final hit in files) {
+          case IncludeLoaded(:final List<IncludeHit> files):
+            for (final IncludeHit hit in files) {
               BeancountGrammar(
                 filename: hit.path,
                 includes: includes,
@@ -164,17 +173,17 @@ class BeancountGrammar {
         }
       }
       if (code.startsWith('include')) {
-        final halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        final ParsedLedger? halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
         if (halted != null) {
           return halted;
         }
         continue;
       }
-      final optionPair = _parseOption(code);
+      final (String, String)? optionPair = _parseOption(code);
       if (optionPair != null) {
-        final applied = applyLedgerOption(state.options, optionPair.$1, optionPair.$2);
+        final (LedgerOptions, String?) applied = applyLedgerOption(state.options, optionPair.$1, optionPair.$2);
         if (applied.$2 != null) {
-          final halted = fail(applied.$2!, lineNo);
+          final ParsedLedger? halted = fail(applied.$2!, lineNo);
           if (halted != null) {
             return halted;
           }
@@ -192,20 +201,20 @@ class BeancountGrammar {
           ),
         );
         state.options = applied.$1;
-        final warning = ledgerOptionWarning(optionPair.$1);
+        final String? warning = ledgerOptionWarning(optionPair.$1);
         if (warning != null) {
           noteWarning(warning, lineNo);
         }
         continue;
       }
       if (code.startsWith('option')) {
-        final halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        final ParsedLedger? halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
         if (halted != null) {
           return halted;
         }
         continue;
       }
-      final plugin = _parsePlugin(code, lineNo);
+      final Plugin? plugin = _parsePlugin(code, lineNo);
       if (plugin != null) {
         if (honorOptions) {
           state.plugins.add(plugin);
@@ -215,22 +224,22 @@ class BeancountGrammar {
         continue;
       }
       if (code.startsWith('plugin')) {
-        final halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
+        final ParsedLedger? halted = fail(_foundExpected(code, _directiveFailurePosition(code)), lineNo);
         if (halted != null) {
           return halted;
         }
         continue;
       }
-      final pushMeta = _parsePushMeta(code);
+      final MetaEntry? pushMeta = _parsePushMeta(code);
       if (pushMeta != null) {
         state.metaStack.add(pushMeta);
         continue;
       }
-      final popMeta = _parsePopMeta(code);
+      final String? popMeta = _parsePopMeta(code);
       if (popMeta != null) {
-        final at = state.metaStack.lastIndexWhere((entry) => entry.key == popMeta);
+        final int at = state.metaStack.lastIndexWhere((MetaEntry entry) => entry.key == popMeta);
         if (at < 0) {
-          final halted = fail('invalid popmeta', lineNo);
+          final ParsedLedger? halted = fail('invalid popmeta', lineNo);
           if (halted != null) {
             return halted;
           }
@@ -239,16 +248,16 @@ class BeancountGrammar {
         state.metaStack.removeAt(at);
         continue;
       }
-      final push = _parsePushTag(code);
+      final String? push = _parsePushTag(code);
       if (push != null) {
         state.tagStack.add(push);
         continue;
       }
-      final pop = _parsePopTag(code);
+      final String? pop = _parsePopTag(code);
       if (pop != null) {
-        final at = state.tagStack.lastIndexOf(pop);
+        final int at = state.tagStack.lastIndexOf(pop);
         if (at < 0) {
-          final halted = fail('invalid poptag', lineNo);
+          final ParsedLedger? halted = fail('invalid poptag', lineNo);
           if (halted != null) {
             return halted;
           }
@@ -257,49 +266,56 @@ class BeancountGrammar {
         state.tagStack.removeAt(at);
         continue;
       }
-      final header = _parseDirectiveHeader(code, lineNo, allowPipe: state.options.allowPipeSeparator == true);
+      final ParsedDirective? header = _parseDirectiveHeader(
+        code,
+        lineNo,
+        allowPipe: state.options.allowPipeSeparator == true,
+      );
       if (header == null) {
-        final dateError = _invalidDateMessage(code);
-        final allowPipe = state.options.allowPipeSeparator == true;
-        final failurePos = _directiveFailurePosition(code, allowPipe: allowPipe);
-        final dated = date().parse(code) is Success;
+        final String? dateError = _invalidDateMessage(code);
+        final bool allowPipe = state.options.allowPipeSeparator == true;
+        final int failurePos = _directiveFailurePosition(code, allowPipe: allowPipe);
+        final bool dated = date().parse(code) is Success;
         if (dateError != null) {
-          final halted = fail(dateError, lineNo);
+          final ParsedLedger? halted = fail(dateError, lineNo);
           if (halted != null) {
             return halted;
           }
           continue;
         }
         if (dated && !allowPipe && _txnStringsContainPipe(code)) {
-          final halted = fail('Pipe symbol is deprecated.', lineNo);
+          final ParsedLedger? halted = fail('Pipe symbol is deprecated.', lineNo);
           if (halted != null) {
             return halted;
           }
           continue;
         }
-        final halted = fail(dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos), lineNo);
+        final ParsedLedger? halted = fail(
+          dated ? _foundExpected(code, failurePos) : _foundTopLevel(code, failurePos),
+          lineNo,
+        );
         if (halted != null) {
           return halted;
         }
         continue;
       }
-      final applied = _withPushedTags(header, state.tagStack);
+      final ParsedDirective applied = _withPushedTags(header, state.tagStack);
       if (applied.body is TransactionBody) {
-        final postings = <ParsedPosting>[];
-        final metaEntries = <MetaEntry>[];
-        final seenMeta = <String>{};
-        final txn = (applied.body as TransactionBody).value;
-        final tags = [...txn.tags];
-        final links = [...txn.links];
+        final List<ParsedPosting> postings = <ParsedPosting>[];
+        final List<MetaEntry> metaEntries = <MetaEntry>[];
+        final Set<String> seenMeta = <String>{};
+        final ParsedTransaction txn = (applied.body as TransactionBody).value;
+        final List<Tag> tags = <Tag>[...txn.tags];
+        final List<Link> links = <Link>[...txn.links];
         ParsedPosting? lastPosting;
-        var endLine = lineNo;
+        int endLine = lineNo;
         while (index < lines.length) {
-          final postingRaw = lines[index];
+          final String postingRaw = lines[index];
           if (postingRaw.trimLeft().startsWith(';')) {
             index += 1;
             continue;
           }
-          final postingCode = _stripTrailingComment(postingRaw).trimRight();
+          final String postingCode = _stripTrailingComment(postingRaw).trimRight();
           if (postingCode.trim().isEmpty) {
             index += 1;
             continue;
@@ -307,16 +323,16 @@ class BeancountGrammar {
           if (!(postingCode.startsWith(' ') || postingCode.startsWith('\t'))) {
             break;
           }
-          final postingLine = index + firstLine;
-          final trimmed = postingCode.trimLeft();
-          final tagsLinks = _parseTagsLinksLine(trimmed);
+          final int postingLine = index + firstLine;
+          final String trimmed = postingCode.trimLeft();
+          final ({List<Link> links, List<Tag> tags})? tagsLinks = _parseTagsLinksLine(trimmed);
           if (tagsLinks != null) {
             if (lastPosting != null) {
-              final entries = [...lastPosting.meta.entries];
-              for (final tag in tagsLinks.tags) {
+              final List<MetaEntry> entries = <MetaEntry>[...lastPosting.meta.entries];
+              for (final Tag tag in tagsLinks.tags) {
                 entries.add(MetaEntry(key: '', value: MetaValue.tag(tag)));
               }
-              final updated = lastPosting.copyWith(meta: Meta(entries: entries));
+              final ParsedPosting updated = lastPosting.copyWith(meta: Meta(entries: entries));
               postings[postings.length - 1] = updated;
               lastPosting = updated;
               endLine = postingLine;
@@ -329,15 +345,17 @@ class BeancountGrammar {
             index += 1;
             continue;
           }
-          final meta = _parseMetaEntry(trimmed);
+          final MetaEntry? meta = _parseMetaEntry(trimmed);
           if (meta != null) {
             if (lastPosting != null) {
-              final postingMeta = lastPosting.meta;
-              final keys = {for (final entry in postingMeta.entries) entry.key};
+              final Meta postingMeta = lastPosting.meta;
+              final Set<String> keys = <String>{for (final MetaEntry entry in postingMeta.entries) entry.key};
               if (!keys.add(meta.key)) {
                 noteError('duplicate key ${meta.key}', postingLine);
               } else {
-                final updated = lastPosting.copyWith(meta: Meta(entries: [...postingMeta.entries, meta]));
+                final ParsedPosting updated = lastPosting.copyWith(
+                  meta: Meta(entries: <MetaEntry>[...postingMeta.entries, meta]),
+                );
                 postings[postings.length - 1] = updated;
                 lastPosting = updated;
               }
@@ -350,7 +368,7 @@ class BeancountGrammar {
             index += 1;
             continue;
           }
-          final posting = _parsePosting(trimmed, postingLine);
+          final ParsedPosting? posting = _parsePosting(trimmed, postingLine);
           if (posting == null) {
             noteError(_foundPosting(trimmed, _postingFailurePosition(trimmed)), postingLine);
             index += 1;
@@ -366,14 +384,14 @@ class BeancountGrammar {
         if (postings.isEmpty && state.errors.isNotEmpty) {
           continue;
         }
-        final txnDirective = applied.copyWith(
+        final ParsedDirective txnDirective = applied.copyWith(
           location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
           meta: _metaWithStack(state.metaStack, metaEntries),
           body: DirectiveBody.transaction(txn.copyWith(tags: tags, links: links, postings: postings)),
         );
-        final accountError = _accountTypeError(txnDirective, state.options);
+        final String? accountError = _accountTypeError(txnDirective, state.options);
         if (accountError != null) {
-          final halted = fail(accountError, lineNo);
+          final ParsedLedger? halted = fail(accountError, lineNo);
           if (halted != null) {
             return halted;
           }
@@ -381,16 +399,16 @@ class BeancountGrammar {
         }
         state.directives.add(txnDirective);
       } else {
-        final metaEntries = <MetaEntry>[];
-        final seenMeta = <String>{};
-        var endLine = lineNo;
+        final List<MetaEntry> metaEntries = <MetaEntry>[];
+        final Set<String> seenMeta = <String>{};
+        int endLine = lineNo;
         while (index < lines.length) {
-          final raw = lines[index];
+          final String raw = lines[index];
           if (raw.trimLeft().startsWith(';')) {
             index += 1;
             continue;
           }
-          final codeLine = _stripTrailingComment(raw).trimRight();
+          final String codeLine = _stripTrailingComment(raw).trimRight();
           if (codeLine.trim().isEmpty) {
             index += 1;
             continue;
@@ -398,11 +416,11 @@ class BeancountGrammar {
           if (!(codeLine.startsWith(' ') || codeLine.startsWith('\t'))) {
             break;
           }
-          final metaLine = index + firstLine;
-          final trimmed = codeLine.trimLeft();
-          final meta = _parseMetaEntry(trimmed);
+          final int metaLine = index + firstLine;
+          final String trimmed = codeLine.trimLeft();
+          final MetaEntry? meta = _parseMetaEntry(trimmed);
           if (meta == null) {
-            final halted = fail(_foundExpected(trimmed, 0), metaLine);
+            final ParsedLedger? halted = fail(_foundExpected(trimmed, 0), metaLine);
             if (halted != null) {
               return halted;
             }
@@ -416,13 +434,13 @@ class BeancountGrammar {
           endLine = metaLine;
           index += 1;
         }
-        final directive = applied.copyWith(
+        final ParsedDirective directive = applied.copyWith(
           location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: endLine),
           meta: _metaWithStack(state.metaStack, metaEntries),
         );
-        final accountError = _accountTypeError(directive, state.options);
+        final String? accountError = _accountTypeError(directive, state.options);
         if (accountError != null) {
-          final halted = fail(accountError, lineNo);
+          final ParsedLedger? halted = fail(accountError, lineNo);
           if (halted != null) {
             return halted;
           }
@@ -432,19 +450,24 @@ class BeancountGrammar {
       }
     }
     if (!isRoot) {
-      return ParsedLedger.directives(directives: const [], warnings: warnings(), options: state.options, info: info());
+      return ParsedLedger.directives(
+        directives: const <ParsedDirective>[],
+        warnings: warnings(),
+        options: state.options,
+        info: info(),
+      );
     }
     if (state.errors.isNotEmpty && !recover) {
       return ParsedLedger.errors(errors: state.errors, warnings: warnings(), options: state.options, info: info());
     }
     if (state.tagStack.isNotEmpty) {
-      final halted = fail('invalid pushtag', firstLine + lines.length - 1);
+      final ParsedLedger? halted = fail('invalid pushtag', firstLine + lines.length - 1);
       if (halted != null) {
         return halted;
       }
     }
     if (state.metaStack.isNotEmpty) {
-      final halted = fail('invalid pushmeta', firstLine + lines.length - 1);
+      final ParsedLedger? halted = fail('invalid pushmeta', firstLine + lines.length - 1);
       if (halted != null) {
         return halted;
       }
@@ -452,7 +475,7 @@ class BeancountGrammar {
     state.directives.sort(compareParsedDirectives);
     return ParsedLedger.directives(
       directives: state.directives,
-      errors: List.unmodifiable(state.errors),
+      errors: List<ParseError>.unmodifiable(state.errors),
       warnings: warnings(),
       options: state.options,
       info: info(),
@@ -460,18 +483,20 @@ class BeancountGrammar {
   }
 
   String? _parseInclude(String line) {
-    final result = (string('include') & spaces() & quotedString()).end().parse(line);
+    final Result<List<dynamic>> result = (string('include') & spaces() & quotedString()).end().parse(line);
     return result is Success ? result.value[2] as String : null;
   }
 
   String _includeContextKey(List<String> tags, List<MetaEntry> meta) {
-    final tagPart = [...tags]..sort();
-    final metaPart = [for (final entry in meta) '${entry.key}=${entry.value}']..sort();
+    final List<String> tagPart = <String>[...tags]..sort();
+    final List<String> metaPart = <String>[for (final MetaEntry entry in meta) '${entry.key}=${entry.value}']..sort();
     return '${tagPart.join('\u{1e}')}\u{1f}${metaPart.join('\u{1e}')}';
   }
 
   (String, String)? _parseOption(String line) {
-    final result = (string('option') & spaces() & quotedString() & spaces() & quotedString()).end().parse(line);
+    final Result<List<dynamic>> result = (string('option') & spaces() & quotedString() & spaces() & quotedString())
+        .end()
+        .parse(line);
     if (result is! Success) {
       return null;
     }
@@ -479,12 +504,14 @@ class BeancountGrammar {
   }
 
   Plugin? _parsePlugin(String line, int lineNo) {
-    final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
-    final withConfig = (string('plugin') & spaces() & quotedString() & spaces() & quotedString()).end().parse(line);
+    final BeanLocation location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
+    final Result<List<dynamic>> withConfig = (string('plugin') & spaces() & quotedString() & spaces() & quotedString())
+        .end()
+        .parse(line);
     if (withConfig is Success) {
       return Plugin(name: withConfig.value[2] as String, config: withConfig.value[4] as String, location: location);
     }
-    final bare = (string('plugin') & spaces() & quotedString()).end().parse(line);
+    final Result<List<dynamic>> bare = (string('plugin') & spaces() & quotedString()).end().parse(line);
     if (bare is Success) {
       return Plugin(name: bare.value[2] as String, location: location);
     }
@@ -492,15 +519,15 @@ class BeancountGrammar {
   }
 
   String? _accountTypeError(ParsedDirective directive, LedgerOptions options) {
-    final prefixes = [
+    final List<String> prefixes = <String>[
       options.accountPrefixes.assets ?? 'Assets',
       options.accountPrefixes.liabilities ?? 'Liabilities',
       options.accountPrefixes.equity ?? 'Equity',
       options.accountPrefixes.income ?? 'Income',
       options.accountPrefixes.expenses ?? 'Expenses',
     ];
-    for (final account in _accountsIn(directive)) {
-      final root = account.name.split(':').first;
+    for (final Account account in _accountsIn(directive)) {
+      final String root = account.name.split(':').first;
       if (!prefixes.contains(root)) {
         return 'unknown account type $root, must be one of ${prefixes.join(', ')}';
       }
@@ -510,21 +537,21 @@ class BeancountGrammar {
 
   Iterable<Account> _accountsIn(ParsedDirective directive) sync* {
     switch (directive.body) {
-      case OpenBody(:final account):
+      case OpenBody(:final Account account):
         yield account;
-      case CloseBody(:final account):
+      case CloseBody(:final Account account):
         yield account;
-      case BalanceBody(:final account):
+      case BalanceBody(:final Account account):
         yield account;
-      case PadBody(:final account, :final sourceAccount):
+      case PadBody(:final Account account, :final Account sourceAccount):
         yield account;
         yield sourceAccount;
-      case NoteBody(:final account):
+      case NoteBody(:final Account account):
         yield account;
-      case DocumentBody(:final account):
+      case DocumentBody(:final Account account):
         yield account;
-      case TransactionBody(:final value):
-        for (final posting in value.postings) {
+      case TransactionBody(:final ParsedTransaction value):
+        for (final ParsedPosting posting in value.postings) {
           yield posting.account;
         }
       case PriceBody():
@@ -537,56 +564,58 @@ class BeancountGrammar {
   }
 
   String? _parsePushTag(String line) {
-    final result = (string('pushtag') & spaces() & _tagOrLink()).end().parse(line);
+    final Result<List<dynamic>> result = (string('pushtag') & spaces() & _tagOrLink()).end().parse(line);
     if (result is! Success) {
       return null;
     }
-    final tag = result.value[2];
+    final dynamic tag = result.value[2];
     return tag is Tag ? tag.name : null;
   }
 
   String? _parsePopTag(String line) {
-    final result = (string('poptag') & spaces() & _tagOrLink()).end().parse(line);
+    final Result<List<dynamic>> result = (string('poptag') & spaces() & _tagOrLink()).end().parse(line);
     if (result is! Success) {
       return null;
     }
-    final tag = result.value[2];
+    final dynamic tag = result.value[2];
     return tag is Tag ? tag.name : null;
   }
 
   MetaEntry? _parsePushMeta(String line) {
-    final result = (string('pushmeta') & spaces() & metaEntry()).end().parse(line);
+    final Result<List<dynamic>> result = (string('pushmeta') & spaces() & metaEntry()).end().parse(line);
     return result is Success ? result.value[2] as MetaEntry : null;
   }
 
   String? _parsePopMeta(String line) {
-    final key = (pattern('a-z') & pattern(r'A-Za-z0-9_-').star()).flatten();
-    final result = (string('popmeta') & spaces() & key & spaces() & char(':') & spaces()).end().parse(line);
+    final Parser<String> key = (pattern('a-z') & pattern('A-Za-z0-9_-').star()).flatten();
+    final Result<List<dynamic>> result = (string('popmeta') & spaces() & key & spaces() & char(':') & spaces())
+        .end()
+        .parse(line);
     return result is Success ? result.value[2] as String : null;
   }
 
   Meta _metaWithStack(List<MetaEntry> stack, List<MetaEntry> explicit) {
-    final byKey = <String, MetaEntry>{};
-    final order = <String>[];
-    for (final entry in stack) {
+    final Map<String, MetaEntry> byKey = <String, MetaEntry>{};
+    final List<String> order = <String>[];
+    for (final MetaEntry entry in stack) {
       if (!byKey.containsKey(entry.key)) {
         order.add(entry.key);
       }
       byKey[entry.key] = entry;
     }
-    for (final entry in explicit) {
+    for (final MetaEntry entry in explicit) {
       if (!byKey.containsKey(entry.key)) {
         order.add(entry.key);
       }
       byKey[entry.key] = entry;
     }
-    return Meta(entries: [for (final key in order) byKey[key]!]);
+    return Meta(entries: <MetaEntry>[for (final String key in order) byKey[key]!]);
   }
 
   List<Tag> _uniqueTags(Iterable<Tag> tags) {
-    final seen = <String>{};
-    final out = <Tag>[];
-    for (final tag in tags) {
+    final Set<String> seen = <String>{};
+    final List<Tag> out = <Tag>[];
+    for (final Tag tag in tags) {
       if (seen.add(tag.name)) {
         out.add(tag);
       }
@@ -598,48 +627,48 @@ class BeancountGrammar {
     if (tagStack.isEmpty) {
       return directive;
     }
-    final fromStack = <Tag>[];
-    final seen = <String>{};
-    for (final name in tagStack) {
+    final List<Tag> fromStack = <Tag>[];
+    final Set<String> seen = <String>{};
+    for (final String name in tagStack) {
       if (seen.add(name)) {
         fromStack.add(Tag(name: name));
       }
     }
     return switch (directive.body) {
-      TransactionBody(:final value) => directive.copyWith(
-        body: DirectiveBody.transaction(value.copyWith(tags: _uniqueTags([...fromStack, ...value.tags]))),
+      TransactionBody(:final ParsedTransaction value) => directive.copyWith(
+        body: DirectiveBody.transaction(value.copyWith(tags: _uniqueTags(<Tag>[...fromStack, ...value.tags]))),
       ),
-      DocumentBody(:final account, :final filename, :final tags, :final links) => directive.copyWith(
-        body: DirectiveBody.document(
-          account: account,
-          filename: filename,
-          tags: _uniqueTags([...fromStack, ...tags]),
-          links: links,
+      DocumentBody(:final Account account, :final String filename, :final List<Tag> tags, :final List<Link> links) =>
+        directive.copyWith(
+          body: DirectiveBody.document(
+            account: account,
+            filename: filename,
+            tags: _uniqueTags(<Tag>[...fromStack, ...tags]),
+            links: links,
+          ),
         ),
-      ),
-      NoteBody(:final account, :final comment, :final tags, :final links) => directive.copyWith(
-        body: DirectiveBody.note(
-          account: account,
-          comment: comment,
-          tags: _uniqueTags([...fromStack, ...tags]),
-          links: links,
+      NoteBody(:final Account account, :final String comment, :final List<Tag> tags, :final List<Link> links) =>
+        directive.copyWith(
+          body: DirectiveBody.note(
+            account: account,
+            comment: comment,
+            tags: _uniqueTags(<Tag>[...fromStack, ...tags]),
+            links: links,
+          ),
         ),
-      ),
       _ => directive,
     };
   }
 
-  bool _isOrgModeTitle(String line) {
-    // Beancount ignores '*' at column 0 when more text follows (`* Heading`, `** Nested`).
-    return line.startsWith('*') && line.length > 1;
-  }
+  // Beancount ignores '*' at column 0 when more text follows (`* Heading`, `** Nested`).
+  bool _isOrgModeTitle(String line) => line.startsWith('*') && line.length > 1;
 
   String _stripTrailingComment(String line) {
-    final inString = false;
+    const bool inString = false;
     // Strings are rare on comment-bearing lines; strip ; outside quotes.
-    var quoted = inString;
-    for (var i = 0; i < line.length; i++) {
-      final ch = line[i];
+    bool quoted = inString;
+    for (int i = 0; i < line.length; i++) {
+      final String ch = line[i];
       if (ch == '"') {
         quoted = !quoted;
       } else if (ch == ';' && !quoted) {
@@ -650,31 +679,37 @@ class BeancountGrammar {
   }
 
   ParsedDirective? _parseDirectiveHeader(String line, int lineNo, {bool allowPipe = false}) {
-    final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
-    final open = (date() & spaces() & string('open') & spaces() & account() & _openTail()).map((values) {
-      final tail = values[5] as ({List<Currency> currencies, BookingMethod? booking});
+    final BeanLocation location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
+    final Parser<ParsedDirective> open = (date() & spaces() & string('open') & spaces() & account() & _openTail()).map((
+      List<dynamic> values,
+    ) {
+      final ({BookingMethod? booking, List<Currency> currencies}) tail =
+          values[5] as ({List<Currency> currencies, BookingMethod? booking});
       return ParsedDirective(
         location: location,
         date: values[0] as BeanDate,
         body: DirectiveBody.open(account: values[4] as Account, currencies: tail.currencies, booking: tail.booking),
       );
     });
-    final close = (date() & spaces() & string('close') & spaces() & account()).map((values) {
-      return ParsedDirective(
+    final Parser<ParsedDirective> close = (date() & spaces() & string('close') & spaces() & account()).map(
+      (List<dynamic> values) => ParsedDirective(
         location: location,
         date: values[0] as BeanDate,
         body: DirectiveBody.close(account: values[4] as Account),
-      );
-    });
-    final commodity = (date() & spaces() & string('commodity') & spaces() & currency()).map((values) {
-      return ParsedDirective(
+      ),
+    );
+    final Parser<ParsedDirective> commodity = (date() & spaces() & string('commodity') & spaces() & currency()).map(
+      (List<dynamic> values) => ParsedDirective(
         location: location,
         date: values[0] as BeanDate,
         body: DirectiveBody.commodity(currency: values[4] as Currency),
-      );
-    });
-    final transaction = (date() & spaces() & flag() & _txnTail(allowPipe: allowPipe)).map((values) {
-      final tail = values[3] as ({String? payee, String narration, List<Tag> tags, List<Link> links});
+      ),
+    );
+    final Parser<ParsedDirective> transaction = (date() & spaces() & flag() & _txnTail(allowPipe: allowPipe)).map((
+      List<dynamic> values,
+    ) {
+      final ({List<Link> links, String narration, String? payee, List<Tag> tags}) tail =
+          values[3] as ({String? payee, String narration, List<Tag> tags, List<Link> links});
       return ParsedDirective(
         location: location,
         date: values[0] as BeanDate,
@@ -689,30 +724,35 @@ class BeancountGrammar {
         ),
       );
     });
-    final balance = (date() & spaces() & string('balance') & spaces() & account() & spaces() & _balanceAmount()).map((
-      values,
-    ) {
-      final amountTol = values[6] as ({Amount amount, BeanNumber? tolerance});
-      return ParsedDirective(
-        location: location,
-        date: values[0] as BeanDate,
-        body: DirectiveBody.balance(
-          account: values[4] as Account,
-          amount: amountTol.amount,
-          tolerance: amountTol.tolerance,
-        ),
-      );
-    });
-    final pad = (date() & spaces() & string('pad') & spaces() & account() & spaces() & account()).map((values) {
-      return ParsedDirective(
-        location: location,
-        date: values[0] as BeanDate,
-        body: DirectiveBody.pad(account: values[4] as Account, sourceAccount: values[6] as Account),
-      );
-    });
-    final note = (date() & spaces() & string('note') & spaces() & account() & spaces() & quotedString() & _tagsLinks())
-        .map((values) {
-          final tl = values[7] as ({List<Tag> tags, List<Link> links});
+    final Parser<ParsedDirective> balance =
+        (date() & spaces() & string('balance') & spaces() & account() & spaces() & _balanceAmount()).map((
+          List<dynamic> values,
+        ) {
+          final ({Amount amount, BeanNumber? tolerance}) amountTol =
+              values[6] as ({Amount amount, BeanNumber? tolerance});
+          return ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.balance(
+              account: values[4] as Account,
+              amount: amountTol.amount,
+              tolerance: amountTol.tolerance,
+            ),
+          );
+        });
+    final Parser<ParsedDirective> pad =
+        (date() & spaces() & string('pad') & spaces() & account() & spaces() & account()).map(
+          (List<dynamic> values) => ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.pad(account: values[4] as Account, sourceAccount: values[6] as Account),
+          ),
+        );
+    final Parser<ParsedDirective> note =
+        (date() & spaces() & string('note') & spaces() & account() & spaces() & quotedString() & _tagsLinks()).map((
+          List<dynamic> values,
+        ) {
+          final ({List<Link> links, List<Tag> tags}) tl = values[7] as ({List<Tag> tags, List<Link> links});
           return ParsedDirective(
             location: location,
             date: values[0] as BeanDate,
@@ -724,36 +764,39 @@ class BeancountGrammar {
             ),
           );
         });
-    final price = (date() & spaces() & string('price') & spaces() & currency() & spaces() & amount()).map((values) {
-      return ParsedDirective(
-        location: location,
-        date: values[0] as BeanDate,
-        body: DirectiveBody.price(currency: values[4] as Currency, amount: values[6] as Amount),
-      );
-    });
-    final event = (date() & spaces() & string('event') & spaces() & quotedString() & spaces() & quotedString()).map((
-      values,
-    ) {
-      return ParsedDirective(
-        location: location,
-        date: values[0] as BeanDate,
-        body: DirectiveBody.event(name: values[4] as String, description: values[6] as String),
-      );
-    });
-    final query = (date() & spaces() & string('query') & spaces() & quotedString() & spaces() & quotedString()).map((
-      values,
-    ) {
-      return ParsedDirective(
-        location: location,
-        date: values[0] as BeanDate,
-        body: DirectiveBody.query(name: values[4] as String, queryString: values[6] as String),
-      );
-    });
-    final document =
+    final Parser<ParsedDirective> price =
+        (date() & spaces() & string('price') & spaces() & currency() & spaces() & amount()).map(
+          (List<dynamic> values) => ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.price(currency: values[4] as Currency, amount: values[6] as Amount),
+          ),
+        );
+    final Parser<ParsedDirective> event =
+        (date() & spaces() & string('event') & spaces() & quotedString() & spaces() & quotedString()).map(
+          (
+            List<dynamic> values,
+          ) => ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.event(name: values[4] as String, description: values[6] as String),
+          ),
+        );
+    final Parser<ParsedDirective> query =
+        (date() & spaces() & string('query') & spaces() & quotedString() & spaces() & quotedString()).map(
+          (
+            List<dynamic> values,
+          ) => ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.query(name: values[4] as String, queryString: values[6] as String),
+          ),
+        );
+    final Parser<ParsedDirective> document =
         (date() & spaces() & string('document') & spaces() & account() & spaces() & quotedString() & _tagsLinks()).map((
-          values,
+          List<dynamic> values,
         ) {
-          final tl = values[7] as ({List<Tag> tags, List<Link> links});
+          final ({List<Link> links, List<Tag> tags}) tl = values[7] as ({List<Tag> tags, List<Link> links});
           return ParsedDirective(
             location: location,
             date: values[0] as BeanDate,
@@ -765,14 +808,15 @@ class BeancountGrammar {
             ),
           );
         });
-    final custom = (date() & spaces() & string('custom') & spaces() & quotedString() & _customValues()).map((values) {
-      return ParsedDirective(
-        location: location,
-        date: values[0] as BeanDate,
-        body: DirectiveBody.custom(type: values[4] as String, values: values[5] as List<CustomValue>),
-      );
-    });
-    final parser = [
+    final Parser<ParsedDirective> custom =
+        (date() & spaces() & string('custom') & spaces() & quotedString() & _customValues()).map(
+          (List<dynamic> values) => ParsedDirective(
+            location: location,
+            date: values[0] as BeanDate,
+            body: DirectiveBody.custom(type: values[4] as String, values: values[5] as List<CustomValue>),
+          ),
+        );
+    final Parser<ParsedDirective> parser = <Parser<ParsedDirective>>[
       open,
       close,
       commodity,
@@ -786,7 +830,7 @@ class BeancountGrammar {
       custom,
       transaction,
     ].toChoiceParser(failureJoiner: selectFarthest).cast<ParsedDirective>().end();
-    final result = parser.parse(line);
+    final Result<ParsedDirective> result = parser.parse(line);
     if (result is Failure) {
       _lastFailurePosition = result.position;
       return null;
@@ -795,86 +839,91 @@ class BeancountGrammar {
   }
 
   Parser<({Amount amount, BeanNumber? tolerance})> _balanceAmount() {
-    final withTolerance = (numberExpr() & spaces() & char('~') & spaces() & numberExpr() & spaces() & currency()).map((
-      values,
-    ) {
-      return (
-        amount: Amount(number: values[0] as BeanNumber, currency: values[6] as Currency),
-        tolerance: values[4] as BeanNumber,
-      );
-    });
-    final plain = amount().map((value) => (amount: value, tolerance: null));
+    final Parser<({Amount amount, BeanNumber tolerance})> withTolerance =
+        (numberExpr() & spaces() & char('~') & spaces() & numberExpr() & spaces() & currency()).map(
+          (
+            List<dynamic> values,
+          ) => (
+            amount: Amount(number: values[0] as BeanNumber, currency: values[6] as Currency),
+            tolerance: values[4] as BeanNumber,
+          ),
+        );
+    final Parser<({Amount amount, Null tolerance})> plain = amount().map(
+      (Amount value) => (amount: value, tolerance: null),
+    );
     return (withTolerance | plain).cast();
   }
 
-  Parser<({List<Tag> tags, List<Link> links})> _tagsLinks() {
-    return (spaces() & _tagOrLink()).star().map((values) {
-      final tags = <Tag>[];
-      final links = <Link>[];
-      for (final part in values) {
-        final item = part[1];
-        if (item is Tag) {
-          tags.add(item);
-        } else if (item is Link) {
-          links.add(item);
+  Parser<({List<Tag> tags, List<Link> links})> _tagsLinks() =>
+      (spaces() & _tagOrLink()).star().map((List<List<dynamic>> values) {
+        final List<Tag> tags = <Tag>[];
+        final List<Link> links = <Link>[];
+        for (final List<dynamic> part in values) {
+          final dynamic item = part[1];
+          if (item is Tag) {
+            tags.add(item);
+          } else if (item is Link) {
+            links.add(item);
+          }
         }
-      }
-      return (tags: tags, links: links);
-    });
-  }
+        return (tags: tags, links: links);
+      });
 
-  Parser<List<CustomValue>> _customValues() {
-    return (spaces() & _customValue()).star().map((values) {
-      return [for (final part in values) part[1] as CustomValue];
-    });
-  }
+  Parser<List<CustomValue>> _customValues() => (spaces() & _customValue()).star().map(
+    (List<List<dynamic>> values) => <CustomValue>[for (final List<dynamic> part in values) part[1] as CustomValue],
+  );
 
   Parser<CustomValue> _customValue() {
-    final boolean = (string('TRUE').map((_) => true) | string('FALSE').map((_) => false)).cast<bool>().map(
-      CustomValue.boolean,
-    );
-    final dateValue = date().map(CustomValue.date);
-    final text = quotedString().map(CustomValue.text);
-    final amountValue = amount().map(CustomValue.amount);
-    final number = numberExpr().map(CustomValue.number);
-    final accountValue = account().map(CustomValue.account);
-    final currencyValue = currency().map(CustomValue.currency);
+    final Parser<CustomValue> boolean = (string('TRUE').map((_) => true) | string('FALSE').map((_) => false))
+        .cast<bool>()
+        .map(
+          CustomValue.boolean,
+        );
+    final Parser<CustomValue> dateValue = date().map(CustomValue.date);
+    final Parser<CustomValue> text = quotedString().map(CustomValue.text);
+    final Parser<CustomValue> amountValue = amount().map(CustomValue.amount);
+    final Parser<CustomValue> number = numberExpr().map(CustomValue.number);
+    final Parser<CustomValue> accountValue = account().map(CustomValue.account);
+    final Parser<CustomValue> currencyValue = currency().map(CustomValue.currency);
     return (boolean | dateValue | text | amountValue | number | accountValue | currencyValue).cast<CustomValue>();
   }
 
   Parser<({List<Currency> currencies, BookingMethod? booking})> _openTail() {
-    final currencies = (spaces() & currency() & (char(',') & spaces().optional() & currency()).star()).map((values) {
-      final list = <Currency>[values[1] as Currency];
-      for (final part in values[2] as List<dynamic>) {
-        list.add((part as List<dynamic>)[2] as Currency);
-      }
-      return list;
-    });
-    final booking = (spaces() & quotedString()).map((values) => _bookingMethod(values[1] as String));
-    return (currencies.optional().map((value) => value ?? <Currency>[]) & booking.optional()).map((values) {
-      return (currencies: values[0] as List<Currency>, booking: values[1] as BookingMethod?);
-    });
+    final Parser<List<Currency>> currencies =
+        (spaces() & currency() & (char(',') & spaces().optional() & currency()).star()).map((List<dynamic> values) {
+          final List<Currency> list = <Currency>[values[1] as Currency];
+          for (final dynamic part in values[2] as List<dynamic>) {
+            list.add((part as List<dynamic>)[2] as Currency);
+          }
+          return list;
+        });
+    final Parser<BookingMethod?> booking = (spaces() & quotedString()).map(
+      (List<dynamic> values) => _bookingMethod(values[1] as String),
+    );
+    return (currencies.optional().map((List<Currency>? value) => value ?? <Currency>[]) & booking.optional()).map(
+      (List<dynamic> values) => (currencies: values[0] as List<Currency>, booking: values[1] as BookingMethod?),
+    );
   }
 
-  BookingMethod? _bookingMethod(String value) {
-    return switch (value) {
-      'STRICT' => BookingMethod.strict,
-      'STRICT_WITH_SIZE' => BookingMethod.strictWithSize,
-      'NONE' => BookingMethod.none,
-      'AVERAGE' => BookingMethod.average,
-      'FIFO' => BookingMethod.fifo,
-      'LIFO' => BookingMethod.lifo,
-      'HIFO' => BookingMethod.hifo,
-      _ => null,
-    };
-  }
+  BookingMethod? _bookingMethod(String value) => switch (value) {
+    'STRICT' => BookingMethod.strict,
+    'STRICT_WITH_SIZE' => BookingMethod.strictWithSize,
+    'NONE' => BookingMethod.none,
+    'AVERAGE' => BookingMethod.average,
+    'FIFO' => BookingMethod.fifo,
+    'LIFO' => BookingMethod.lifo,
+    'HIFO' => BookingMethod.hifo,
+    _ => null,
+  };
 
   Parser<({String? payee, String narration, List<Tag> tags, List<Link> links})> _txnTail({required bool allowPipe}) {
-    final tagsLinks = (spaces() & _tagOrLink()).star().map((values) {
-      final tags = <Tag>[];
-      final links = <Link>[];
-      for (final part in values) {
-        final item = part[1];
+    final Parser<({List<Link> links, List<Tag> tags})> tagsLinks = (spaces() & _tagOrLink()).star().map((
+      List<List<dynamic>> values,
+    ) {
+      final List<Tag> tags = <Tag>[];
+      final List<Link> links = <Link>[];
+      for (final List<dynamic> part in values) {
+        final dynamic item = part[1];
         if (item is Tag) {
           tags.add(item);
         } else if (item is Link) {
@@ -883,63 +932,67 @@ class BeancountGrammar {
       }
       return (tags: tags, links: links);
     });
-    final skippedPipes = allowPipe ? (spaces() & char('|')).star().map((_) {}) : epsilon();
-    final two =
+    final Parser<void> skippedPipes = allowPipe ? (spaces() & char('|')).star().map((_) {}) : epsilon();
+    final Parser<({List<Link> links, String narration, String payee, List<Tag> tags})> two =
         (skippedPipes & spaces() & quotedString() & skippedPipes & spaces() & quotedString() & skippedPipes & tagsLinks)
-            .map((values) {
-              final tl = values[7] as ({List<Tag> tags, List<Link> links});
+            .map((List<dynamic> values) {
+              final ({List<Link> links, List<Tag> tags}) tl = values[7] as ({List<Tag> tags, List<Link> links});
               return (payee: values[2] as String, narration: values[5] as String, tags: tl.tags, links: tl.links);
             });
-    final one = (skippedPipes & spaces() & quotedString() & skippedPipes & tagsLinks).map((values) {
-      final tl = values[4] as ({List<Tag> tags, List<Link> links});
-      return (payee: null, narration: values[2] as String, tags: tl.tags, links: tl.links);
-    });
-    final none = (skippedPipes & tagsLinks).map((values) {
-      final tl = values[1] as ({List<Tag> tags, List<Link> links});
-      return (payee: null, narration: '', tags: tl.tags, links: tl.links);
-    });
+    final Parser<({List<Link> links, String narration, Null payee, List<Tag> tags})> one =
+        (skippedPipes & spaces() & quotedString() & skippedPipes & tagsLinks).map((List<dynamic> values) {
+          final ({List<Link> links, List<Tag> tags}) tl = values[4] as ({List<Tag> tags, List<Link> links});
+          return (payee: null, narration: values[2] as String, tags: tl.tags, links: tl.links);
+        });
+    final Parser<({List<Link> links, String narration, Null payee, List<Tag> tags})> none = (skippedPipes & tagsLinks)
+        .map((List<dynamic> values) {
+          final ({List<Link> links, List<Tag> tags}) tl = values[1] as ({List<Tag> tags, List<Link> links});
+          return (payee: null, narration: '', tags: tl.tags, links: tl.links);
+        });
     return (two | one | none).cast();
   }
 
   Parser<Object> _tagOrLink() {
-    final name = pattern(r'A-Za-z0-9_./-').plus().flatten();
-    final tag = (char('#') & name).map((values) => Tag(name: values[1] as String));
-    final link = (char('^') & name).map((values) => Link(name: values[1] as String));
+    final Parser<String> name = pattern('A-Za-z0-9_./-').plus().flatten();
+    final Parser<Tag> tag = (char('#') & name).map((List<dynamic> values) => Tag(name: values[1] as String));
+    final Parser<Link> link = (char('^') & name).map((List<dynamic> values) => Link(name: values[1] as String));
     return (tag | link).cast<Object>();
   }
 
   ({List<Tag> tags, List<Link> links})? _parseTagsLinksLine(String line) {
-    final parser = (_tagOrLink() & (spaces() & _tagOrLink()).star()).end().map((values) {
-      final tags = <Tag>[];
-      final links = <Link>[];
-      void take(Object item) {
-        if (item is Tag) {
-          tags.add(item);
-        } else if (item is Link) {
-          links.add(item);
-        }
-      }
+    final Parser<({List<Link> links, List<Tag> tags})> parser = (_tagOrLink() & (spaces() & _tagOrLink()).star())
+        .end()
+        .map((List<dynamic> values) {
+          final List<Tag> tags = <Tag>[];
+          final List<Link> links = <Link>[];
+          void take(Object item) {
+            if (item is Tag) {
+              tags.add(item);
+            } else if (item is Link) {
+              links.add(item);
+            }
+          }
 
-      take(values[0] as Object);
-      for (final part in values[1] as List<dynamic>) {
-        take((part as List<dynamic>)[1] as Object);
-      }
-      return (tags: tags, links: links);
-    });
-    final result = parser.parse(line);
+          take(values[0] as Object);
+          for (final dynamic part in values[1] as List<dynamic>) {
+            take((part as List<dynamic>)[1] as Object);
+          }
+          return (tags: tags, links: links);
+        });
+    final Result<({List<Link> links, List<Tag> tags})> result = parser.parse(line);
     return result is Success ? result.value : null;
   }
 
   MetaEntry? _parseMetaEntry(String line) {
-    final result = metaEntry().end().parse(line);
+    final Result<MetaEntry> result = metaEntry().end().parse(line);
     return result is Success ? result.value : null;
   }
 
   bool _hasUnclosedQuote(String input) {
-    var open = false;
-    for (var i = 0; i < input.length; i += 1) {
-      final ch = input[i];
-      if (ch == '\\' && open && i + 1 < input.length) {
+    bool open = false;
+    for (int i = 0; i < input.length; i += 1) {
+      final String ch = input[i];
+      if (ch == r'\' && open && i + 1 < input.length) {
         i += 1;
         continue;
       }
@@ -951,12 +1004,12 @@ class BeancountGrammar {
   }
 
   String? _invalidDateMessage(String line) {
-    final match = RegExp(r'^(\d{4})[-/](\d{2})[-/](\d{2})').firstMatch(line);
+    final RegExpMatch? match = RegExp(r'^(\d{4})[-/](\d{2})[-/](\d{2})').firstMatch(line);
     if (match == null) {
       return null;
     }
-    final month = int.parse(match.group(2)!);
-    final day = int.parse(match.group(3)!);
+    final int month = int.parse(match.group(2)!);
+    final int day = int.parse(match.group(3)!);
     if (month < 1 || month > 12) {
       return "found 'ERROR month out of range'";
     }
@@ -967,17 +1020,17 @@ class BeancountGrammar {
   }
 
   ParsedPosting? _parsePosting(String line, int lineNo) {
-    final location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
+    final BeanLocation location = BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo);
     Flag? postingFlag;
     final Account accountValue;
-    var position = 0;
-    final flagged = (flag() & whitespaceInline().plus() & account()).parse(line);
+    int position = 0;
+    final Result<List<dynamic>> flagged = (flag() & whitespaceInline().plus() & account()).parse(line);
     if (flagged is Success) {
       postingFlag = flagged.value[0] as Flag;
       accountValue = flagged.value[2] as Account;
       position = flagged.position;
     } else {
-      final accountResult = account().parse(line);
+      final Result<Account> accountResult = account().parse(line);
       if (accountResult is! Success) {
         _lastFailurePosition = accountResult is Failure ? accountResult.position : 0;
         return null;
@@ -989,16 +1042,16 @@ class BeancountGrammar {
     ParsedCost? cost;
     ParsedPrice? price;
 
-    final unitsAttempt = (spaces() & incompleteAmount()).parse(line.substring(position));
+    final Result<List<dynamic>> unitsAttempt = (spaces() & incompleteAmount()).parse(line.substring(position));
     if (unitsAttempt is Success) {
       units = unitsAttempt.value[1] as IncompleteAmount;
       position += unitsAttempt.position;
     }
 
-    final costWs = spaces().parse(line.substring(position));
-    final costPos = costWs is Success ? position + costWs.position : position;
+    final Result<void> costWs = spaces().parse(line.substring(position));
+    final int costPos = costWs is Success ? position + costWs.position : position;
     if (costPos < line.length && line[costPos] == '{') {
-      final costResult = costSpec().parse(line.substring(costPos));
+      final Result<ParsedCost> costResult = costSpec().parse(line.substring(costPos));
       if (costResult is! Success) {
         _lastFailurePosition = costPos + (costResult is Failure ? costResult.position : 0);
         return null;
@@ -1007,10 +1060,10 @@ class BeancountGrammar {
       position = costPos + costResult.position;
     }
 
-    final priceWs = spaces().parse(line.substring(position));
-    final pricePos = priceWs is Success ? position + priceWs.position : position;
+    final Result<void> priceWs = spaces().parse(line.substring(position));
+    final int pricePos = priceWs is Success ? position + priceWs.position : position;
     if (pricePos < line.length && line[pricePos] == '@') {
-      final priceResult = priceSpec().parse(line.substring(pricePos));
+      final Result<ParsedPrice> priceResult = priceSpec().parse(line.substring(pricePos));
       if (priceResult is! Success) {
         _lastFailurePosition = pricePos + (priceResult is Failure ? priceResult.position : 0);
         return null;
@@ -1019,7 +1072,7 @@ class BeancountGrammar {
       position = pricePos + priceResult.position;
     }
 
-    final trail = spaces().parse(line.substring(position));
+    final Result<void> trail = spaces().parse(line.substring(position));
     if (trail is Success) {
       position += trail.position;
     }
@@ -1029,7 +1082,6 @@ class BeancountGrammar {
     }
     return ParsedPosting(
       location: location,
-      meta: const Meta(),
       flag: postingFlag,
       account: accountValue,
       units: units,
@@ -1046,14 +1098,14 @@ class BeancountGrammar {
   }
 
   bool _txnStringsContainPipe(String line) {
-    final prefix = (date() & spaces() & flag()).parse(line);
+    final Result<List<dynamic>> prefix = (date() & spaces() & flag()).parse(line);
     if (prefix is! Success) {
       return false;
     }
-    final rest = line.substring(prefix.position);
-    var inString = false;
-    for (var i = 0; i < rest.length; i++) {
-      final ch = rest[i];
+    final String rest = line.substring(prefix.position);
+    bool inString = false;
+    for (int i = 0; i < rest.length; i++) {
+      final String ch = rest[i];
       if (ch == '"') {
         inString = !inString;
         continue;
@@ -1071,37 +1123,37 @@ class BeancountGrammar {
   }
 
   String _foundExpected(String input, int position, {String expected = 'something else'}) {
-    final found = _foundLexeme(input, position);
+    final String found = _foundLexeme(input, position);
     return "found '$found' expected $expected";
   }
 
   String _foundPosting(String input, int position) {
-    final found = _foundLexeme(input, position);
+    final String found = _foundLexeme(input, position);
     return "found '$found'";
   }
 
   String _foundTopLevel(String input, int position) {
-    final found = _foundLexeme(input, position);
-    final ch = found.isEmpty ? '' : found[0];
+    final String found = _foundLexeme(input, position);
+    final String ch = found.isEmpty ? '' : found[0];
     return 'found $ch expected transaction, directive, or end of input';
   }
 
   String _foundLexeme(String input, int position) {
-    var i = position;
+    int i = position;
     while (i < input.length && (input.codeUnitAt(i) == 0x20 || input.codeUnitAt(i) == 0x09)) {
       i += 1;
     }
     if (i >= input.length) {
       return '';
     }
-    final ch = input[i];
+    final String ch = input[i];
     if (!_isTokenStart(ch)) {
       return 'ERROR unrecognized token';
     }
     if (ch == '"') {
-      var j = i + 1;
+      int j = i + 1;
       while (j < input.length && input[j] != '"') {
-        if (input[j] == '\\' && j + 1 < input.length) {
+        if (input[j] == r'\' && j + 1 < input.length) {
           j += 2;
           continue;
         }
@@ -1115,9 +1167,9 @@ class BeancountGrammar {
     if ('{}[]()@~,*/|'.contains(ch)) {
       return ch;
     }
-    var j = i + 1;
+    int j = i + 1;
     while (j < input.length) {
-      final c = input[j];
+      final String c = input[j];
       if (c == ' ' || c == '\t' || c == ':' || '{}[]()@~,*/|"'.contains(c)) {
         break;
       }
@@ -1127,7 +1179,7 @@ class BeancountGrammar {
   }
 
   bool _isTokenStart(String ch) {
-    final code = ch.codeUnitAt(0);
+    final int code = ch.codeUnitAt(0);
     if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)) {
       return true;
     }
@@ -1136,36 +1188,34 @@ class BeancountGrammar {
 }
 
 int compareParsedDirectives(ParsedDirective a, ParsedDirective b) {
-  final byDate = compareBeanDate(a.date, b.date);
+  final int byDate = compareBeanDate(a.date, b.date);
   if (byDate != 0) {
     return byDate;
   }
-  final byType = _typeOrder(a.body).compareTo(_typeOrder(b.body));
+  final int byType = _typeOrder(a.body).compareTo(_typeOrder(b.body));
   if (byType != 0) {
     return byType;
   }
   return a.location.linenoBegin.compareTo(b.location.linenoBegin);
 }
 
-int _typeOrder(DirectiveBody body) {
-  return switch (body) {
-    OpenBody() => 0,
-    CloseBody() => 1,
-    BalanceBody() => 2,
-    PadBody() => 3,
-    TransactionBody() => 4,
-    NoteBody() => 5,
-    DocumentBody() => 6,
-    PriceBody() => 7,
-    EventBody() => 8,
-    QueryBody() => 9,
-    CommodityBody() => 10,
-    CustomBody() => 11,
-  };
-}
+int _typeOrder(DirectiveBody body) => switch (body) {
+  OpenBody() => 0,
+  CloseBody() => 1,
+  BalanceBody() => 2,
+  PadBody() => 3,
+  TransactionBody() => 4,
+  NoteBody() => 5,
+  DocumentBody() => 6,
+  PriceBody() => 7,
+  EventBody() => 8,
+  QueryBody() => 9,
+  CommodityBody() => 10,
+  CustomBody() => 11,
+};
 
 class _ParseState {
-  LedgerOptions options = LedgerOptions();
+  LedgerOptions options = const LedgerOptions();
   final List<Plugin> plugins = <Plugin>[];
   final List<OptionSetting> optionSettings = <OptionSetting>[];
   final List<ParsedDirective> directives = <ParsedDirective>[];

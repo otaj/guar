@@ -1,10 +1,9 @@
 // Map parsed amounts, costs, prices, meta, and flags into booked domain types.
 
 import 'package:decimal/decimal.dart';
+import 'package:guar_book/src/options_defaults.dart';
 import 'package:guar_domain/guar_domain.dart' as d;
 import 'package:guar_parser/guar_parser.dart' as p;
-
-import '../options_defaults.dart';
 
 d.Amount mapAmount(p.Amount amount) => d.Amount(
   number: amount.number.resolved,
@@ -27,14 +26,14 @@ d.Cost? mapResolvedCost(p.ParsedCost? cost, d.BeanDate txnDate, Decimal unitsAbs
   if (cost == null) {
     return null;
   }
-  final per = cost.numberPer?.resolved;
-  final total = cost.numberTotal?.resolved;
+  final Decimal? per = cost.numberPer?.resolved;
+  final Decimal? total = cost.numberTotal?.resolved;
   if (cost.currency == null) {
     return null;
   }
   Decimal? unitCost;
   if (total != null) {
-    var costTotal = total;
+    Decimal costTotal = total;
     if (per != null) {
       costTotal += per * unitsAbs;
     }
@@ -60,7 +59,7 @@ d.Amount? mapPrice(p.ParsedPrice? price, Decimal? unitsAbs) {
   if (price == null || price.number == null || price.currency == null) {
     return null;
   }
-  var number = price.number!.resolved;
+  Decimal number = price.number!.resolved;
   if (price.isTotal) {
     if (unitsAbs == null || unitsAbs == Decimal.zero) {
       return null;
@@ -75,8 +74,8 @@ d.Amount? mapPrice(p.ParsedPrice? price, Decimal? unitsAbs) {
 }
 
 d.Flag mapFlag(p.Flag flag) => switch (flag) {
-  p.SpecialFlagValue(:final value) => d.Flag.special(_special(value)),
-  p.LetterFlag(:final value) => d.Flag.letter(value),
+  p.SpecialFlagValue(:final p.SpecialFlag value) => d.Flag.special(_special(value)),
+  p.LetterFlag(:final String value) => d.Flag.letter(value),
 };
 
 d.SpecialFlag _special(p.SpecialFlag value) => switch (value) {
@@ -89,21 +88,23 @@ d.SpecialFlag _special(p.SpecialFlag value) => switch (value) {
 };
 
 d.Meta mapMeta(p.Meta meta, d.AccountPrefixes prefixes) => d.Meta(
-  entries: [
-    for (final entry in meta.entries)
+  entries: <d.MetaEntry>[
+    for (final p.MetaEntry entry in meta.entries)
       d.MetaEntry(key: entry.key, value: entry.value == null ? null : _metaValue(entry.value!, prefixes)),
   ],
 );
 
 d.MetaValue _metaValue(p.MetaValue value, d.AccountPrefixes prefixes) => switch (value) {
-  p.MetaText(:final value) => d.MetaValue.text(value),
-  p.MetaAccount(:final value) => d.MetaValue.account(prefixes.account(value.name)),
-  p.MetaCurrency(:final value) => d.MetaValue.currency(d.Currency(name: value.name)),
-  p.MetaTag(:final value) => d.MetaValue.tag(d.Tag(name: value.name)),
-  p.MetaDate(:final value) => d.MetaValue.date(d.BeanDate(year: value.year, month: value.month, day: value.day)),
-  p.MetaBoolean(:final value) => d.MetaValue.boolean(value),
-  p.MetaNumber(:final value) => d.MetaValue.number(value.resolved),
-  p.MetaAmount(:final value) => d.MetaValue.amount(mapAmount(value)),
+  p.MetaText(:final String value) => d.MetaValue.text(value),
+  p.MetaAccount(:final p.Account value) => d.MetaValue.account(prefixes.account(value.name)),
+  p.MetaCurrency(:final p.Currency value) => d.MetaValue.currency(d.Currency(name: value.name)),
+  p.MetaTag(:final p.Tag value) => d.MetaValue.tag(d.Tag(name: value.name)),
+  p.MetaDate(:final p.BeanDate value) => d.MetaValue.date(
+    d.BeanDate(year: value.year, month: value.month, day: value.day),
+  ),
+  p.MetaBoolean(:final bool value) => d.MetaValue.boolean(value),
+  p.MetaNumber(:final p.BeanNumber value) => d.MetaValue.number(value.resolved),
+  p.MetaAmount(:final p.Amount value) => d.MetaValue.amount(mapAmount(value)),
 };
 
 d.BeanDate mapDate(p.BeanDate date) => d.BeanDate(year: date.year, month: date.month, day: date.day);

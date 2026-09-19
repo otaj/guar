@@ -19,7 +19,7 @@ void main() {
         '  Equity:Opening-Balances   -2 USD\n'
         '2014-06-01 close Assets:Account2\n',
       ),
-      ["Unused account 'Assets:Account3'"],
+      <String>["Unused account 'Assets:Account3'"],
     );
   });
 

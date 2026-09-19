@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('LedgerOptions fills beancount defaults', () {
-    final options = LedgerOptions();
+    final LedgerOptions options = LedgerOptions();
     expect(options.title, 'Beancount');
     expect(options.accountPrefixes.assets, 'Assets');
     expect(options.accountPrefixes.liabilities, 'Liabilities');

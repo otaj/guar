@@ -8,7 +8,7 @@ bool isValidBeanDate(int year, int month, int day) {
 }
 
 int daysInMonth(int year, int month) {
-  const lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const List<int> lengths = <int>[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   if (month == 2 && _isLeapYear(year)) return 29;
   return lengths[month - 1];
 }
@@ -25,8 +25,8 @@ final RegExp _accountRoot = RegExp(r'^[\p{Lu}][\p{L}\p{Nd}\-]*$', unicode: true)
 final RegExp _accountLeaf = RegExp(r'^[\p{Lu}\p{Nd}][\p{L}\p{Nd}\-]*$', unicode: true);
 
 bool isValidAccountName(String name) {
-  final parts = name.split(':');
-  if (parts.length < 2 || parts.any((part) => part.isEmpty)) return false;
+  final List<String> parts = name.split(':');
+  if (parts.length < 2 || parts.any((String part) => part.isEmpty)) return false;
   if (!_accountRoot.hasMatch(parts.first)) return false;
   return parts.skip(1).every(_accountLeaf.hasMatch);
 }

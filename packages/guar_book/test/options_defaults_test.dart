@@ -8,7 +8,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('defaultOptions fills beancount OPTIONS_DEFAULTS', () {
-    final options = defaultOptions(p.LedgerOptions());
+    final LedgerOptions options = defaultOptions(const p.LedgerOptions());
     expect(options.title, 'Beancount');
     expect(options.accountPrefixes.assets, 'Assets');
     expect(options.accountPrefixes.liabilities, 'Liabilities');
@@ -30,8 +30,8 @@ void main() {
   });
 
   test('defaultOptions keeps explicit file options', () {
-    final options = defaultOptions(
-      p.LedgerOptions(
+    final LedgerOptions options = defaultOptions(
+      const p.LedgerOptions(
         title: 'My Books',
         accountPrefixes: p.AccountPrefixes(assets: 'Actifs', equity: 'Capitaux'),
         bookingMethod: p.BookingMethod.fifo,
@@ -46,7 +46,7 @@ void main() {
   });
 
   test('defaultOptions keeps the two tolerance multipliers apart', () {
-    final inferredOnly = defaultOptions(
+    final LedgerOptions inferredOnly = defaultOptions(
       p.LedgerOptions(
         inferredToleranceMultiplier: p.BeanNumber(verbatim: '1.1', resolved: Decimal.parse('1.1')),
       ),
@@ -54,7 +54,7 @@ void main() {
     expect(inferredOnly.inferredToleranceMultiplier.toString(), '1.1');
     expect(inferredOnly.toleranceMultiplier.toString(), '0.5');
 
-    final ordinaryOnly = defaultOptions(
+    final LedgerOptions ordinaryOnly = defaultOptions(
       p.LedgerOptions(
         toleranceMultiplier: p.BeanNumber(verbatim: '2.0', resolved: Decimal.parse('2.0')),
       ),
@@ -64,14 +64,16 @@ void main() {
   });
 
   test('defaultOptions keeps a parser-set account_previous_balances', () {
-    final options = defaultOptions(p.LedgerOptions(accountPreviousBalances: p.Account(name: 'Equity:Opening')));
+    final LedgerOptions options = defaultOptions(
+      p.LedgerOptions(accountPreviousBalances: p.Account(name: 'Equity:Opening')),
+    );
     expect(options.accountPreviousBalances.name, 'Equity:Opening');
   });
 
   test('Book.process applies defaults on an empty successful ledger', () {
-    final ledger = Book().process(const p.ParsedLedger.directives(directives: []));
+    final Ledger ledger = Book().process(const p.ParsedLedger.directives(directives: <p.ParsedDirective>[]));
     expect(ledger, isA<LedgerDirectives>());
-    final options = (ledger as LedgerDirectives).options;
+    final LedgerOptions options = (ledger as LedgerDirectives).options;
     expect(options.bookingMethod, BookingMethod.strict);
     expect(options.title, 'Beancount');
   });

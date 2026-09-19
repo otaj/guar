@@ -2,26 +2,25 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'validation.dart';
+import 'package:guar_parser/src/domain/validation.dart';
 
 part 'date.freezed.dart';
 
 int compareBeanDate(BeanDate left, BeanDate right) {
-  final byYear = left.year.compareTo(right.year);
+  final int byYear = left.year.compareTo(right.year);
   if (byYear != 0) return byYear;
-  final byMonth = left.month.compareTo(right.month);
+  final int byMonth = left.month.compareTo(right.month);
   if (byMonth != 0) return byMonth;
   return left.day.compareTo(right.day);
 }
 
 @Freezed(when: FreezedWhenOptions.none, map: FreezedMapOptions.none)
 abstract class BeanDate with _$BeanDate {
-  const BeanDate._();
-
   factory BeanDate({required int year, required int month, required int day}) {
     ensureBeanDate(year, month, day);
     return BeanDate._create(year: year, month: month, day: day);
   }
+  const BeanDate._();
 
   const factory BeanDate._create({required int year, required int month, required int day}) = _BeanDate;
 

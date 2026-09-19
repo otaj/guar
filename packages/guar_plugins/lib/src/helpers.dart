@@ -1,5 +1,6 @@
 // Shared helpers for stock plugins: sort keys and account use maps.
 
+import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
 
 int directiveTypeOrder(DirectiveBody body) => switch (body) {
@@ -11,40 +12,40 @@ int directiveTypeOrder(DirectiveBody body) => switch (body) {
 };
 
 int compareDirectiveDate(Directive a, Directive b) {
-  final byDate = compareBeanDate(a.date, b.date);
+  final int byDate = compareBeanDate(a.date, b.date);
   if (byDate != 0) return byDate;
-  final byType = directiveTypeOrder(a.body).compareTo(directiveTypeOrder(b.body));
+  final int byType = directiveTypeOrder(a.body).compareTo(directiveTypeOrder(b.body));
   if (byType != 0) return byType;
   return _originLine(a.origin).compareTo(_originLine(b.origin));
 }
 
 int _originLine(Origin origin) => switch (origin) {
-  SourceOrigin(:final location) => location.linenoBegin,
+  SourceOrigin(:final BeanLocation location) => location.linenoBegin,
   GeneratedOrigin() => 0,
 };
 
 BeanLocation nowhereLocation([String filename = '']) => BeanLocation(filename: filename, linenoBegin: 0, linenoEnd: 0);
 
 BeanLocation directiveLocation(Directive directive, [String generatedFilename = '']) => switch (directive.origin) {
-  SourceOrigin(:final location) => location,
+  SourceOrigin(:final BeanLocation location) => location,
   GeneratedOrigin() => nowhereLocation(generatedFilename),
 };
 
 String? metaText(MetaValue? value) => switch (value) {
   null => null,
-  MetaText(:final value) => value,
-  MetaAccount(:final value) => value.name,
-  MetaCurrency(:final value) => value.name,
-  MetaTag(:final value) => value.name,
-  MetaDate(:final value) => '$value',
-  MetaBoolean(:final value) => value ? 'TRUE' : 'FALSE',
-  MetaNumber(:final value) => value.toString(),
-  MetaAmount(:final value) => value.toString(),
+  MetaText(:final String value) => value,
+  MetaAccount(:final Account value) => value.name,
+  MetaCurrency(:final Currency value) => value.name,
+  MetaTag(:final Tag value) => value.name,
+  MetaDate(:final BeanDate value) => '$value',
+  MetaBoolean(:final bool value) => value ? 'TRUE' : 'FALSE',
+  MetaNumber(:final Decimal value) => value.toString(),
+  MetaAmount(:final Amount value) => value.toString(),
 };
 
 Meta metaWithout(Meta meta, String key) => Meta(
-  entries: [
-    for (final entry in meta.entries)
+  entries: <MetaEntry>[
+    for (final MetaEntry entry in meta.entries)
       if (entry.key != key) entry,
   ],
 );
@@ -55,41 +56,41 @@ bool isBalanceSheetAccount(Account account) => switch (account.type) {
 };
 
 Map<String, BeanDate> accountFirstUse(List<Directive> directives) {
-  final first = <String, BeanDate>{};
+  final Map<String, BeanDate> first = <String, BeanDate>{};
   void consider(String account, BeanDate date) {
-    final existing = first[account];
+    final BeanDate? existing = first[account];
     if (existing == null || compareBeanDate(date, existing) < 0) {
       first[account] = date;
     }
   }
 
-  for (final directive in directives) {
-    final date = directive.date;
+  for (final Directive directive in directives) {
+    final BeanDate date = directive.date;
     switch (directive.body) {
-      case OpenBody(:final account):
+      case OpenBody(:final Account account):
         consider(account.name, date);
-      case CloseBody(:final account):
+      case CloseBody(:final Account account):
         consider(account.name, date);
-      case BalanceBody(:final account):
+      case BalanceBody(:final Account account):
         consider(account.name, date);
-      case PadBody(:final account, :final sourceAccount):
+      case PadBody(:final Account account, :final Account sourceAccount):
         consider(account.name, date);
         consider(sourceAccount.name, date);
-      case DocumentBody(:final account):
+      case DocumentBody(:final Account account):
         consider(account.name, date);
-      case NoteBody(:final account):
+      case NoteBody(:final Account account):
         consider(account.name, date);
-      case TransactionBody(:final value):
-        for (final posting in value.postings) {
+      case TransactionBody(:final Transaction value):
+        for (final Posting posting in value.postings) {
           consider(posting.account.name, date);
         }
-      case CustomBody(:final values):
-        for (final custom in values) {
+      case CustomBody(:final List<CustomValue> values):
+        for (final CustomValue custom in values) {
           if (custom is CustomAccount) {
             consider(custom.value.name, date);
           }
         }
-      case BudgetBody(:final account) || BudgetOffBody(:final account):
+      case BudgetBody(:final Account account) || BudgetOffBody(:final Account account):
         consider(account.name, date);
       case PriceBody() || CommodityBody() || EventBody() || QueryBody():
         break;
@@ -99,23 +100,23 @@ Map<String, BeanDate> accountFirstUse(List<Directive> directives) {
 }
 
 Set<String> usedAccounts(List<Directive> directives) {
-  final used = <String>{};
-  for (final directive in directives) {
+  final Set<String> used = <String>{};
+  for (final Directive directive in directives) {
     switch (directive.body) {
-      case TransactionBody(:final value):
-        for (final posting in value.postings) {
+      case TransactionBody(:final Transaction value):
+        for (final Posting posting in value.postings) {
           used.add(posting.account.name);
         }
-      case BalanceBody(:final account):
+      case BalanceBody(:final Account account):
         used.add(account.name);
-      case CloseBody(:final account):
+      case CloseBody(:final Account account):
         used.add(account.name);
-      case PadBody(:final account, :final sourceAccount):
+      case PadBody(:final Account account, :final Account sourceAccount):
         used.add(account.name);
         used.add(sourceAccount.name);
-      case DocumentBody(:final account):
+      case DocumentBody(:final Account account):
         used.add(account.name);
-      case NoteBody(:final account):
+      case NoteBody(:final Account account):
         used.add(account.name);
       default:
         break;
@@ -125,14 +126,14 @@ Set<String> usedAccounts(List<Directive> directives) {
 }
 
 Map<String, ({Directive? open, Directive? close})> accountOpenClose(List<Directive> directives) {
-  final map = <String, ({Directive? open, Directive? close})>{};
-  for (final directive in directives) {
+  final Map<String, ({Directive? close, Directive? open})> map = <String, ({Directive? open, Directive? close})>{};
+  for (final Directive directive in directives) {
     switch (directive.body) {
-      case OpenBody(:final account):
-        final existing = map[account.name];
+      case OpenBody(:final Account account):
+        final ({Directive? close, Directive? open})? existing = map[account.name];
         map[account.name] = (open: directive, close: existing?.close);
-      case CloseBody(:final account):
-        final existing = map[account.name];
+      case CloseBody(:final Account account):
+        final ({Directive? close, Directive? open})? existing = map[account.name];
         map[account.name] = (open: existing?.open, close: directive);
       default:
         break;
@@ -142,11 +143,11 @@ Map<String, ({Directive? open, Directive? close})> accountOpenClose(List<Directi
 }
 
 Set<String> parentAccounts(Iterable<String> accounts) {
-  final parents = <String>{};
-  for (final account in accounts) {
-    var name = account;
+  final Set<String> parents = <String>{};
+  for (final String account in accounts) {
+    String name = account;
     while (true) {
-      final colon = name.lastIndexOf(':');
+      final int colon = name.lastIndexOf(':');
       if (colon < 0) break;
       name = name.substring(0, colon);
       parents.add(name);

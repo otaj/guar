@@ -5,17 +5,28 @@ import 'dart:math';
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
 
-import '../plugin.dart';
-import 'common.dart';
+import 'package:guar_plugins/src/plugin.dart';
+import 'package:guar_plugins/src/reds/common.dart';
 
 final Decimal _defaultTolerance = Decimal.parse('0.0099');
 
 BookPluginResult zerosumPlugin(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) {
-  final parsed = _parse(config);
+  final ({
+    Map<String, ({int dateRange, String target})> accounts,
+    bool flagUnmatched,
+    String linkPrefix,
+    bool linkTransactions,
+    bool matchMetadata,
+    String matchMetadataName,
+    String replaceFrom,
+    String replaceTo,
+    Decimal tolerance,
+  })?
+  parsed = _parse(config);
   if (parsed == null) {
     return configError(directives, 'Invalid configuration for zerosum plugin; skipping.');
   }
-  final matched = _zerosum(directives, options, info, parsed);
+  final List<Directive> matched = _zerosum(directives, options, info, parsed);
   return _flagUnmatched(matched, parsed);
 }
 
@@ -31,27 +42,27 @@ BookPluginResult zerosumPlugin(List<Directive> directives, LedgerOptions options
   bool flagUnmatched,
 })?
 _parse(String? config) {
-  final parsed = parseConfigMap(config);
+  final ({String? error, Map<Object?, Object?>? map}) parsed = parseConfigMap(config);
   if (parsed.error != null) return null;
-  final map = Map<Object?, Object?>.of(parsed.map!);
-  final rawAccounts = map.remove('zerosum_accounts');
-  final accounts = <String, ({String target, int dateRange})>{};
+  final Map<Object?, Object?> map = Map<Object?, Object?>.of(parsed.map!);
+  final Object? rawAccounts = map.remove('zerosum_accounts');
+  final Map<String, ({int dateRange, String target})> accounts = <String, ({String target, int dateRange})>{};
   if (rawAccounts is Map<Object?, Object?>) {
-    for (final entry in rawAccounts.entries) {
+    for (final MapEntry<Object?, Object?> entry in rawAccounts.entries) {
       if (entry.key is! String || entry.value is! List) return null;
-      final spec = entry.value! as List<Object?>;
+      final List<Object?> spec = entry.value! as List<Object?>;
       if (spec.length < 2) return null;
-      accounts[entry.key! as String] = (target: spec[0]?.toString() ?? '', dateRange: (spec[1] as num).toInt());
+      accounts[entry.key! as String] = (target: spec[0]?.toString() ?? '', dateRange: (spec[1]! as num).toInt());
     }
   }
-  var replaceFrom = '';
-  var replaceTo = '';
-  final replace = map.remove('account_name_replace');
+  String replaceFrom = '';
+  String replaceTo = '';
+  final Object? replace = map.remove('account_name_replace');
   if (replace is List && replace.length >= 2) {
     replaceFrom = replace[0]?.toString() ?? '';
     replaceTo = replace[1]?.toString() ?? '';
   }
-  final toleranceValue = map.remove('tolerance');
+  final Object? toleranceValue = map.remove('tolerance');
   return (
     accounts: accounts,
     replaceFrom: replaceFrom,
@@ -82,63 +93,63 @@ List<Directive> _zerosum(
   })
   config,
 ) {
-  final current = [...directives];
-  final newAccounts = <String>{};
-  final random = Random(6);
-  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  final List<Directive> current = <Directive>[...directives];
+  final Set<String> newAccounts = <String>{};
+  final Random random = Random(6);
+  const String alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
   String matchId() =>
-      String.fromCharCodes(List.generate(20, (_) => alphabet.codeUnitAt(random.nextInt(alphabet.length))));
+      String.fromCharCodes(List<int>.generate(20, (int _) => alphabet.codeUnitAt(random.nextInt(alphabet.length))));
 
   void replacePosting(int txnIndex, int postingIndex, Account account, String? id) {
-    final transaction = transactionOf(current[txnIndex])!;
-    final postings = [...transaction.postings];
-    var posting = postings[postingIndex];
-    var meta = posting.meta;
+    final Transaction transaction = transactionOf(current[txnIndex])!;
+    final List<Posting> postings = <Posting>[...transaction.postings];
+    final Posting posting = postings[postingIndex];
+    Meta meta = posting.meta;
     if (id != null && config.matchMetadata) {
       meta = metaWith(meta, config.matchMetadataName, MetaValue.text(id));
     }
     postings[postingIndex] = posting.copyWith(account: account, meta: meta);
-    var links = transaction.links;
+    List<Link> links = transaction.links;
     if (id != null && config.linkTransactions) {
-      links = [...links, Link(name: '${config.linkPrefix}$id')];
+      links = <Link>[...links, Link(name: '${config.linkPrefix}$id')];
     }
     current[txnIndex] = replaceTransaction(current[txnIndex], transaction.copyWith(postings: postings, links: links));
   }
 
-  for (final entry in config.accounts.entries) {
-    final zsAccount = entry.key;
-    final targetName = entry.value.target.isEmpty
+  for (final MapEntry<String, ({int dateRange, String target})> entry in config.accounts.entries) {
+    final String zsAccount = entry.key;
+    final String targetName = entry.value.target.isEmpty
         ? zsAccount.replaceAll(config.replaceFrom, config.replaceTo)
         : entry.value.target;
-    final target = rewriteAccount(targetName, options);
-    final dateRange = entry.value.dateRange;
-    final indices = [
-      for (var i = 0; i < current.length; i++)
+    final Account target = rewriteAccount(targetName, options);
+    final int dateRange = entry.value.dateRange;
+    final List<int> indices = <int>[
+      for (int i = 0; i < current.length; i++)
         if (transactionOf(current[i]) != null) i,
     ];
 
-    for (var i = 0; i < indices.length; i++) {
-      var reprocess = true;
+    for (int i = 0; i < indices.length; i++) {
+      bool reprocess = true;
       while (reprocess) {
         reprocess = false;
-        final txnIndex = indices[i];
-        final transaction = transactionOf(current[txnIndex]);
+        final int txnIndex = indices[i];
+        final Transaction? transaction = transactionOf(current[txnIndex]);
         if (transaction == null) break;
-        for (var p = 0; p < transaction.postings.length; p++) {
+        for (int p = 0; p < transaction.postings.length; p++) {
           if (transaction.postings[p].account.name != zsAccount) continue;
-          final posting = transaction.postings[p];
-          final maxDate = addDays(current[txnIndex].date, dateRange);
+          final Posting posting = transaction.postings[p];
+          final BeanDate maxDate = addDays(current[txnIndex].date, dateRange);
           ({int txn, int posting})? found;
           outer:
-          for (var j = i; j < indices.length; j++) {
-            final otherIndex = indices[j];
+          for (int j = i; j < indices.length; j++) {
+            final int otherIndex = indices[j];
             if (compareBeanDate(current[otherIndex].date, maxDate) > 0) break;
-            final other = transactionOf(current[otherIndex]);
+            final Transaction? other = transactionOf(current[otherIndex]);
             if (other == null) continue;
-            for (var q = 0; q < other.postings.length; q++) {
+            for (int q = 0; q < other.postings.length; q++) {
               if (j == i && q == p) continue;
-              final candidate = other.postings[q];
+              final Posting candidate = other.postings[q];
               if (candidate.account.name != zsAccount) continue;
               if ((candidate.units.number + posting.units.number).abs() < config.tolerance) {
                 found = (txn: otherIndex, posting: q);
@@ -147,7 +158,7 @@ List<Directive> _zerosum(
             }
           }
           if (found == null) continue;
-          final id = config.matchMetadata || config.linkTransactions ? matchId() : null;
+          final String? id = config.matchMetadata || config.linkTransactions ? matchId() : null;
           replacePosting(txnIndex, p, target, id);
           replacePosting(found.txn, found.posting, target, id);
           newAccounts.add(targetName);
@@ -157,7 +168,7 @@ List<Directive> _zerosum(
       }
     }
   }
-  return [...createOpenDirectives(newAccounts, current, options, info), ...current];
+  return <Directive>[...createOpenDirectives(newAccounts, current, options, info), ...current];
 }
 
 BookPluginResult _flagUnmatched(
@@ -175,18 +186,18 @@ BookPluginResult _flagUnmatched(
   })
   config,
 ) {
-  if (!config.flagUnmatched) return (directives: directives, errors: const []);
-  final zs = config.accounts.keys.toSet();
+  if (!config.flagUnmatched) return (directives: directives, errors: const <ProcessingError>[]);
+  final Set<String> zs = config.accounts.keys.toSet();
   return (
-    directives: [
-      for (final directive in directives)
-        if (transactionOf(directive) case final transaction?)
-          transaction.postings.any((posting) => zs.contains(posting.account.name))
+    directives: <Directive>[
+      for (final Directive directive in directives)
+        if (transactionOf(directive) case final Transaction transaction?)
+          transaction.postings.any((Posting posting) => zs.contains(posting.account.name))
               ? replaceTransaction(directive, transaction.copyWith(flag: const Flag.special(SpecialFlag.exclamation)))
               : directive
         else
           directive,
     ],
-    errors: const [],
+    errors: const <ProcessingError>[],
   );
 }

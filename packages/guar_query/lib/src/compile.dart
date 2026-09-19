@@ -3,26 +3,26 @@
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
 
-import 'ast.dart';
-import 'functions.dart';
-import 'result.dart';
-import 'tables.dart';
-import 'value.dart';
+import 'package:guar_query/src/ast.dart';
+import 'package:guar_query/src/functions.dart';
+import 'package:guar_query/src/result.dart';
+import 'package:guar_query/src/tables.dart';
+import 'package:guar_query/src/value.dart';
 
 QueryResult compileAndExecute(
   Statement statement,
   Ledger ledger, {
-  Object? params,
   required DateTime Function() clock,
+  Object? params,
 }) {
   if (ledger is LedgerErrors) {
-    return QueryResult.errors([
-      for (final error in ledger.errors) QueryError(message: error.message, location: error.location),
+    return QueryResult.errors(<QueryError>[
+      for (final ProcessingError error in ledger.errors) QueryError(message: error.message, location: error.location),
     ]);
   }
-  final env = TableEnv(ledger, clock: clock);
-  final tables = beancountTables(env);
-  final compiler = _Compiler(env, tables, params: params);
+  final TableEnv env = TableEnv(ledger, clock: clock);
+  final Map<String, BqlTable> tables = beancountTables(env);
+  final _Compiler compiler = _Compiler(env, tables, params: params);
   return compiler.run(statement);
 }
 
@@ -63,7 +63,7 @@ abstract class _Eval {
   QueryType get type;
   bool get isAggregate => false;
   QueryValue call(Object row);
-  List<_Eval> get children => const [];
+  List<_Eval> get children => const <_Eval>[];
 }
 
 class _Compiler {
@@ -84,15 +84,15 @@ class _Compiler {
         throw QueryException('CREATE TABLE is not supported');
       case InsertStatement():
         throw QueryException('INSERT is not supported');
-      case PrintStatement(:final fromClause):
+      case PrintStatement(:final FromClause? fromClause):
         return _runPrint(fromClause);
       case BalancesStatement():
         return run(_desugarBalances(statement));
       case JournalStatement():
         return run(_desugarJournal(statement));
       case SelectStatement():
-        final compiled = _compileSelect(statement);
-        var result = _execute(compiled);
+        final _CompiledSelect compiled = _compileSelect(statement);
+        QueryResult result = _execute(compiled);
         if (compiled.pivot != null && result is QueryTable) {
           result = _pivot(result, compiled.pivot!);
         }
@@ -102,59 +102,59 @@ class _Compiler {
 
   QueryResult _runPrint(FromClause? fromClause) {
     table = tables['entries']!;
-    final where = _compileFrom(fromClause);
-    final entries = <Directive>[
-      for (final row in table.rows())
+    final _Eval? where = _compileFrom(fromClause);
+    final List<Directive> entries = <Directive>[
+      for (final Object row in table.rows())
         if (where == null || isTruthy(where.call(row))) row as Directive,
     ];
     return QueryResult.entries(entries);
   }
 
   _CompiledSelect _compileSelect(SelectStatement node) {
-    final previous = table;
-    final previousWindow = _balanceWindow;
+    final BqlTable previous = table;
+    final _BalanceWindow? previousWindow = _balanceWindow;
     _balanceWindow = _BalanceWindow();
-    final fromWhere = _compileFrom(node.fromClause);
-    final targets = _compileTargets(node.targets);
-    var where = node.whereClause == null ? null : compileExpr(node.whereClause!);
+    final _Eval? fromWhere = _compileFrom(node.fromClause);
+    final List<_Target> targets = _compileTargets(node.targets);
+    _Eval? where = node.whereClause == null ? null : compileExpr(node.whereClause!);
     if (where != null && where.isAggregate) {
       throw QueryException('aggregates are not allowed in WHERE clause');
     }
     if (fromWhere != null) {
-      where = where == null ? fromWhere : _And([fromWhere, where]);
+      where = where == null ? fromWhere : _And(<_Eval>[fromWhere, where]);
     }
-    final grouped = _compileGroupBy(node.groupBy, targets);
+    final (List<_Target>, List<int>?, int?) grouped = _compileGroupBy(node.groupBy, targets);
     targets.addAll(grouped.$1);
-    final ordered = _compileOrderBy(node.orderBy, targets);
+    final (List<_Target>, List<(int, Ordering)>?) ordered = _compileOrderBy(node.orderBy, targets);
     targets.addAll(ordered.$1);
-    final groupIndexes = grouped.$2;
+    final List<int>? groupIndexes = grouped.$2;
     if (groupIndexes != null) {
-      final nonAgg = {
-        for (var i = 0; i < targets.length; i++)
+      final Set<int> nonAgg = <int>{
+        for (int i = 0; i < targets.length; i++)
           if (!targets[i].isAggregate) i,
       };
       if (nonAgg.difference(groupIndexes.toSet()).isNotEmpty) {
         throw QueryException('all non-aggregates must be covered by GROUP-BY clause in aggregate query');
       }
-      _balanceWindow!.partition = [
-        for (final index in groupIndexes)
+      _balanceWindow!.partition = <_Eval>[
+        for (final int index in groupIndexes)
           if (!_isDateDerived(targets[index].eval)) targets[index].eval,
       ];
-    } else if (targets.any((target) => target.isAggregate)) {
-      final nonAgg = [
-        for (var i = 0; i < targets.length; i++)
+    } else if (targets.any((_Target target) => target.isAggregate)) {
+      final List<int> nonAgg = <int>[
+        for (int i = 0; i < targets.length; i++)
           if (!targets[i].isAggregate) i,
       ];
       if (nonAgg.isNotEmpty) {
         throw QueryException('all non-aggregates must be covered by GROUP-BY clause in aggregate query');
       }
     }
-    final pivot = _compilePivot(node.pivotBy, targets, grouped.$2);
-    final compiled = _CompiledSelect(
+    final List<int>? pivot = _compilePivot(node.pivotBy, targets, grouped.$2);
+    final _CompiledSelect compiled = _CompiledSelect(
       table: table,
       targets: targets,
       where: where,
-      groupIndexes: grouped.$2 ?? (targets.any((t) => t.isAggregate) ? <int>[] : null),
+      groupIndexes: grouped.$2 ?? (targets.any((_Target t) => t.isAggregate) ? <int>[] : null),
       havingIndex: grouped.$3,
       orderSpec: ordered.$2,
       limit: node.limit,
@@ -169,26 +169,26 @@ class _Compiler {
   _Eval? _compileFrom(FromClause? node) {
     if (node == null) return null;
     switch (node) {
-      case SubselectFrom(:final select):
-        final result = _compileSelect(select);
-        final executed = _execute(result);
+      case SubselectFrom(:final SelectStatement select):
+        final _CompiledSelect result = _compileSelect(select);
+        final QueryResult executed = _execute(result);
         if (executed is! QueryTable) {
           throw QueryException('subquery did not produce a table');
         }
         table = _ResultTable(executed);
         return null;
-      case TableFrom(:final name):
-        final found = tables[name];
+      case TableFrom(:final String name):
+        final BqlTable? found = tables[name];
         if (found == null) {
           throw QueryException('table "$name" does not exist');
         }
         table = found;
         return null;
-      case FilterFrom(:final expression, :final open, :final close, :final clear):
+      case FilterFrom(:final Expr? expression, :final BeanDate? open, :final CloseSpec? close, :final bool? clear):
         if (expression is ColumnExpr) {
-          final column = table.columns[expression.name];
+          final ColumnSpec? column = table.columns[expression.name];
           if (column == null) {
-            final found = tables[expression.name];
+            final BqlTable? found = tables[expression.name];
             if (found != null) {
               table = found;
               if (open != null || close != null || clear == true) {
@@ -202,23 +202,28 @@ class _Compiler {
           table = table.evolve(open: open, close: close, clear: clear);
         }
         if (expression == null) return null;
-        final current = table;
+        final BqlTable current = table;
         if (current is PostingsTable) {
-          final entries = EntriesTable(current.env, open: current.open, close: current.close, clear: current.clear);
+          final EntriesTable entries = EntriesTable(
+            current.env,
+            open: current.open,
+            close: current.close,
+            clear: current.clear,
+          );
           table = entries;
-          final compiled = compileExpr(expression);
+          final _Eval compiled = compileExpr(expression);
           table = current;
           if (compiled.isAggregate) {
             throw QueryException('aggregates are not allowed in FROM clause');
           }
-          final kept = <Directive>[
-            for (final row in entries.rows())
+          final List<Directive> kept = <Directive>[
+            for (final Object row in entries.rows())
               if (isTruthy(compiled.call(row))) row as Directive,
           ];
           table = PostingsTable(current.env.withDirectives(kept));
           return null;
         }
-        final compiled = compileExpr(expression);
+        final _Eval compiled = compileExpr(expression);
         if (compiled.isAggregate) {
           throw QueryException('aggregates are not allowed in FROM clause');
         }
@@ -228,34 +233,34 @@ class _Compiler {
 
   List<_Target> _compileTargets(Object targets) {
     if (targets is Asterisk) {
-      return [
-        for (final name in table.wildcardColumns)
+      return <_Target>[
+        for (final String name in table.wildcardColumns)
           _Target(_Column(table.columns[name]!, name: name), name, table.columns[name]!.type),
       ];
     }
-    final list = targets as List<Target>;
-    return [for (final target in list) _compileTarget(target)];
+    final List<Target> list = targets as List<Target>;
+    return <_Target>[for (final Target target in list) _compileTarget(target)];
   }
 
   _Target _compileTarget(Target target) {
-    final compiled = compileExpr(target.expression);
+    final _Eval compiled = compileExpr(target.expression);
     return _Target(compiled, _targetName(target), compiled.type, key: target.name ?? _exprLabel(target.expression));
   }
 
   String? _targetName(Target target) {
     if (target.name != null) return target.name;
-    final expr = target.expression;
+    final Expr expr = target.expression;
     if (expr is ColumnExpr) return expr.name;
     return _exprLabel(expr);
   }
 
   (List<_Target>, List<int>?, int?) _compileGroupBy(GroupBy? groupBy, List<_Target> targets) {
-    final aggregateQuery = targets.any((target) => target.isAggregate) || groupBy != null;
-    if (!aggregateQuery) return (const [], null, null);
-    final indexes = <int>[];
-    final extra = <_Target>[];
+    final bool aggregateQuery = targets.any((_Target target) => target.isAggregate) || groupBy != null;
+    if (!aggregateQuery) return (const <_Target>[], null, null);
+    final List<int> indexes = <int>[];
+    final List<_Target> extra = <_Target>[];
     if (groupBy != null) {
-      for (final column in groupBy.columns) {
+      for (final Object column in groupBy.columns) {
         if (column is int) {
           if (column < 1 || column > targets.length) {
             throw QueryException('invalid GROUP BY index');
@@ -263,9 +268,9 @@ class _Compiler {
           indexes.add(column - 1);
           continue;
         }
-        final expr = column as Expr;
-        final compiled = compileExpr(expr);
-        final existing = _findTarget(targets, expr);
+        final Expr expr = column as Expr;
+        final _Eval compiled = compileExpr(expr);
+        final int? existing = _findTarget(targets, expr);
         if (existing != null) {
           indexes.add(existing);
         } else {
@@ -274,13 +279,13 @@ class _Compiler {
         }
       }
     } else {
-      for (var i = 0; i < targets.length; i++) {
+      for (int i = 0; i < targets.length; i++) {
         if (!targets[i].isAggregate) indexes.add(i);
       }
     }
     int? havingIndex;
     if (groupBy?.having != null) {
-      final compiled = compileExpr(groupBy!.having!);
+      final _Eval compiled = compileExpr(groupBy!.having!);
       havingIndex = targets.length + extra.length;
       extra.add(_Target(compiled, null, compiled.type, key: _exprLabel(groupBy.having!)));
     }
@@ -288,17 +293,17 @@ class _Compiler {
   }
 
   (List<_Target>, List<(int, Ordering)>?) _compileOrderBy(List<OrderBy>? orderBy, List<_Target> targets) {
-    if (orderBy == null) return (const [], null);
-    final spec = <(int, Ordering)>[];
-    final extra = <_Target>[];
-    for (final item in orderBy) {
+    if (orderBy == null) return (const <_Target>[], null);
+    final List<(int, Ordering)> spec = <(int, Ordering)>[];
+    final List<_Target> extra = <_Target>[];
+    for (final OrderBy item in orderBy) {
       if (item.column is int) {
         spec.add(((item.column as int) - 1, item.ordering));
         continue;
       }
-      final expr = item.column as Expr;
-      final compiled = compileExpr(expr);
-      final existing = _findTarget(targets, expr);
+      final Expr expr = item.column as Expr;
+      final _Eval compiled = compileExpr(expr);
+      final int? existing = _findTarget(targets, expr);
       if (existing != null) {
         spec.add((existing, item.ordering));
       } else {
@@ -311,12 +316,12 @@ class _Compiler {
 
   List<int>? _compilePivot(PivotBy? pivotBy, List<_Target> targets, List<int>? groupIndexes) {
     if (pivotBy == null) return null;
-    final indexes = <int>[];
-    for (final column in pivotBy.columns) {
+    final List<int> indexes = <int>[];
+    for (final Object column in pivotBy.columns) {
       if (column is int) {
         indexes.add(column - 1);
       } else if (column is ColumnExpr) {
-        final found = targets.indexWhere((target) => target.name == column.name);
+        final int found = targets.indexWhere((_Target target) => target.name == column.name);
         if (found < 0) throw QueryException('unknown PIVOT BY column');
         indexes.add(found);
       }
@@ -326,94 +331,94 @@ class _Compiler {
 
   int? _findTarget(List<_Target> targets, Expr expr) {
     if (expr is ColumnExpr) {
-      final named = targets.indexWhere((target) => target.name == expr.name);
+      final int named = targets.indexWhere((_Target target) => target.name == expr.name);
       if (named >= 0) return named;
     }
-    final label = _exprLabel(expr);
-    final keyed = targets.indexWhere((target) => target.key == label);
+    final String label = _exprLabel(expr);
+    final int keyed = targets.indexWhere((_Target target) => target.key == label);
     if (keyed >= 0) return keyed;
     return null;
   }
 
   _Eval compileExpr(Expr expr) {
     switch (expr) {
-      case ColumnExpr(:final name):
-        final column = table.columns[name];
+      case ColumnExpr(:final String name):
+        final ColumnSpec? column = table.columns[name];
         if (column == null) throw QueryException('column "$name" does not exist');
         if (name == 'balance' && table is PostingsTable) {
           return _Balance(_balanceWindow ??= _BalanceWindow());
         }
         return _Column(column, name: name);
-      case ConstantExpr(:final value):
-        final queryValue = queryValueFromLiteral(value);
+      case ConstantExpr(:final Object? value):
+        final QueryValue queryValue = queryValueFromLiteral(value);
         return _Constant(queryValue);
-      case PlaceholderExpr(:final name):
+      case PlaceholderExpr(:final String? name):
         return _Constant(_resolveParam(name));
       case AsteriskExpr():
         return _Constant(const QueryValue.null_(), type: QueryType.asterisk);
-      case FunctionExpr(:final fname, :final operands):
+      case FunctionExpr(:final String fname, :final List<Object> operands):
         return _compileFunction(fname, operands);
-      case AttributeExpr(:final operand, :final name):
+      case AttributeExpr(:final Expr operand, :final String name):
         return _Attribute(compileExpr(operand), name);
-      case SubscriptExpr(:final operand, :final key):
+      case SubscriptExpr(:final Expr operand, :final String key):
         return _Subscript(compileExpr(operand), key);
-      case SelectExpr(:final select):
+      case SelectExpr(:final SelectStatement select):
         return _Subquery(this, select);
-      case NotExpr(:final operand):
+      case NotExpr(:final Expr operand):
         return _Not(compileExpr(operand));
-      case IsNullExpr(:final operand):
+      case IsNullExpr(:final Expr operand):
         return _IsNull(compileExpr(operand), not: false);
-      case IsNotNullExpr(:final operand):
+      case IsNotNullExpr(:final Expr operand):
         return _IsNull(compileExpr(operand), not: true);
-      case NegExpr(:final operand):
-        return _compileFunction('neg', [operand]);
-      case AndExpr(:final args):
-        return _And([for (final arg in args) compileExpr(arg)]);
-      case OrExpr(:final args):
-        return _Or([for (final arg in args) compileExpr(arg)]);
-      case EqualExpr(:final left, :final right):
+      case NegExpr(:final Expr operand):
+        return _compileFunction('neg', <Object>[operand]);
+      case AndExpr(:final List<Expr> args):
+        return _And(<_Eval>[for (final Expr arg in args) compileExpr(arg)]);
+      case OrExpr(:final List<Expr> args):
+        return _Or(<_Eval>[for (final Expr arg in args) compileExpr(arg)]);
+      case EqualExpr(:final Expr left, :final Expr right):
         return _Compare(compileExpr(left), compileExpr(right), CompareOp.eq);
-      case NotEqualExpr(:final left, :final right):
+      case NotEqualExpr(:final Expr left, :final Expr right):
         return _Compare(compileExpr(left), compileExpr(right), CompareOp.neq);
-      case GreaterExpr(:final left, :final right):
+      case GreaterExpr(:final Expr left, :final Expr right):
         return _Compare(compileExpr(left), compileExpr(right), CompareOp.gt);
-      case GreaterEqExpr(:final left, :final right):
+      case GreaterEqExpr(:final Expr left, :final Expr right):
         return _Compare(compileExpr(left), compileExpr(right), CompareOp.gte);
-      case LessExpr(:final left, :final right):
+      case LessExpr(:final Expr left, :final Expr right):
         return _Compare(compileExpr(left), compileExpr(right), CompareOp.lt);
-      case LessEqExpr(:final left, :final right):
+      case LessEqExpr(:final Expr left, :final Expr right):
         return _Compare(compileExpr(left), compileExpr(right), CompareOp.lte);
-      case MatchExpr(:final left, :final right):
+      case MatchExpr(:final Expr left, :final Expr right):
         return _Match(compileExpr(left), compileExpr(right), MatchKind.search);
-      case NotMatchExpr(:final left, :final right):
+      case NotMatchExpr(:final Expr left, :final Expr right):
         return _Match(compileExpr(left), compileExpr(right), MatchKind.search, not: true);
-      case MatchesExpr(:final left, :final right):
+      case MatchesExpr(:final Expr left, :final Expr right):
         return _Match(compileExpr(left), compileExpr(right), MatchKind.prefix);
-      case InExpr(:final left, :final right):
+      case InExpr(:final Expr left, :final Expr right):
         return _In(compileExpr(left), compileExpr(right), not: false, compiler: this);
-      case NotInExpr(:final left, :final right):
+      case NotInExpr(:final Expr left, :final Expr right):
         return _In(compileExpr(left), compileExpr(right), not: true, compiler: this);
-      case AddExpr(:final left, :final right):
+      case AddExpr(:final Expr left, :final Expr right):
         return _Arith(compileExpr(left), compileExpr(right), ArithOp.add);
-      case SubExpr(:final left, :final right):
+      case SubExpr(:final Expr left, :final Expr right):
         return _Arith(compileExpr(left), compileExpr(right), ArithOp.sub);
-      case MulExpr(:final left, :final right):
+      case MulExpr(:final Expr left, :final Expr right):
         return _Arith(compileExpr(left), compileExpr(right), ArithOp.mul);
-      case DivExpr(:final left, :final right):
+      case DivExpr(:final Expr left, :final Expr right):
         return _Arith(compileExpr(left), compileExpr(right), ArithOp.div);
-      case ModExpr(:final left, :final right):
+      case ModExpr(:final Expr left, :final Expr right):
         return _Arith(compileExpr(left), compileExpr(right), ArithOp.mod);
-      case BetweenExpr(:final operand, :final lower, :final upper):
+      case BetweenExpr(:final Expr operand, :final Expr lower, :final Expr upper):
         return _Between(compileExpr(operand), compileExpr(lower), compileExpr(upper));
-      case AnyExpr(:final left, :final op, :final right):
+      case AnyExpr(:final Expr left, :final String op, :final Expr right):
         return _Quantified(compileExpr(left), op, compileExpr(right), all: false, compiler: this);
-      case AllExpr(:final left, :final op, :final right):
+      case AllExpr(:final Expr left, :final String op, :final Expr right):
         return _Quantified(compileExpr(left), op, compileExpr(right), all: true, compiler: this);
     }
   }
 
   _Eval _compileFunction(String fname, List<Object> operands) {
-    final name = fname.toLowerCase();
+    final String name = fname.toLowerCase();
     if (name == 'meta' && operands.length == 1 && operands.single is Expr) {
       return _Subscript(_Column(table.columns['meta']!, name: 'meta'), _constText(operands.single as Expr));
     }
@@ -427,15 +432,15 @@ class _Compiler {
       return _HasAccount(compileExpr(operands.single as Expr));
     }
     if (name == 'coalesce') {
-      return _Coalesce([for (final operand in operands) compileExpr(operand as Expr)]);
+      return _Coalesce(<_Eval>[for (final Object operand in operands) compileExpr(operand as Expr)]);
     }
-    final compiled = [
-      for (final operand in operands)
+    final List<_Eval> compiled = <_Eval>[
+      for (final Object operand in operands)
         operand is Asterisk
             ? _Constant(const QueryValue.null_(), type: QueryType.asterisk)
             : compileExpr(operand as Expr),
     ];
-    final spec = _lookupFunction(name, compiled.map((eval) => eval.type).toList());
+    final FuncSpec? spec = _lookupFunction(name, compiled.map((_Eval eval) => eval.type).toList());
     if (spec == null) {
       throw QueryException('no function matches "$name" name and argument types');
     }
@@ -447,7 +452,7 @@ class _Compiler {
 
   FuncSpec? _lookupFunction(String name, List<QueryType> args) {
     FuncSpec? fallback;
-    for (final spec in functions) {
+    for (final FuncSpec spec in functions) {
       if (spec.name != name) continue;
       if (spec.name == 'coalesce') return spec;
       if (spec.argTypes.length != args.length && spec.argTypes.length != 1) continue;
@@ -456,8 +461,8 @@ class _Compiler {
         continue;
       }
       if (spec.argTypes.length != args.length) continue;
-      var ok = true;
-      for (var i = 0; i < args.length; i++) {
+      bool ok = true;
+      for (int i = 0; i < args.length; i++) {
         if (!typeMatches(spec.argTypes[i], args[i])) {
           ok = false;
           break;
@@ -469,13 +474,13 @@ class _Compiler {
   }
 
   String _constText(Expr expr) {
-    final compiled = compileExpr(expr);
-    final value = compiled.call(const Object());
+    final _Eval compiled = compileExpr(expr);
+    final QueryValue value = compiled.call(const Object());
     return value.asText() ?? '';
   }
 
   QueryValue _resolveParam(String? name) {
-    final parameters = params;
+    final Object? parameters = params;
     if (name == null) {
       if (parameters is List && parameters.isNotEmpty) {
         return queryValueFromLiteral(parameters.first);
@@ -492,34 +497,35 @@ class _Compiler {
   }
 
   QueryResult _execute(_CompiledSelect query) {
-    final rows = <List<QueryValue>>[];
+    final List<List<QueryValue>> rows = <List<QueryValue>>[];
     if (query.groupIndexes == null) {
-      for (final row in query.table.rows()) {
+      for (final Object row in query.table.rows()) {
         if (query.where != null && !isTruthy(query.where!.call(row))) continue;
-        rows.add([for (final target in query.targets) target.eval.call(row)]);
+        rows.add(<QueryValue>[for (final _Target target in query.targets) target.eval.call(row)]);
       }
     } else {
-      final aggregates = _collectAggregates(query.targets);
-      final groups = <String, _Group>{};
-      for (final row in query.table.rows()) {
+      final List<_Aggregate> aggregates = _collectAggregates(query.targets);
+      final Map<String, _Group> groups = <String, _Group>{};
+      for (final Object row in query.table.rows()) {
         if (query.where != null && !isTruthy(query.where!.call(row))) continue;
-        final keyValues = [for (final index in query.groupIndexes!) query.targets[index].eval.call(row)];
-        final key = keyValues.map(_stringifyValue).join('\u0001');
-        final group = groups.putIfAbsent(key, () => _Group(keyValues, aggregates.length));
-        group.update(aggregates, row);
+        final List<QueryValue> keyValues = <QueryValue>[
+          for (final int index in query.groupIndexes!) query.targets[index].eval.call(row),
+        ];
+        final String key = keyValues.map(_stringifyValue).join('\u0001');
+        groups.putIfAbsent(key, () => _Group(keyValues, aggregates.length)).update(aggregates, row);
       }
-      for (final group in groups.values) {
-        final values = group.finalize(query.targets, aggregates);
+      for (final _Group group in groups.values) {
+        final List<QueryValue> values = group.finalize(query.targets, aggregates);
         if (query.havingIndex != null && !isTruthy(values[query.havingIndex!])) continue;
         rows.add(values);
       }
     }
 
-    var resultRows = rows;
+    final List<List<QueryValue>> resultRows = rows;
     if (query.orderSpec != null) {
-      resultRows.sort((a, b) {
-        for (final (index, ordering) in query.orderSpec!) {
-          final compared = compareValues(a[index], b[index]);
+      resultRows.sort((List<QueryValue> a, List<QueryValue> b) {
+        for (final (int index, Ordering ordering) in query.orderSpec!) {
+          final int compared = compareValues(a[index], b[index]);
           if (compared != 0) {
             return ordering == Ordering.desc ? -compared : compared;
           }
@@ -527,17 +533,17 @@ class _Compiler {
         return 0;
       });
     }
-    final visible = [
-      for (var i = 0; i < query.targets.length; i++)
+    final List<int> visible = <int>[
+      for (int i = 0; i < query.targets.length; i++)
         if (query.targets[i].name != null) i,
     ];
-    var projected = [
-      for (final row in resultRows) [for (final index in visible) row[index]],
+    List<List<QueryValue>> projected = <List<QueryValue>>[
+      for (final List<QueryValue> row in resultRows) <QueryValue>[for (final int index in visible) row[index]],
     ];
     if (query.distinct) {
-      final seen = <String>{};
-      projected = [
-        for (final row in projected)
+      final Set<String> seen = <String>{};
+      projected = <List<QueryValue>>[
+        for (final List<QueryValue> row in projected)
           if (seen.add(row.map(_stringifyValue).join('\u0001'))) row,
       ];
     }
@@ -545,10 +551,10 @@ class _Compiler {
       projected = projected.take(query.limit!).toList();
     }
     return QueryResult.table(
-      columns: [
-        for (final index in visible) QueryColumn(name: query.targets[index].name!, type: query.targets[index].type),
+      columns: <QueryColumn>[
+        for (final int index in visible) QueryColumn(name: query.targets[index].name!, type: query.targets[index].type),
       ],
-      rows: [for (final row in projected) QueryRow(row)],
+      rows: <QueryRow>[for (final List<QueryValue> row in projected) QueryRow(row)],
     );
   }
 }
@@ -560,23 +566,23 @@ class _Group {
   final List<QueryValue?> stores;
 
   void update(List<_Aggregate> aggregates, Object row) {
-    for (final aggregate in aggregates) {
+    for (final _Aggregate aggregate in aggregates) {
       stores[aggregate.slot] = _aggregate(aggregate.spec.name, stores[aggregate.slot], aggregate.feed(row));
     }
   }
 
   List<QueryValue> finalize(List<_Target> targets, List<_Aggregate> aggregates) {
-    for (final aggregate in aggregates) {
+    for (final _Aggregate aggregate in aggregates) {
       aggregate.lookup = () => stores[aggregate.slot] ?? _emptyAgg(aggregate);
     }
     try {
-      var keyIndex = 0;
-      return [
-        for (final target in targets)
+      int keyIndex = 0;
+      return <QueryValue>[
+        for (final _Target target in targets)
           if (target.isAggregate) target.eval.call(const Object()) else keys[keyIndex++],
       ];
     } finally {
-      for (final aggregate in aggregates) {
+      for (final _Aggregate aggregate in aggregates) {
         aggregate.lookup = null;
       }
     }
@@ -584,18 +590,16 @@ class _Group {
 }
 
 List<_Aggregate> _collectAggregates(List<_Target> targets) {
-  final found = <_Aggregate>[];
+  final List<_Aggregate> found = <_Aggregate>[];
   void walk(_Eval eval) {
     if (eval is _Aggregate) {
       eval.slot = found.length;
       found.add(eval);
     }
-    for (final child in eval.children) {
-      walk(child);
-    }
+    eval.children.forEach(walk);
   }
 
-  for (final target in targets) {
+  for (final _Target target in targets) {
     walk(target.eval);
   }
   return found;
@@ -610,21 +614,23 @@ QueryValue _emptyAgg(_Aggregate aggregate) {
 QueryValue _aggregate(String name, QueryValue? store, QueryValue next) {
   switch (name) {
     case 'count':
-      final add = next is QueryInteger ? next.value : (next.isNull ? 0 : 1);
+      final int add = next is QueryInteger ? next.value : (next.isNull ? 0 : 1);
       return QueryValue.integer((store is QueryInteger ? store.value : 0) + add);
     case 'sum':
       if (next.isNull) return store ?? const QueryValue.null_();
       if (store == null || store.isNull) return next;
       return switch ((store, next)) {
-        (QueryInteger(:final value), QueryInteger(value: final other)) => QueryValue.integer(value + other),
-        (QueryNumber(:final value), QueryNumber(value: final other)) => QueryValue.number(value + other),
-        (QueryInventory(:final value), QueryInventory(value: final other)) => QueryValue.inventory(
+        (QueryInteger(:final int value), QueryInteger(value: final int other)) => QueryValue.integer(value + other),
+        (QueryNumber(:final Decimal value), QueryNumber(value: final Decimal other)) => QueryValue.number(
+          value + other,
+        ),
+        (QueryInventory(:final Inventory value), QueryInventory(value: final Inventory other)) => QueryValue.inventory(
           value.addInventory(other),
         ),
-        (QueryInventory(:final value), QueryAmount(value: final amount)) => QueryValue.inventory(
+        (QueryInventory(:final Inventory value), QueryAmount(value: final Amount amount)) => QueryValue.inventory(
           value.addAmount(amount).inventory,
         ),
-        (QueryInventory(:final value), QueryPosition(value: final position)) => QueryValue.inventory(
+        (QueryInventory(:final Inventory value), QueryPosition(value: final Position position)) => QueryValue.inventory(
           value.addPosition(position).inventory,
         ),
         _ => store,
@@ -648,56 +654,56 @@ QueryValue _aggregate(String name, QueryValue? store, QueryValue next) {
 
 QueryResult _pivot(QueryTable table, List<int> pivots) {
   if (pivots.length != 2) return table;
-  final rowIndex = pivots[0];
-  final colIndex = pivots[1];
-  final valueIndexes = [
-    for (var i = 0; i < table.columns.length; i++)
+  final int rowIndex = pivots[0];
+  final int colIndex = pivots[1];
+  final List<int> valueIndexes = <int>[
+    for (int i = 0; i < table.columns.length; i++)
       if (i != rowIndex && i != colIndex) i,
   ];
-  final colKeys = <String>{};
-  for (final row in table.rows) {
+  final Set<String> colKeys = <String>{};
+  for (final QueryRow row in table.rows) {
     colKeys.add(_stringifyValue(row.values[colIndex]));
   }
-  final sortedKeys = colKeys.toList()..sort();
-  final names = <QueryColumn>[
+  final List<String> sortedKeys = colKeys.toList()..sort();
+  final List<QueryColumn> names = <QueryColumn>[
     QueryColumn(
       name: '${table.columns[rowIndex].name}/${table.columns[colIndex].name}',
       type: table.columns[rowIndex].type,
     ),
   ];
   if (valueIndexes.length <= 1) {
-    for (final key in sortedKeys) {
+    for (final String key in sortedKeys) {
       names.add(
         QueryColumn(name: key, type: valueIndexes.isEmpty ? QueryType.object : table.columns[valueIndexes.single].type),
       );
     }
   } else {
-    for (final key in sortedKeys) {
-      for (final index in valueIndexes) {
+    for (final String key in sortedKeys) {
+      for (final int index in valueIndexes) {
         names.add(QueryColumn(name: '$key/${table.columns[index].name}', type: table.columns[index].type));
       }
     }
   }
-  final grouped = <String, Map<String, QueryRow>>{};
-  for (final row in table.rows) {
-    final rowKey = _stringifyValue(row.values[rowIndex]);
-    final colKey = _stringifyValue(row.values[colIndex]);
-    grouped.putIfAbsent(rowKey, () => {})[colKey] = row;
+  final Map<String, Map<String, QueryRow>> grouped = <String, Map<String, QueryRow>>{};
+  for (final QueryRow row in table.rows) {
+    final String rowKey = _stringifyValue(row.values[rowIndex]);
+    final String colKey = _stringifyValue(row.values[colIndex]);
+    grouped.putIfAbsent(rowKey, () => <String, QueryRow>{})[colKey] = row;
   }
-  final out = <QueryRow>[];
-  final rowKeys = grouped.keys.toList()..sort();
-  for (final rowKey in rowKeys) {
-    final cells = grouped[rowKey]!;
-    final sample = cells.values.first;
-    final values = <QueryValue>[sample.values[rowIndex]];
-    for (final colKey in sortedKeys) {
-      final match = cells[colKey];
+  final List<QueryRow> out = <QueryRow>[];
+  final List<String> rowKeys = grouped.keys.toList()..sort();
+  for (final String rowKey in rowKeys) {
+    final Map<String, QueryRow> cells = grouped[rowKey]!;
+    final QueryRow sample = cells.values.first;
+    final List<QueryValue> values = <QueryValue>[sample.values[rowIndex]];
+    for (final String colKey in sortedKeys) {
+      final QueryRow? match = cells[colKey];
       if (valueIndexes.length <= 1) {
         values.add(
           match == null || valueIndexes.isEmpty ? const QueryValue.null_() : match.values[valueIndexes.single],
         );
       } else {
-        for (final index in valueIndexes) {
+        for (final int index in valueIndexes) {
           values.add(match == null ? const QueryValue.null_() : match.values[index]);
         }
       }
@@ -715,9 +721,9 @@ class _ResultTable extends BqlTable {
   String get name => 'subquery';
 
   @override
-  late final Map<String, ColumnSpec> columns = {
-    for (var i = 0; i < result.columns.length; i++)
-      result.columns[i].name: ColumnSpec(result.columns[i].type, (row) => (row as QueryRow).values[i]),
+  late final Map<String, ColumnSpec> columns = <String, ColumnSpec>{
+    for (int i = 0; i < result.columns.length; i++)
+      result.columns[i].name: ColumnSpec(result.columns[i].type, (Object row) => (row as QueryRow).values[i]),
   };
 
   @override
@@ -736,16 +742,16 @@ class _Column extends _Eval {
 
 // Running `balance` is partitioned by GROUP BY keys that are not date parts, so monthly last(balance) still carries an account forward.
 class _BalanceWindow {
-  List<_Eval> partition = const [];
-  final Map<String, Inventory> _running = {};
+  List<_Eval> partition = const <_Eval>[];
+  final Map<String, Inventory> _running = <String, Inventory>{};
   Object? _row;
   QueryValue? _value;
 
   QueryValue of(Object row) {
     if (identical(row, _row) && _value != null) return _value!;
-    final position = _positionOf(row);
-    final key = [for (final eval in partition) _stringifyValue(eval.call(row))].join('\u0001');
-    final next = (_running[key] ?? const Inventory()).addPosition(position).inventory;
+    final Position position = _positionOf(row);
+    final String key = <String>[for (final _Eval eval in partition) _stringifyValue(eval.call(row))].join('\u0001');
+    final Inventory next = (_running[key] ?? const Inventory()).addPosition(position).inventory;
     _running[key] = next;
     _row = row;
     _value = QueryValue.inventory(next);
@@ -761,8 +767,17 @@ Position _positionOf(Object row) {
 }
 
 bool _isDateDerived(_Eval eval) {
-  const dateColumns = {'date', 'year', 'month', 'day'};
-  const dateFunctions = {'year', 'month', 'day', 'yearmonth', 'quarter', 'weekday', 'date_trunc', 'date_part'};
+  const Set<String> dateColumns = <String>{'date', 'year', 'month', 'day'};
+  const Set<String> dateFunctions = <String>{
+    'year',
+    'month',
+    'day',
+    'yearmonth',
+    'quarter',
+    'weekday',
+    'date_trunc',
+    'date_part',
+  };
   if (eval is _Column) return dateColumns.contains(eval.name);
   if (eval is _Call) {
     if (dateFunctions.contains(eval.spec.name)) return true;
@@ -772,7 +787,7 @@ bool _isDateDerived(_Eval eval) {
     return dateColumns.contains(eval.name) || _isDateDerived(eval.operand);
   }
   if (eval is _Constant) return true;
-  final children = eval.children;
+  final List<_Eval> children = eval.children;
   return children.isNotEmpty && children.every(_isDateDerived);
 }
 
@@ -802,13 +817,15 @@ class _Call extends _Eval {
   @override
   QueryType get type => spec.outType;
   @override
-  bool get isAggregate => args.any((arg) => arg.isAggregate);
+  bool get isAggregate => args.any((_Eval arg) => arg.isAggregate);
   @override
   List<_Eval> get children => args;
   @override
   QueryValue call(Object row) {
-    final values = [for (final arg in args) arg.call(row)];
-    if (spec.name != 'coalesce' && values.any((value) => value.isNull) && spec.outType != QueryType.boolean) {
+    final List<QueryValue> values = <QueryValue>[for (final _Eval arg in args) arg.call(row)];
+    if (spec.name != 'coalesce' &&
+        values.any((QueryValue value) => value.isNull) &&
+        spec.outType != QueryType.boolean) {
       if (spec.name != 'bool' &&
           spec.name != 'int' &&
           spec.name != 'decimal' &&
@@ -835,13 +852,13 @@ class _Aggregate extends _Eval {
   @override
   List<_Eval> get children => args;
   QueryValue feed(Object row) {
-    final values = [for (final arg in args) arg.call(row)];
+    final List<QueryValue> values = <QueryValue>[for (final _Eval arg in args) arg.call(row)];
     return spec.eval(row, env, values);
   }
 
   @override
   QueryValue call(Object row) {
-    final resolved = lookup;
+    final QueryValue Function()? resolved = lookup;
     if (resolved != null) return resolved();
     return feed(row);
   }
@@ -853,12 +870,12 @@ class _And extends _Eval {
   @override
   QueryType get type => QueryType.boolean;
   @override
-  bool get isAggregate => args.any((arg) => arg.isAggregate);
+  bool get isAggregate => args.any((_Eval arg) => arg.isAggregate);
   @override
   List<_Eval> get children => args;
   @override
   QueryValue call(Object row) {
-    for (final arg in args) {
+    for (final _Eval arg in args) {
       if (!isTruthy(arg.call(row))) return const QueryValue.boolean(false);
     }
     return const QueryValue.boolean(true);
@@ -871,12 +888,12 @@ class _Or extends _Eval {
   @override
   QueryType get type => QueryType.boolean;
   @override
-  bool get isAggregate => args.any((arg) => arg.isAggregate);
+  bool get isAggregate => args.any((_Eval arg) => arg.isAggregate);
   @override
   List<_Eval> get children => args;
   @override
   QueryValue call(Object row) {
-    for (final arg in args) {
+    for (final _Eval arg in args) {
       if (isTruthy(arg.call(row))) return const QueryValue.boolean(true);
     }
     return const QueryValue.boolean(false);
@@ -891,7 +908,7 @@ class _Not extends _Eval {
   @override
   bool get isAggregate => operand.isAggregate;
   @override
-  List<_Eval> get children => [operand];
+  List<_Eval> get children => <_Eval>[operand];
   @override
   QueryValue call(Object row) => QueryValue.boolean(!isTruthy(operand.call(row)));
 }
@@ -905,10 +922,10 @@ class _IsNull extends _Eval {
   @override
   bool get isAggregate => operand.isAggregate;
   @override
-  List<_Eval> get children => [operand];
+  List<_Eval> get children => <_Eval>[operand];
   @override
   QueryValue call(Object row) {
-    final isNull = operand.call(row).isNull;
+    final bool isNull = operand.call(row).isNull;
     return QueryValue.boolean(not ? !isNull : isNull);
   }
 }
@@ -925,13 +942,13 @@ class _Compare extends _Eval {
   @override
   bool get isAggregate => left.isAggregate || right.isAggregate;
   @override
-  List<_Eval> get children => [left, right];
+  List<_Eval> get children => <_Eval>[left, right];
   @override
   QueryValue call(Object row) {
-    final a = left.call(row);
-    final b = right.call(row);
-    final equal = valuesEqual(a, b);
-    final compared = compareValues(a, b);
+    final QueryValue a = left.call(row);
+    final QueryValue b = right.call(row);
+    final bool equal = valuesEqual(a, b);
+    final int compared = compareValues(a, b);
     return QueryValue.boolean(switch (op) {
       CompareOp.eq => equal,
       CompareOp.neq => !equal,
@@ -955,10 +972,10 @@ class _Match extends _Eval {
   QueryType get type => QueryType.boolean;
   @override
   QueryValue call(Object row) {
-    final text = left.call(row).asText() ?? '';
-    final pattern = right.call(row).asText() ?? '';
-    final regex = RegExp(pattern);
-    final matched = kind == MatchKind.search ? regex.hasMatch(text) : regex.matchAsPrefix(text) != null;
+    final String text = left.call(row).asText() ?? '';
+    final String pattern = right.call(row).asText() ?? '';
+    final RegExp regex = RegExp(pattern);
+    final bool matched = kind == MatchKind.search ? regex.hasMatch(text) : regex.matchAsPrefix(text) != null;
     return QueryValue.boolean(not ? !matched : matched);
   }
 }
@@ -973,13 +990,13 @@ class _In extends _Eval {
   QueryType get type => QueryType.boolean;
   @override
   QueryValue call(Object row) {
-    var rhs = right;
+    _Eval rhs = right;
     if (rhs is _Subquery) {
       rhs = _Constant(QueryValue.list(rhs.values()));
     }
-    final needle = left.call(row);
-    final haystack = membershipStrings(rhs.call(row));
-    final contained = haystack.contains(needle.asText() ?? _stringifyValue(needle));
+    final QueryValue needle = left.call(row);
+    final Set<String> haystack = membershipStrings(rhs.call(row));
+    final bool contained = haystack.contains(needle.asText() ?? _stringifyValue(needle));
     return QueryValue.boolean(not ? !contained : contained);
   }
 }
@@ -995,14 +1012,14 @@ class _Quantified extends _Eval {
   QueryType get type => QueryType.boolean;
   @override
   QueryValue call(Object row) {
-    final needle = left.call(row);
-    var rhs = right.call(row);
+    final QueryValue needle = left.call(row);
+    QueryValue rhs = right.call(row);
     if (right is _Subquery) {
       rhs = QueryValue.list((right as _Subquery).values());
     }
-    final items = membershipStrings(rhs);
+    final Set<String> items = membershipStrings(rhs);
     bool test(String item) {
-      final text = needle.asText() ?? _stringifyValue(needle);
+      final String text = needle.asText() ?? _stringifyValue(needle);
       return switch (op) {
         '=' => text == item,
         '!=' => text != item,
@@ -1012,7 +1029,7 @@ class _Quantified extends _Eval {
       };
     }
 
-    final matched = all ? items.every(test) : items.any(test);
+    final bool matched = all ? items.every(test) : items.any(test);
     return QueryValue.boolean(items.isEmpty ? all : matched);
   }
 }
@@ -1028,19 +1045,19 @@ class _Arith extends _Eval {
   @override
   bool get isAggregate => left.isAggregate || right.isAggregate;
   @override
-  List<_Eval> get children => [left, right];
+  List<_Eval> get children => <_Eval>[left, right];
   @override
   QueryValue call(Object row) {
-    final a = left.call(row);
-    final b = right.call(row);
+    final QueryValue a = left.call(row);
+    final QueryValue b = right.call(row);
     if (a.isNull || b.isNull) return const QueryValue.null_();
     if (a is QueryText || b is QueryText) {
       if (op == ArithOp.add) {
         return QueryValue.text('${a.asText() ?? ''}${b.asText() ?? ''}');
       }
     }
-    final leftNum = _number(a);
-    final rightNum = _number(b);
+    final Decimal? leftNum = _number(a);
+    final Decimal? rightNum = _number(b);
     if (leftNum == null || rightNum == null) return const QueryValue.null_();
     return switch (op) {
       ArithOp.add => _numValue(a, b, leftNum + rightNum),
@@ -1062,9 +1079,9 @@ QueryValue _numValue(QueryValue a, QueryValue b, Decimal value) {
 }
 
 Decimal? _number(QueryValue value) => switch (value) {
-  QueryInteger(:final value) => Decimal.fromInt(value),
-  QueryNumber(:final value) => value,
-  QueryBoolean(:final value) => Decimal.fromInt(value ? 1 : 0),
+  QueryInteger(:final int value) => Decimal.fromInt(value),
+  QueryNumber(:final Decimal value) => value,
+  QueryBoolean(:final bool value) => Decimal.fromInt(value ? 1 : 0),
   _ => null,
 };
 
@@ -1077,7 +1094,7 @@ class _Between extends _Eval {
   QueryType get type => QueryType.boolean;
   @override
   QueryValue call(Object row) {
-    final value = operand.call(row);
+    final QueryValue value = operand.call(row);
     return QueryValue.boolean(compareValues(value, lower.call(row)) >= 0 && compareValues(value, upper.call(row)) <= 0);
   }
 }
@@ -1090,23 +1107,23 @@ class _Attribute extends _Eval {
   QueryType get type => QueryType.object;
   @override
   QueryValue call(Object row) {
-    final value = operand.call(row);
+    final QueryValue value = operand.call(row);
     return switch ((value, name)) {
-      (QueryDate(:final value), 'year') => QueryValue.integer(value.year),
-      (QueryDate(:final value), 'month') => QueryValue.integer(value.month),
-      (QueryDate(:final value), 'day') => QueryValue.integer(value.day),
-      (QueryAmount(:final value), 'number') => QueryValue.number(value.number),
-      (QueryAmount(:final value), 'currency') => QueryValue.text(value.currency.name),
-      (QueryPosition(:final value), 'units') => QueryValue.amount(value.units),
-      (QueryPosition(:final value), 'cost') =>
+      (QueryDate(:final BeanDate value), 'year') => QueryValue.integer(value.year),
+      (QueryDate(:final BeanDate value), 'month') => QueryValue.integer(value.month),
+      (QueryDate(:final BeanDate value), 'day') => QueryValue.integer(value.day),
+      (QueryAmount(:final Amount value), 'number') => QueryValue.number(value.number),
+      (QueryAmount(:final Amount value), 'currency') => QueryValue.text(value.currency.name),
+      (QueryPosition(:final Position value), 'units') => QueryValue.amount(value.units),
+      (QueryPosition(:final Position value), 'cost') =>
         value.cost == null ? const QueryValue.null_() : QueryValue.cost(value.cost!),
-      (QueryCost(:final value), 'number') => QueryValue.number(value.number),
-      (QueryCost(:final value), 'currency') => QueryValue.text(value.currency.name),
-      (QueryCost(:final value), 'date') => QueryValue.date(value.date),
-      (QueryCost(:final value), 'label') => QueryValue.text(value.label ?? ''),
-      (QueryTransaction(), 'meta') => QueryValue.meta(const Meta()),
-      (QueryDirective(:final value), 'date') => QueryValue.date(value.date),
-      (QueryDirective(:final value), 'meta') => QueryValue.meta(value.meta),
+      (QueryCost(:final Cost value), 'number') => QueryValue.number(value.number),
+      (QueryCost(:final Cost value), 'currency') => QueryValue.text(value.currency.name),
+      (QueryCost(:final Cost value), 'date') => QueryValue.date(value.date),
+      (QueryCost(:final Cost value), 'label') => QueryValue.text(value.label ?? ''),
+      (QueryTransaction(), 'meta') => const QueryValue.meta(Meta()),
+      (QueryDirective(:final Directive value), 'date') => QueryValue.date(value.date),
+      (QueryDirective(:final Directive value), 'meta') => QueryValue.meta(value.meta),
       _ => const QueryValue.null_(),
     };
   }
@@ -1120,7 +1137,7 @@ class _Subscript extends _Eval {
   QueryType get type => QueryType.object;
   @override
   QueryValue call(Object row) {
-    final value = operand.call(row);
+    final QueryValue value = operand.call(row);
     if (value is QueryMeta) return metaLookup(value.value, key);
     return const QueryValue.null_();
   }
@@ -1147,7 +1164,7 @@ class _AnyMeta extends _Eval {
   @override
   QueryValue call(Object row) {
     if (row is PostingRow) {
-      final posting = metaLookup(row.posting.meta, key);
+      final QueryValue posting = metaLookup(row.posting.meta, key);
       if (!posting.isNull) return posting;
       return metaLookup(row.directive.meta, key);
     }
@@ -1162,10 +1179,14 @@ class _HasAccount extends _Eval {
   QueryType get type => QueryType.boolean;
   @override
   QueryValue call(Object row) {
-    final regex = RegExp('(?i)${pattern.call(row).asText() ?? ''}');
-    final accounts = switch (row) {
-      PostingRow(:final transaction) => [for (final posting in transaction.postings) posting.account.name],
-      Directive(:final body) => [for (final account in _directiveAccounts(body)) account.name],
+    final RegExp regex = RegExp('(?i)${pattern.call(row).asText() ?? ''}');
+    final List<String> accounts = switch (row) {
+      PostingRow(:final Transaction transaction) => <String>[
+        for (final Posting posting in transaction.postings) posting.account.name,
+      ],
+      Directive(:final DirectiveBody body) => <String>[
+        for (final Account account in _directiveAccounts(body)) account.name,
+      ],
       _ => const <String>[],
     };
     return QueryValue.boolean(accounts.any(regex.hasMatch));
@@ -1173,12 +1194,12 @@ class _HasAccount extends _Eval {
 }
 
 Set<Account> _directiveAccounts(DirectiveBody body) => switch (body) {
-  TransactionBody(:final value) => {for (final posting in value.postings) posting.account},
-  OpenBody(:final account) => {account},
-  CloseBody(:final account) => {account},
-  BalanceBody(:final account) => {account},
-  BudgetBody(:final account) || BudgetOffBody(:final account) => {account},
-  _ => {},
+  TransactionBody(:final Transaction value) => <Account>{for (final Posting posting in value.postings) posting.account},
+  OpenBody(:final Account account) => <Account>{account},
+  CloseBody(:final Account account) => <Account>{account},
+  BalanceBody(:final Account account) => <Account>{account},
+  BudgetBody(:final Account account) || BudgetOffBody(:final Account account) => <Account>{account},
+  _ => <Account>{},
 };
 
 class _Coalesce extends _Eval {
@@ -1188,8 +1209,8 @@ class _Coalesce extends _Eval {
   QueryType get type => args.first.type;
   @override
   QueryValue call(Object row) {
-    for (final arg in args) {
-      final value = arg.call(row);
+    for (final _Eval arg in args) {
+      final QueryValue value = arg.call(row);
       if (!value.isNull) return value;
     }
     return const QueryValue.null_();
@@ -1203,11 +1224,11 @@ class _Subquery extends _Eval {
   @override
   QueryType get type => QueryType.set;
   List<QueryValue> values() {
-    final compiled = compiler._compileSelect(select);
-    final result = compiler._execute(compiled);
-    if (result is! QueryTable) return const [];
-    return [
-      for (final row in result.rows)
+    final _CompiledSelect compiled = compiler._compileSelect(select);
+    final QueryResult result = compiler._execute(compiled);
+    if (result is! QueryTable) return const <QueryValue>[];
+    return <QueryValue>[
+      for (final QueryRow row in result.rows)
         if (row.values.isNotEmpty) row.values.first,
     ];
   }
@@ -1217,38 +1238,38 @@ class _Subquery extends _Eval {
 }
 
 SelectStatement _desugarBalances(BalancesStatement statement) {
-  final summary = statement.summaryFunc;
-  final position = summary == null || summary.isEmpty
+  final String? summary = statement.summaryFunc;
+  final Expr position = summary == null || summary.isEmpty
       ? const Expr.column('position')
-      : Expr.function(summary, [const Expr.column('position')]);
+      : Expr.function(summary, <Object>[const Expr.column('position')]);
   return SelectStatement(
-    targets: [
+    targets: <Target>[
       const Target(expression: Expr.column('account')),
-      Target(expression: Expr.function('sum', [position])),
+      Target(expression: Expr.function('sum', <Object>[position])),
     ],
     fromClause: statement.fromClause,
     whereClause: statement.whereClause,
     groupBy: const GroupBy(
-      columns: [
+      columns: <Object>[
         Expr.column('account'),
-        Expr.function('account_sortkey', [Expr.column('account')]),
+        Expr.function('account_sortkey', <Object>[Expr.column('account')]),
       ],
     ),
-    orderBy: const [
-      OrderBy(column: Expr.function('account_sortkey', [Expr.column('account')])),
+    orderBy: const <OrderBy>[
+      OrderBy(column: Expr.function('account_sortkey', <Object>[Expr.column('account')])),
     ],
   );
 }
 
 SelectStatement _desugarJournal(JournalStatement statement) {
-  final summary = statement.summaryFunc;
-  Expr wrap(Expr inner) => summary == null || summary.isEmpty ? inner : Expr.function(summary, [inner]);
+  final String? summary = statement.summaryFunc;
+  Expr wrap(Expr inner) => summary == null || summary.isEmpty ? inner : Expr.function(summary, <Object>[inner]);
   return SelectStatement(
-    targets: [
+    targets: <Target>[
       const Target(expression: Expr.column('date')),
       const Target(expression: Expr.column('flag')),
-      const Target(expression: Expr.function('maxwidth', [Expr.column('payee'), Expr.constant(48)])),
-      const Target(expression: Expr.function('maxwidth', [Expr.column('narration'), Expr.constant(80)])),
+      const Target(expression: Expr.function('maxwidth', <Object>[Expr.column('payee'), Expr.constant(48)])),
+      const Target(expression: Expr.function('maxwidth', <Object>[Expr.column('narration'), Expr.constant(80)])),
       const Target(expression: Expr.column('account')),
       Target(expression: wrap(const Expr.column('position'))),
       Target(expression: wrap(const Expr.column('balance'))),
@@ -1261,10 +1282,10 @@ SelectStatement _desugarJournal(JournalStatement statement) {
 }
 
 String _exprLabel(Expr expr) => switch (expr) {
-  ColumnExpr(:final name) => name,
-  FunctionExpr(:final fname, :final operands) =>
-    '$fname(${operands.map((operand) => operand is Expr ? _exprLabel(operand) : '*').join(', ')})',
-  ConstantExpr(:final value) => '$value',
+  ColumnExpr(:final String name) => name,
+  FunctionExpr(:final String fname, :final List<Object> operands) =>
+    '$fname(${operands.map((Object operand) => operand is Expr ? _exprLabel(operand) : '*').join(', ')})',
+  ConstantExpr(:final Object? value) => '$value',
   _ => 'column',
 };
 
@@ -1272,16 +1293,16 @@ int compareValues(QueryValue left, QueryValue right) {
   if (left.isNull && right.isNull) return 0;
   if (left.isNull) return -1;
   if (right.isNull) return 1;
-  final a = left is QueryMetaCell ? _unwrapMeta(left.value) : left;
-  final b = right is QueryMetaCell ? _unwrapMeta(right.value) : right;
+  final QueryValue a = left is QueryMetaCell ? _unwrapMeta(left.value) : left;
+  final QueryValue b = right is QueryMetaCell ? _unwrapMeta(right.value) : right;
   if (a is QueryInteger && b is QueryInteger) return a.value.compareTo(b.value);
   if (a is QueryNumber && b is QueryNumber) return a.value.compareTo(b.value);
   if (a is QueryInteger && b is QueryNumber) return Decimal.fromInt(a.value).compareTo(b.value);
   if (a is QueryNumber && b is QueryInteger) return a.value.compareTo(Decimal.fromInt(b.value));
   if (a is QueryDate && b is QueryDate) return compareBeanDate(a.value, b.value);
   if (a is QueryBoolean && b is QueryBoolean) return a.value == b.value ? 0 : (a.value ? 1 : -1);
-  final leftText = a.asText() ?? _stringifyValue(a);
-  final rightText = b.asText() ?? _stringifyValue(b);
+  final String leftText = a.asText() ?? _stringifyValue(a);
+  final String rightText = b.asText() ?? _stringifyValue(b);
   return leftText.compareTo(rightText);
 }
 
@@ -1289,36 +1310,36 @@ bool valuesEqual(QueryValue left, QueryValue right) {
   if (left.isNull && right.isNull) return true;
   if (left.isNull || right.isNull) return false;
   if (left == right) return true;
-  final aText = left.asText();
-  final bText = right.asText();
+  final String? aText = left.asText();
+  final String? bText = right.asText();
   if (aText != null && bText != null) return aText == bText;
   return compareValues(left, right) == 0;
 }
 
 QueryValue _unwrapMeta(MetaValue value) => switch (value) {
-  MetaText(:final value) => QueryValue.text(value),
-  MetaAccount(:final value) => QueryValue.account(value),
-  MetaCurrency(:final value) => QueryValue.currency(value),
-  MetaTag(:final value) => QueryValue.text(value.name),
-  MetaDate(:final value) => QueryValue.date(value),
-  MetaBoolean(:final value) => QueryValue.boolean(value),
-  MetaNumber(:final value) => QueryValue.number(value),
-  MetaAmount(:final value) => QueryValue.amount(value),
+  MetaText(:final String value) => QueryValue.text(value),
+  MetaAccount(:final Account value) => QueryValue.account(value),
+  MetaCurrency(:final Currency value) => QueryValue.currency(value),
+  MetaTag(:final Tag value) => QueryValue.text(value.name),
+  MetaDate(:final BeanDate value) => QueryValue.date(value),
+  MetaBoolean(:final bool value) => QueryValue.boolean(value),
+  MetaNumber(:final Decimal value) => QueryValue.number(value),
+  MetaAmount(:final Amount value) => QueryValue.amount(value),
 };
 
 String _stringifyValue(QueryValue value) => switch (value) {
   QueryNull() => '',
-  QueryBoolean(:final value) => value ? 'TRUE' : 'FALSE',
-  QueryInteger(:final value) => '$value',
-  QueryNumber(:final value) => '$value',
-  QueryText(:final value) => value,
-  QueryDate(:final value) => '$value',
-  QueryAccount(:final value) => value.name,
-  QueryCurrency(:final value) => value.name,
-  QueryAmount(:final value) => '$value',
-  QueryPosition(:final value) => '$value',
-  QueryInventory(:final value) => '$value',
-  QueryFlag(:final value) => flagChar(value),
-  QueryMetaCell(:final value) => _stringifyValue(_unwrapMeta(value)),
+  QueryBoolean(:final bool value) => value ? 'TRUE' : 'FALSE',
+  QueryInteger(:final int value) => '$value',
+  QueryNumber(:final Decimal value) => '$value',
+  QueryText(:final String value) => value,
+  QueryDate(:final BeanDate value) => '$value',
+  QueryAccount(:final Account value) => value.name,
+  QueryCurrency(:final Currency value) => value.name,
+  QueryAmount(:final Amount value) => '$value',
+  QueryPosition(:final Position value) => '$value',
+  QueryInventory(:final Inventory value) => '$value',
+  QueryFlag(:final Flag value) => flagChar(value),
+  QueryMetaCell(:final MetaValue value) => _stringifyValue(_unwrapMeta(value)),
   _ => value.toString(),
 };

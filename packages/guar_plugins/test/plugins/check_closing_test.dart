@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _source =
+const String _source =
     'plugin "beancount.plugins.check_closing"\n'
     '2018-02-16 open Assets:US:Brokerage:Main:Cash\n'
     '2018-02-16 open Assets:US:Brokerage:Main:Options\n'
@@ -22,21 +22,21 @@ const _source =
 
 void main() {
   test('inserts a zero balance the day after the closing posting', () {
-    expect(balances(booked(_source)), ['2018-02-17 Assets:US:Brokerage:Main:Options 0 QQQ180216C160']);
+    expect(balances(booked(_source)), <String>['2018-02-17 Assets:US:Brokerage:Main:Options 0 QQQ180216C160']);
   });
 
   test('strips the closing metadata from the posting', () {
-    final keys = [
-      for (final directive in booked(_source))
-        if (directive.body case TransactionBody(:final value))
-          for (final posting in value.postings)
-            for (final entry in posting.meta.entries) entry.key,
+    final List<String> keys = <String>[
+      for (final Directive directive in booked(_source))
+        if (directive.body case TransactionBody(:final Transaction value))
+          for (final Posting posting in value.postings)
+            for (final MetaEntry entry in posting.meta.entries) entry.key,
     ];
     expect(keys, isNot(contains('closing')));
   });
 
   test('leaves transactions without the metadata alone', () {
-    final directives = booked(
+    final List<Directive> directives = booked(
       'plugin "beancount.plugins.check_closing"\n'
       '2018-02-16 open Assets:Cash\n'
       '2018-02-16 open Expenses:Food\n'

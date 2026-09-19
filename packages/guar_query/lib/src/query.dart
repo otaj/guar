@@ -2,10 +2,10 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
-import 'ast.dart';
-import 'compile.dart';
-import 'grammar.dart';
-import 'result.dart';
+import 'package:guar_query/src/ast.dart';
+import 'package:guar_query/src/compile.dart';
+import 'package:guar_query/src/grammar.dart';
+import 'package:guar_query/src/result.dart';
 
 class Query {
   Query({DateTime Function()? clock}) : clock = clock ?? DateTime.now;
@@ -18,7 +18,7 @@ class Query {
     try {
       return compileAndExecute(statement, ledger, params: params, clock: clock);
     } on QueryException catch (error) {
-      return QueryResult.errors([error.toError()]);
+      return QueryResult.errors(<QueryError>[error.toError()]);
     }
   }
 
@@ -26,7 +26,7 @@ class Query {
     try {
       return execute(ledger, parse(source), params: params);
     } on QueryException catch (error) {
-      return QueryResult.errors([error.toError()]);
+      return QueryResult.errors(<QueryError>[error.toError()]);
     }
   }
 }

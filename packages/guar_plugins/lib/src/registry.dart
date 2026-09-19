@@ -1,7 +1,7 @@
 // Combined default plugin map registered by Book().
 
-import 'plugin.dart';
-import 'reds/reds.dart';
-import 'stock.dart';
+import 'package:guar_plugins/src/plugin.dart';
+import 'package:guar_plugins/src/reds/reds.dart';
+import 'package:guar_plugins/src/stock.dart';
 
-final Map<String, BookPlugin> defaultPlugins = {...stockPlugins, ...redsPlugins};
+final Map<String, BookPlugin> defaultPlugins = <String, BookPlugin>{...stockPlugins, ...redsPlugins};

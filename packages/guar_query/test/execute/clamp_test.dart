@@ -6,7 +6,7 @@ import 'package:guar_parser/guar_parser.dart' as p;
 import 'package:guar_query/guar_query.dart';
 import 'package:test/test.dart';
 
-const _source = '''
+const String _source = '''
 2024-01-01 open Assets:Bank USD
 2024-01-01 open Expenses:Food USD
 2024-01-01 open Income:Salary USD
@@ -25,16 +25,16 @@ const _source = '''
 ''';
 
 Ledger _book(String source) {
-  final parsed = const p.BeancountParser().parse(source, filename: 'test.beancount');
-  final booked = Book().process(parsed);
+  final p.ParsedLedger parsed = const p.BeancountParser().parse(source, filename: 'test.beancount');
+  final Ledger booked = Book().process(parsed);
   expect(booked, isA<LedgerDirectives>(), reason: booked is LedgerErrors ? booked.errors.toString() : null);
   return booked;
 }
 
 List<Directive> _txns(Ledger ledger) {
   expect(ledger, isA<LedgerDirectives>());
-  return [
-    for (final directive in (ledger as LedgerDirectives).directives)
+  return <Directive>[
+    for (final Directive directive in (ledger as LedgerDirectives).directives)
       if (directive.body is TransactionBody) directive,
   ];
 }
@@ -49,74 +49,107 @@ void main() {
   });
 
   test('entry on start date is included', () {
-    final clamped = clamp(ledger, BeanDate(year: 2024, month: 2, day: 15), BeanDate(year: 2024, month: 3, day: 1));
-    final groceries = [
-      for (final txn in _txns(clamped))
+    final Ledger clamped = clamp(
+      ledger,
+      BeanDate(year: 2024, month: 2, day: 15),
+      BeanDate(year: 2024, month: 3, day: 1),
+    );
+    final List<Directive> groceries = <Directive>[
+      for (final Directive txn in _txns(clamped))
         if (txn.date == BeanDate(year: 2024, month: 2, day: 15) && _narration(txn) == 'Groceries') txn,
     ];
     expect(groceries, hasLength(1));
   });
 
   test('entry on end date is excluded', () {
-    final clamped = clamp(ledger, BeanDate(year: 2024, month: 2, day: 1), BeanDate(year: 2024, month: 3, day: 15));
-    expect(_txns(clamped).where((txn) => txn.date.toString().compareTo('2024-03-15') >= 0), isEmpty);
+    final Ledger clamped = clamp(
+      ledger,
+      BeanDate(year: 2024, month: 2, day: 1),
+      BeanDate(year: 2024, month: 3, day: 15),
+    );
+    expect(_txns(clamped).where((Directive txn) => txn.date.toString().compareTo('2024-03-15') >= 0), isEmpty);
   });
 
   test('empty window still has opening-balance entries', () {
-    final clamped = clamp(ledger, BeanDate(year: 2024, month: 4, day: 1), BeanDate(year: 2024, month: 5, day: 1));
-    final txns = _txns(clamped);
+    final Ledger clamped = clamp(
+      ledger,
+      BeanDate(year: 2024, month: 4, day: 1),
+      BeanDate(year: 2024, month: 5, day: 1),
+    );
+    final List<Directive> txns = _txns(clamped);
     expect(txns, isNotEmpty);
-    for (final txn in txns) {
-      final narration = _narration(txn);
+    for (final Directive txn in txns) {
+      final String narration = _narration(txn);
       expect(narration.contains('Summarization') || narration.contains('Opening'), isTrue);
     }
   });
 
   test('opening entries use summarization narration and equity', () {
-    final clamped = clamp(ledger, BeanDate(year: 2024, month: 2, day: 1), BeanDate(year: 2024, month: 3, day: 1));
-    final opening = [
-      for (final txn in _txns(clamped))
+    final Ledger clamped = clamp(
+      ledger,
+      BeanDate(year: 2024, month: 2, day: 1),
+      BeanDate(year: 2024, month: 3, day: 1),
+    );
+    final List<Directive> opening = <Directive>[
+      for (final Directive txn in _txns(clamped))
         if (_narration(txn).contains('Summarization')) txn,
     ];
     expect(opening, isNotEmpty);
-    for (final txn in opening) {
+    for (final Directive txn in opening) {
       expect(_narration(txn), contains('Opening balance'));
-      final accounts = [for (final posting in (txn.body as TransactionBody).value.postings) posting.account.name];
-      expect(accounts.any((name) => name.startsWith('Equity:')), isTrue);
+      final List<String> accounts = <String>[
+        for (final Posting posting in (txn.body as TransactionBody).value.postings) posting.account.name,
+      ];
+      expect(accounts.any((String name) => name.startsWith('Equity:')), isTrue);
     }
   });
 
   test('regular transactions before start date are dropped', () {
-    final clamped = clamp(ledger, BeanDate(year: 2024, month: 2, day: 1), BeanDate(year: 2024, month: 3, day: 1));
+    final Ledger clamped = clamp(
+      ledger,
+      BeanDate(year: 2024, month: 2, day: 1),
+      BeanDate(year: 2024, month: 3, day: 1),
+    );
     expect(
       _txns(
         clamped,
-      ).where((txn) => txn.date.toString().compareTo('2024-01-31') < 0 && !_narration(txn).contains('Summarization')),
+      ).where(
+        (Directive txn) =>
+            txn.date.toString().compareTo('2024-01-31') < 0 && !_narration(txn).contains('Summarization'),
+      ),
       isEmpty,
     );
   });
 
   test('regular transactions are strictly before end date', () {
-    final clamped = clamp(ledger, BeanDate(year: 2024, month: 2, day: 1), BeanDate(year: 2024, month: 3, day: 1));
-    final regular = [
-      for (final txn in _txns(clamped))
+    final Ledger clamped = clamp(
+      ledger,
+      BeanDate(year: 2024, month: 2, day: 1),
+      BeanDate(year: 2024, month: 3, day: 1),
+    );
+    final List<Directive> regular = <Directive>[
+      for (final Directive txn in _txns(clamped))
         if (!_narration(txn).contains('Summarization')) txn,
     ];
-    expect(regular.every((txn) => txn.date.toString().compareTo('2024-03-01') < 0), isTrue);
+    expect(regular.every((Directive txn) => txn.date.toString().compareTo('2024-03-01') < 0), isTrue);
   });
 
   test('errors ledger is unchanged', () {
-    final errors = Ledger.errors(
-      errors: [ProcessingError(message: 'boom', location: BeanLocation(linenoBegin: 1, linenoEnd: 1))],
+    final Ledger errors = Ledger.errors(
+      errors: <ProcessingError>[ProcessingError(message: 'boom', location: BeanLocation(linenoBegin: 1, linenoEnd: 1))],
       options: LedgerOptions(),
     );
     expect(clamp(errors, BeanDate(year: 2024, month: 1, day: 1), BeanDate(year: 2024, month: 2, day: 1)), same(errors));
   });
 
   test('clamp keeps parse warnings', () {
-    final warned = _book('option "insert_pythonpath" "TRUE"\n$_source');
+    final Ledger warned = _book('option "insert_pythonpath" "TRUE"\n$_source');
     expect((warned as LedgerDirectives).warnings, isNotEmpty);
-    final clamped = clamp(warned, BeanDate(year: 2024, month: 2, day: 1), BeanDate(year: 2024, month: 3, day: 1));
+    final Ledger clamped = clamp(
+      warned,
+      BeanDate(year: 2024, month: 2, day: 1),
+      BeanDate(year: 2024, month: 3, day: 1),
+    );
     expect((clamped as LedgerDirectives).warnings, warned.warnings);
   });
 }

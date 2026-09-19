@@ -3,46 +3,47 @@
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
 
-import '../plugin.dart';
-import 'common.dart';
+import 'package:guar_plugins/src/plugin.dart';
+import 'package:guar_plugins/src/reds/common.dart';
 
-BookPluginResult boxAccrual(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) {
-  return (directives: [for (final directive in directives) _accrue(directive)], errors: const []);
-}
+BookPluginResult boxAccrual(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) => (
+  directives: <Directive>[for (final Directive directive in directives) _accrue(directive)],
+  errors: const <ProcessingError>[],
+);
 
 Directive _accrue(Directive directive) {
-  final transaction = transactionOf(directive);
+  final Transaction? transaction = transactionOf(directive);
   if (transaction == null) return directive;
-  final expiry = metaDate(directive.meta, 'synthetic_loan_expiry');
+  final BeanDate? expiry = metaDate(directive.meta, 'synthetic_loan_expiry');
   if (expiry == null) return directive;
-  final losses = [
-    for (var i = 0; i < transaction.postings.length; i++)
+  final List<int> losses = <int>[
+    for (int i = 0; i < transaction.postings.length; i++)
       if (transaction.postings[i].account.name.endsWith(':Capital-Losses')) i,
   ];
   if (losses.length != 1) return directive;
-  final loss = transaction.postings[losses.single];
-  final start = directive.date;
+  final Posting loss = transaction.postings[losses.single];
+  final BeanDate start = directive.date;
   if (start.year == expiry.year) return directive;
-  final totalDays = daysInclusive(start, expiry);
+  final int totalDays = daysInclusive(start, expiry);
   if (totalDays <= 0) return directive;
 
-  final fractions = <({int days, BeanDate end})>[];
-  for (var year = start.year; year <= expiry.year; year++) {
-    final yearStart = BeanDate(year: year, month: 1, day: 1);
-    final yearEnd = BeanDate(year: year, month: 12, day: 31);
-    final segStart = compareBeanDate(start, yearStart) > 0 ? start : yearStart;
-    final segEnd = compareBeanDate(expiry, yearEnd) < 0 ? expiry : yearEnd;
-    final segDays = daysInclusive(segStart, segEnd);
+  final List<({int days, BeanDate end})> fractions = <({int days, BeanDate end})>[];
+  for (int year = start.year; year <= expiry.year; year++) {
+    final BeanDate yearStart = BeanDate(year: year, month: 1, day: 1);
+    final BeanDate yearEnd = BeanDate(year: year, month: 12, day: 31);
+    final BeanDate segStart = compareBeanDate(start, yearStart) > 0 ? start : yearStart;
+    final BeanDate segEnd = compareBeanDate(expiry, yearEnd) < 0 ? expiry : yearEnd;
+    final int segDays = daysInclusive(segStart, segEnd);
     if (segDays <= 0) continue;
     fractions.add((days: segDays, end: segEnd));
   }
   if (fractions.isEmpty) return directive;
 
-  final totalLoss = loss.units.number;
-  final splits = <Posting>[];
-  var roundedSum = Decimal.zero;
-  for (var i = 0; i < fractions.length; i++) {
-    var segAmt = (totalLoss * Decimal.fromInt(fractions[i].days) / Decimal.fromInt(totalDays)).toDecimal(
+  final Decimal totalLoss = loss.units.number;
+  final List<Posting> splits = <Posting>[];
+  Decimal roundedSum = Decimal.zero;
+  for (int i = 0; i < fractions.length; i++) {
+    Decimal segAmt = (totalLoss * Decimal.fromInt(fractions[i].days) / Decimal.fromInt(totalDays)).toDecimal(
       scaleOnInfinitePrecision: 16,
     );
     if (i < fractions.length - 1) {
@@ -64,8 +65,8 @@ Directive _accrue(Directive directive) {
   return replaceTransaction(
     directive,
     transaction.copyWith(
-      postings: [
-        for (var i = 0; i < transaction.postings.length; i++)
+      postings: <Posting>[
+        for (int i = 0; i < transaction.postings.length; i++)
           if (i != losses.single) transaction.postings[i],
         ...splits,
       ],

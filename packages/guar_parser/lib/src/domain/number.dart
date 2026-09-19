@@ -12,8 +12,8 @@ abstract class BeanNumber with _$BeanNumber {
 
 extension BeanNumberPlaces on BeanNumber {
   int get places {
-    final compact = verbatim.replaceAll(',', '').replaceAll(' ', '');
-    final match = RegExp(r'^[+-]?\d+(?:\.(\d+))?$').firstMatch(compact);
+    final String compact = verbatim.replaceAll(',', '').replaceAll(' ', '');
+    final RegExpMatch? match = RegExp(r'^[+-]?\d+(?:\.(\d+))?$').firstMatch(compact);
     return match?.group(1)?.length ?? 0;
   }
 }

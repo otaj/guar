@@ -8,16 +8,16 @@ import 'package:test/test.dart';
 
 void main() {
   test('pad inserts balancing transaction before balance assertion', () {
-    final source = '''
+    const String source = '''
 2020-01-01 open Assets:Checking
 2020-01-01 open Equity:Opening-Balances
 2020-01-01 pad Assets:Checking Equity:Opening-Balances
 2020-01-02 balance Assets:Checking 100.00 USD
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'pad.beancount'));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'pad.beancount'));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final directives = (ledger as LedgerDirectives).directives;
-    final txns = directives.map((d) => d.body).whereType<TransactionBody>().toList();
+    final List<Directive> directives = (ledger as LedgerDirectives).directives;
+    final List<TransactionBody> txns = directives.map((Directive d) => d.body).whereType<TransactionBody>().toList();
     expect(txns, hasLength(1));
     expect(txns.single.value.postings.first.units.number, Decimal.parse('100.00'));
     expect(txns.single.value.flag, Flag.letter('P'));
@@ -26,22 +26,24 @@ void main() {
   });
 
   test('pad transactions follow insert-entry on posting accounts', () {
-    final source = '''
+    const String source = '''
 2020-01-01 custom "fava-option" "insert-entry" "Assets:Checking"
 2020-01-01 open Assets:Checking
 2020-01-01 open Equity:Opening-Balances
 2020-01-01 pad Assets:Checking Equity:Opening-Balances
 2020-01-02 balance Assets:Checking 100.00 USD
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'checking.beancount'));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'checking.beancount'));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final txns = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<TransactionBody>();
-    final origin = txns.single.value.origin as SourceOrigin;
+    final Iterable<TransactionBody> txns = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>();
+    final SourceOrigin origin = txns.single.value.origin as SourceOrigin;
     expect(origin.location.filename, 'checking.beancount');
   });
 
   test('pad looks ahead through intervening transactions', () {
-    final source = '''
+    const String source = '''
 2024-01-01 open Assets:Bank
 2024-01-01 open Equity:Opening-Balances
 2024-01-01 open Expenses:Food
@@ -51,12 +53,12 @@ void main() {
   Expenses:Food
 2024-01-31 balance Assets:Bank 800.00 USD
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'pad-ahead.beancount'));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'pad-ahead.beancount'));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
   });
 
   test('balance assertion infers tolerance from written decimal places', () {
-    final source = '''
+    const String source = '''
 2024-01-01 open Assets:Bank
 2024-01-01 open Equity:Opening-Balances
 2024-01-15 * "Deposit"
@@ -64,12 +66,12 @@ void main() {
   Equity:Opening-Balances
 2024-01-31 balance Assets:Bank 1000.00 USD
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'bal-tol.beancount'));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'bal-tol.beancount'));
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
   });
 
   test('failed balance assertion yields errors', () {
-    final source = '''
+    const String source = '''
 2020-01-01 open Assets:Checking
 2020-01-01 open Equity:Opening-Balances
 2020-01-01 * "seed"
@@ -77,9 +79,9 @@ void main() {
   Equity:Opening-Balances  -50.00 USD
 2020-01-02 balance Assets:Checking 100.00 USD
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source, filename: 'bal.beancount'));
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'bal.beancount'));
     expect(ledger, isA<LedgerErrors>());
-    final errors = (ledger as LedgerErrors).errors;
-    expect(errors.any((e) => e.message.contains('Balance failed')), isTrue);
+    final List<ProcessingError> errors = (ledger as LedgerErrors).errors;
+    expect(errors.any((ProcessingError e) => e.message.contains('Balance failed')), isTrue);
   });
 }

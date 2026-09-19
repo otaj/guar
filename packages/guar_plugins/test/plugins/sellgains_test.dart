@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const _header =
+const String _header =
     'plugin "beancount.plugins.auto_accounts"\n'
     'plugin "beancount.plugins.sellgains"\n';
 

@@ -19,7 +19,7 @@ void main() {
         '  Expenses:Food         1.00 USD\n'
         '  Assets:Other         -1.00 USD\n',
       ),
-      ["Non-leaf account 'Expenses:Food' has postings on it"],
+      <String>["Non-leaf account 'Expenses:Food' has postings on it"],
     );
   });
 

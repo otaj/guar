@@ -23,7 +23,7 @@ void main() {
         '  Assets:Invest:Shares       1 HOOL @ 720.00 USD\n'
         '  Assets:Invest:Cash\n',
       ),
-      ["Currency 'HOOL' is used both with and without cost"],
+      <String>["Currency 'HOOL' is used both with and without cost"],
     );
   });
 

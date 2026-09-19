@@ -2,25 +2,24 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
+import 'package:guar_plugins/src/helpers.dart';
+import 'package:guar_plugins/src/plugin.dart';
 
-import 'plugin.dart';
-import 'helpers.dart';
-
-const _closingField = 'closing';
+const String _closingField = 'closing';
 
 BookPluginResult checkClosing(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) {
-  final out = <Directive>[];
-  for (final directive in directives) {
-    final body = directive.body;
+  final List<Directive> out = <Directive>[];
+  for (final Directive directive in directives) {
+    final DirectiveBody body = directive.body;
     if (body is! TransactionBody) {
       out.add(directive);
       continue;
     }
 
-    final postings = <Posting>[];
-    final balances = <Directive>[];
-    for (final posting in body.value.postings) {
-      if (posting.meta.lookup(_closingField) != MetaValue.boolean(true)) {
+    final List<Posting> postings = <Posting>[];
+    final List<Directive> balances = <Directive>[];
+    for (final Posting posting in body.value.postings) {
+      if (posting.meta.lookup(_closingField) != const MetaValue.boolean(true)) {
         postings.add(posting);
         continue;
       }
@@ -45,8 +44,9 @@ BookPluginResult checkClosing(List<Directive> directives, LedgerOptions options,
       );
     }
 
-    out.addAll(balances);
-    out.add(directive.copyWith(body: DirectiveBody.transaction(body.value.copyWith(postings: postings))));
+    out
+      ..addAll(balances)
+      ..add(directive.copyWith(body: DirectiveBody.transaction(body.value.copyWith(postings: postings))));
   }
-  return (directives: out, errors: const []);
+  return (directives: out, errors: const <ProcessingError>[]);
 }

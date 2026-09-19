@@ -4,10 +4,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:guar_parser/guar_parser.dart';
-import 'package:protobuf/protobuf.dart' show TextFormatExtension;
+import 'package:guar_parser/src/proto/domain_to_proto.dart';
 import 'package:protobean/protobean.dart' as pb;
-
-import 'domain_to_proto.dart';
+import 'package:protobuf/protobuf.dart' show TextFormatExtension;
 
 enum ProtoExportFormat { binary, text }
 
@@ -20,7 +19,7 @@ extension BeancountProtoExport on BeancountParser {
 
   void exportProtoToFile(ParsedLedger ledger, File file, {required bool overwrite, required ProtoExportFormat format}) {
     if (file.existsSync()) {
-      final existing = file.readAsBytesSync();
+      final Uint8List existing = file.readAsBytesSync();
       if (existing.isNotEmpty && !overwrite) {
         throw StateError('refusing to overwrite ${file.path}');
       }

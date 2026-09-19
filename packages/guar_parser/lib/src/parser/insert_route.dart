@@ -1,6 +1,6 @@
 // Destination file for a directive created in memory (insert-entry / default-file / root).
 
-import '../domain/domain.dart';
+import 'package:guar_parser/src/domain/domain.dart';
 
 BeanLocation insertLocation({
   required BeanDate date,
@@ -8,48 +8,55 @@ BeanLocation insertLocation({
   required List<ParsedDirective> existing,
   required ProcessingInfo info,
 }) {
-  final tree = _filesInTree(existing, info);
-  final root = info.filename ?? '';
-  final match = _matchingInsertEntry(date, _accountsForInsert(body), existing);
+  final Set<String> tree = _filesInTree(existing, info);
+  final String root = info.filename ?? '';
+  final ({String filename, int lineno})? match = _matchingInsertEntry(date, _accountsForInsert(body), existing);
   if (match != null) {
     return BeanLocation(filename: match.filename, linenoBegin: match.lineno, linenoEnd: match.lineno);
   }
-  final fallback = _defaultFile(existing, tree) ?? root;
-  final line = _appendLine(fallback, existing, info);
+  final String fallback = _defaultFile(existing, tree) ?? root;
+  final int line = _appendLine(fallback, existing, info);
   return BeanLocation(filename: fallback, linenoBegin: line, linenoEnd: line);
 }
 
 BeanLocation optionPluginLocation(ProcessingInfo info) {
-  final root = info.filename ?? '';
+  final String root = info.filename ?? '';
   return BeanLocation(filename: root, linenoBegin: 1, linenoEnd: 1);
 }
 
-List<String> _accountsForInsert(DirectiveBody body) {
-  return switch (body) {
-    TransactionBody(:final value) => [for (final posting in value.postings.reversed) posting.account.name],
-    PadBody(:final account, :final sourceAccount) => [account.name, sourceAccount.name],
-    OpenBody(:final account) ||
-    CloseBody(:final account) ||
-    BalanceBody(:final account) ||
-    NoteBody(:final account) ||
-    DocumentBody(:final account) => [account.name],
-    CustomBody(:final values) => [
-      for (final value in values)
-        if (value is CustomAccount) value.value.name,
-    ],
-    PriceBody() || CommodityBody() || EventBody() || QueryBody() => const [],
-  };
-}
+List<String> _accountsForInsert(DirectiveBody body) => switch (body) {
+  TransactionBody(:final ParsedTransaction value) => <String>[
+    for (final ParsedPosting posting in value.postings.reversed) posting.account.name,
+  ],
+  PadBody(:final Account account, :final Account sourceAccount) => <String>[account.name, sourceAccount.name],
+  OpenBody(:final Account account) ||
+  CloseBody(:final Account account) ||
+  BalanceBody(:final Account account) ||
+  NoteBody(:final Account account) ||
+  DocumentBody(:final Account account) => <String>[account.name],
+  CustomBody(:final List<CustomValue> values) => <String>[
+    for (final CustomValue value in values)
+      if (value is CustomAccount) value.value.name,
+  ],
+  PriceBody() || CommodityBody() || EventBody() || QueryBody() => const <String>[],
+};
 
 ({String filename, int lineno})? _matchingInsertEntry(
   BeanDate date,
   List<String> accounts,
   List<ParsedDirective> existing,
 ) {
-  final rules = [for (final directive in existing) ?_insertEntryRule(directive)]
-    ..sort((a, b) => compareBeanDate(b.date, a.date));
-  for (final account in accounts) {
-    for (final rule in rules) {
+  final List<({BeanDate date, String filename, int lineno, RegExp pattern})> rules =
+      <({BeanDate date, String filename, int lineno, RegExp pattern})>[
+        for (final ParsedDirective directive in existing) ?_insertEntryRule(directive),
+      ]..sort(
+        (
+          ({BeanDate date, String filename, int lineno, RegExp pattern}) a,
+          ({BeanDate date, String filename, int lineno, RegExp pattern}) b,
+        ) => compareBeanDate(b.date, a.date),
+      );
+  for (final String account in accounts) {
+    for (final ({BeanDate date, String filename, int lineno, RegExp pattern}) rule in rules) {
       if (compareBeanDate(rule.date, date) >= 0) {
         continue;
       }
@@ -65,12 +72,12 @@ List<String> _accountsForInsert(DirectiveBody body) {
   if (directive.body is! CustomBody) {
     return null;
   }
-  final body = directive.body as CustomBody;
+  final CustomBody body = directive.body as CustomBody;
   if (body.type != 'fava-option' || body.values.length < 2) {
     return null;
   }
-  final key = body.values[0];
-  final value = body.values[1];
+  final CustomValue key = body.values[0];
+  final CustomValue value = body.values[1];
   if (key is! CustomText || key.value != 'insert-entry' || value is! CustomText) {
     return null;
   }
@@ -90,21 +97,23 @@ List<String> _accountsForInsert(DirectiveBody body) {
 
 String? _defaultFile(List<ParsedDirective> existing, Set<String> tree) {
   String? target;
-  for (final directive in existing) {
+  for (final ParsedDirective directive in existing) {
     if (directive.body is! CustomBody) {
       continue;
     }
-    final body = directive.body as CustomBody;
+    final CustomBody body = directive.body as CustomBody;
     if (body.type != 'fava-option' || body.values.isEmpty) {
       continue;
     }
-    final key = body.values[0];
+    final CustomValue key = body.values[0];
     if (key is! CustomText || key.value != 'default-file') {
       continue;
     }
-    final relative = body.values.length > 1 && body.values[1] is CustomText ? (body.values[1] as CustomText).value : '';
-    final resolved = _resolveAgainst(directive.location.filename, relative);
-    final inTree = _treeMember(resolved, tree);
+    final String relative = body.values.length > 1 && body.values[1] is CustomText
+        ? (body.values[1] as CustomText).value
+        : '';
+    final String resolved = _resolveAgainst(directive.location.filename, relative);
+    final String? inTree = _treeMember(resolved, tree);
     if (inTree != null) {
       target = inTree;
     }
@@ -113,33 +122,33 @@ String? _defaultFile(List<ParsedDirective> existing, Set<String> tree) {
 }
 
 int _appendLine(String filename, List<ParsedDirective> existing, ProcessingInfo info) {
-  var last = 0;
+  int last = 0;
   void consider(BeanLocation location) {
     if (location.filename == filename && location.linenoEnd > last) {
       last = location.linenoEnd;
     }
   }
 
-  for (final setting in info.optionSettings) {
+  for (final OptionSetting setting in info.optionSettings) {
     consider(setting.location);
   }
-  for (final plugin in info.plugin) {
+  for (final Plugin plugin in info.plugin) {
     consider(plugin.location);
   }
-  for (final directive in existing) {
+  for (final ParsedDirective directive in existing) {
     consider(directive.location);
   }
   return last == 0 ? 1 : last + 1;
 }
 
 Set<String> _filesInTree(List<ParsedDirective> existing, ProcessingInfo info) {
-  final files = <String>{};
-  final root = info.filename;
+  final Set<String> files = <String>{};
+  final String? root = info.filename;
   if (root != null && root.isNotEmpty) {
     files.add(root);
   }
   files.addAll(info.include);
-  for (final directive in existing) {
+  for (final ParsedDirective directive in existing) {
     if (directive.location.filename.isNotEmpty) {
       files.add(directive.location.filename);
     }
@@ -154,8 +163,8 @@ String _resolveAgainst(String fromFile, String relative) {
   if (relative.startsWith('/')) {
     return relative;
   }
-  final normalized = fromFile.replaceAll('\\', '/');
-  final slash = normalized.lastIndexOf('/');
+  final String normalized = fromFile.replaceAll(r'\', '/');
+  final int slash = normalized.lastIndexOf('/');
   if (slash < 0) {
     return relative;
   }
@@ -166,9 +175,9 @@ String? _treeMember(String path, Set<String> tree) {
   if (tree.contains(path)) {
     return path;
   }
-  final normalized = path.replaceAll('\\', '/');
-  for (final file in tree) {
-    if (file.replaceAll('\\', '/') == normalized) {
+  final String normalized = path.replaceAll(r'\', '/');
+  for (final String file in tree) {
+    if (file.replaceAll(r'\', '/') == normalized) {
       return file;
     }
   }

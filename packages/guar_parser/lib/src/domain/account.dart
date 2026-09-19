@@ -2,7 +2,7 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'validation.dart';
+import 'package:guar_parser/src/domain/validation.dart';
 
 part 'account.freezed.dart';
 

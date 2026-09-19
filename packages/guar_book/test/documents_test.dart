@@ -9,19 +9,23 @@ import 'package:test/test.dart';
 
 void main() {
   test('documents stage inserts document directives from filesystem', () {
-    final root = Directory.systemTemp.createTempSync('guar_book_docs');
+    final Directory root = Directory.systemTemp.createTempSync('guar_book_docs');
     addTearDown(() => root.deleteSync(recursive: true));
-    final accountDir = Directory('${root.path}/Assets/Cash')..createSync(recursive: true);
+    final Directory accountDir = Directory('${root.path}/Assets/Cash')..createSync(recursive: true);
     File('${accountDir.path}/2020-03-15.receipt.pdf').writeAsStringSync('x');
 
-    final source =
+    final String source =
         '''
 option "documents" "${root.path}"
 2020-01-01 open Assets:Cash
 ''';
-    final ledger = Book().process(p.BeancountParser().parse(source, filename: '${root.path}/ledger.beancount'));
+    final Ledger ledger = Book().process(
+      const p.BeancountParser().parse(source, filename: '${root.path}/ledger.beancount'),
+    );
     expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
-    final docs = (ledger as LedgerDirectives).directives.map((d) => d.body).whereType<DocumentBody>();
+    final Iterable<DocumentBody> docs = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<DocumentBody>();
     expect(docs, isNotEmpty);
     expect(docs.first.account.name, 'Assets:Cash');
     expect(docs.first.filename.endsWith('2020-03-15.receipt.pdf'), isTrue);

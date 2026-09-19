@@ -9,7 +9,7 @@ import 'support.dart';
 
 void main() {
   test('auto_accounts inserts opens at first use', () {
-    final ledger = booked(
+    final List<Directive> ledger = booked(
       'plugin "beancount.plugins.auto_accounts"\n'
       '2014-02-01 *\n'
       '  Assets:US:Bank:Checking     100 USD\n'
@@ -19,13 +19,13 @@ void main() {
       '  Assets:US:Bank:Checking     100 USD\n'
       '  Equity:Something           -100 USD\n',
     );
-    final opens = [
-      for (final d in ledger)
-        if (d.body case OpenBody(:final account)) '${d.date} ${account.name}',
+    final List<String> opens = <String>[
+      for (final Directive d in ledger)
+        if (d.body case OpenBody(:final Account account)) '${d.date} ${account.name}',
     ];
     expect(
       opens,
-      containsAll([
+      containsAll(<dynamic>[
         '2014-02-01 Assets:US:Bank:Checking',
         '2014-02-01 Assets:US:Bank:Savings',
         '2014-03-11 Equity:Something',
@@ -34,7 +34,7 @@ void main() {
   });
 
   test('auto_accounts opens follow insert-entry routing', () {
-    final dir = Directory.systemTemp.createTempSync('guar_auto_accounts_');
+    final Directory dir = Directory.systemTemp.createTempSync('guar_auto_accounts_');
     addTearDown(() => dir.deleteSync(recursive: true));
     File(
       '${dir.path}/expenses.beancount',
@@ -46,21 +46,23 @@ include "expenses.beancount"
   Expenses:Food     100 USD
   Assets:Cash      -100 USD
 ''');
-    final source = File('${dir.path}/ledger.beancount').readAsStringSync();
-    final ledger = process(source, filename: '${dir.path}/ledger.beancount');
-    final directives = switch (ledger) {
-      LedgerDirectives(:final directives) => directives,
-      LedgerErrors(:final errors) => throw TestFailure(errors.map((e) => e.message).join('\n')),
+    final String source = File('${dir.path}/ledger.beancount').readAsStringSync();
+    final Ledger ledger = process(source, filename: '${dir.path}/ledger.beancount');
+    final List<Directive> directives = switch (ledger) {
+      LedgerDirectives(:final List<Directive> directives) => directives,
+      LedgerErrors(:final List<ProcessingError> errors) => throw TestFailure(
+        errors.map((ProcessingError e) => e.message).join('\n'),
+      ),
     };
     String? filename(Directive directive) => switch (directive.origin) {
-      SourceOrigin(:final location) => location.filename,
+      SourceOrigin(:final BeanLocation location) => location.filename,
       GeneratedOrigin() => null,
     };
-    final food = directives
-        .where((d) => d.body is OpenBody && (d.body as OpenBody).account.name == 'Expenses:Food')
+    final Directive food = directives
+        .where((Directive d) => d.body is OpenBody && (d.body as OpenBody).account.name == 'Expenses:Food')
         .single;
-    final cash = directives
-        .where((d) => d.body is OpenBody && (d.body as OpenBody).account.name == 'Assets:Cash')
+    final Directive cash = directives
+        .where((Directive d) => d.body is OpenBody && (d.body as OpenBody).account.name == 'Assets:Cash')
         .single;
     expect(filename(food), File('${dir.path}/expenses.beancount').absolute.path);
     expect(filename(cash), File('${dir.path}/ledger.beancount').absolute.path);

@@ -7,14 +7,14 @@ import 'helpers/amounts.dart';
 
 void main() {
   test('booked cost per-unit transaction has complete units and dated cost', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final cash = account('Assets:NZ:Cash', AccountType.assets);
-    final shares = account('Assets:Shares:IBM', AccountType.assets);
-    final txn = Transaction(
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Account cash = account('Assets:NZ:Cash', AccountType.assets);
+    final Account shares = account('Assets:Shares:IBM', AccountType.assets);
+    final Transaction txn = Transaction(
       origin: origin,
       flag: const Flag.special(SpecialFlag.asterisk),
       narration: 'cost per-unit',
-      postings: [
+      postings: <Posting>[
         Posting(
           origin: origin,
           account: shares,
@@ -24,14 +24,14 @@ void main() {
         Posting(origin: origin, account: cash, units: amount('-1500.00', 'NZD')),
       ],
     );
-    final directive = Directive(
+    final Directive directive = Directive(
       origin: origin,
       date: BeanDate(year: 2025, month: 3, day: 1),
       body: DirectiveBody.transaction(txn),
     );
 
     expect(directive.date, BeanDate(year: 2025, month: 3, day: 1));
-    final body = directive.body as TransactionBody;
+    final TransactionBody body = directive.body as TransactionBody;
     expect(body.value.narration, 'cost per-unit');
     expect(body.value.postings.first.units, amount('5', 'IBM'));
     expect(body.value.postings.first.cost!.date, BeanDate(year: 2025, month: 3, day: 1));
@@ -39,12 +39,12 @@ void main() {
   });
 
   test('booked @@ price becomes per-unit price amount', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final txn = Transaction(
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Transaction txn = Transaction(
       origin: origin,
       flag: const Flag.special(SpecialFlag.asterisk),
       narration: 'price total',
-      postings: [
+      postings: <Posting>[
         Posting(
           origin: origin,
           account: account('Assets:UK:Cash', AccountType.assets),
@@ -60,13 +60,13 @@ void main() {
   });
 
   test('open and price directive bodies', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final open = Directive(
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Directive open = Directive(
       origin: origin,
       date: BeanDate(year: 2025, month: 1, day: 1),
       body: DirectiveBody.open(account: account('Assets:UK:Cash', AccountType.assets)),
     );
-    final price = Directive(
+    final Directive price = Directive(
       origin: origin,
       date: BeanDate(year: 2013, month: 6, day: 1),
       body: DirectiveBody.price(
@@ -79,8 +79,8 @@ void main() {
   });
 
   test('budget directive body holds account, interval, and amount', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final budget = Directive(
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Directive budget = Directive(
       origin: origin,
       date: BeanDate(year: 2014, month: 2, day: 10),
       body: DirectiveBody.budget(
@@ -89,15 +89,15 @@ void main() {
         amount: amount('40.00', 'EUR'),
       ),
     );
-    final body = budget.body as BudgetBody;
+    final BudgetBody body = budget.body as BudgetBody;
     expect(body.account.name, 'Expenses:Groceries');
     expect(body.interval, BudgetInterval.monthly);
     expect(body.amount, amount('40.00', 'EUR'));
   });
 
   test('budget-off directive body holds the account and optional currency', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final off = Directive(
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Directive off = Directive(
       origin: origin,
       date: BeanDate(year: 2016, month: 6, day: 1),
       body: DirectiveBody.budgetOff(account: account('Expenses:Books', AccountType.expenses)),
@@ -105,7 +105,7 @@ void main() {
     expect((off.body as BudgetOffBody).account.name, 'Expenses:Books');
     expect((off.body as BudgetOffBody).currency, isNull);
 
-    final eur = Directive(
+    final Directive eur = Directive(
       origin: origin,
       date: BeanDate(year: 2016, month: 6, day: 1),
       body: DirectiveBody.budgetOff(

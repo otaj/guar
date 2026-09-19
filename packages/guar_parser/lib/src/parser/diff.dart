@@ -1,19 +1,24 @@
 // Structural diff of two ParsedLedgers.
 
-import '../domain/domain.dart';
+import 'package:guar_parser/src/domain/domain.dart';
 
-final _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
+final BeanLocation _nowhere = BeanLocation(linenoBegin: 0, linenoEnd: 0);
 
 LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool considerLocations}) {
-  final options = _diffOptions(left.options, right.options);
-  final info = _diffInfo(left.info, right.info, considerLocations: considerLocations);
-  final warningsDiff = _listDiff(left.warnings, right.warnings, (a, b) => _sameWarning(a, b, considerLocations));
+  final OptionsDiff options = _diffOptions(left.options, right.options);
+  final InfoDiff info = _diffInfo(left.info, right.info, considerLocations: considerLocations);
+  final ListDiff<ParseWarning> warningsDiff = _listDiff(
+    left.warnings,
+    right.warnings,
+    (ParseWarning a, ParseWarning b) => _sameWarning(a, b, considerLocations),
+  );
   switch ((left, right)) {
     case (
-      ParsedLedgerDirectives(directives: final leftDirectives),
-      ParsedLedgerDirectives(directives: final rightDirectives),
+      ParsedLedgerDirectives(directives: final List<ParsedDirective> leftDirectives),
+      ParsedLedgerDirectives(directives: final List<ParsedDirective> rightDirectives),
     ):
-      final directivesDiff = _directiveDiff(leftDirectives, rightDirectives, considerLocations: considerLocations);
+      final ({List<ChangedDirective> changed, List<ParsedDirective> onlyInLeft, List<ParsedDirective> onlyInRight})
+      directivesDiff = _directiveDiff(leftDirectives, rightDirectives, considerLocations: considerLocations);
       return LedgerDiff(
         onlyInLeft: directivesDiff.onlyInLeft,
         onlyInRight: directivesDiff.onlyInRight,
@@ -23,8 +28,15 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
         options: options,
         info: info,
       );
-    case (ParsedLedgerErrors(errors: final leftErrors), ParsedLedgerErrors(errors: final rightErrors)):
-      final errorsDiff = _listDiff(leftErrors, rightErrors, (a, b) => _sameError(a, b, considerLocations));
+    case (
+      ParsedLedgerErrors(errors: final List<ParseError> leftErrors),
+      ParsedLedgerErrors(errors: final List<ParseError> rightErrors),
+    ):
+      final ListDiff<ParseError> errorsDiff = _listDiff(
+        leftErrors,
+        rightErrors,
+        (ParseError a, ParseError b) => _sameError(a, b, considerLocations),
+      );
       return LedgerDiff(
         errorsOnlyInLeft: errorsDiff.onlyInLeft,
         errorsOnlyInRight: errorsDiff.onlyInRight,
@@ -33,7 +45,10 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
         options: options,
         info: info,
       );
-    case (ParsedLedgerDirectives(:final directives), ParsedLedgerErrors(:final errors)):
+    case (
+      ParsedLedgerDirectives(:final List<ParsedDirective> directives),
+      ParsedLedgerErrors(:final List<ParseError> errors),
+    ):
       return LedgerDiff(
         onlyInLeft: directives,
         errorsOnlyInRight: errors,
@@ -42,7 +57,10 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
         options: options,
         info: info,
       );
-    case (ParsedLedgerErrors(:final errors), ParsedLedgerDirectives(:final directives)):
+    case (
+      ParsedLedgerErrors(:final List<ParseError> errors),
+      ParsedLedgerDirectives(:final List<ParsedDirective> directives),
+    ):
       return LedgerDiff(
         errorsOnlyInLeft: errors,
         onlyInRight: directives,
@@ -60,15 +78,19 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
   required bool considerLocations,
 }) {
   if (!considerLocations) {
-    final lists = _listDiff(left, right, (a, b) => _withoutLocations(a) == _withoutLocations(b));
-    return (onlyInLeft: lists.onlyInLeft, onlyInRight: lists.onlyInRight, changed: const []);
+    final ListDiff<ParsedDirective> lists = _listDiff(
+      left,
+      right,
+      (ParsedDirective a, ParsedDirective b) => _withoutLocations(a) == _withoutLocations(b),
+    );
+    return (onlyInLeft: lists.onlyInLeft, onlyInRight: lists.onlyInRight, changed: const <ChangedDirective>[]);
   }
-  final used = List<bool>.filled(right.length, false);
-  final onlyInLeft = <ParsedDirective>[];
-  final changed = <ChangedDirective>[];
-  for (final item in left) {
-    var matched = false;
-    for (var i = 0; i < right.length; i++) {
+  final List<bool> used = List<bool>.filled(right.length, false);
+  final List<ParsedDirective> onlyInLeft = <ParsedDirective>[];
+  final List<ChangedDirective> changed = <ChangedDirective>[];
+  for (final ParsedDirective item in left) {
+    bool matched = false;
+    for (int i = 0; i < right.length; i++) {
       if (used[i] || item.location != right[i].location) {
         continue;
       }
@@ -83,71 +105,67 @@ LedgerDiff diffLedgers(ParsedLedger left, ParsedLedger right, {required bool con
       onlyInLeft.add(item);
     }
   }
-  final onlyInRight = [
-    for (var i = 0; i < right.length; i++)
+  final List<ParsedDirective> onlyInRight = <ParsedDirective>[
+    for (int i = 0; i < right.length; i++)
       if (!used[i]) right[i],
   ];
   return (onlyInLeft: onlyInLeft, onlyInRight: onlyInRight, changed: changed);
 }
 
-OptionsDiff _diffOptions(LedgerOptions left, LedgerOptions right) {
-  return OptionsDiff(
-    accountPrefixes: _change(left.accountPrefixes, right.accountPrefixes),
-    title: _change(left.title, right.title),
-    accountPreviousBalances: _change(left.accountPreviousBalances, right.accountPreviousBalances),
-    accountPreviousEarnings: _change(left.accountPreviousEarnings, right.accountPreviousEarnings),
-    accountPreviousConversions: _change(left.accountPreviousConversions, right.accountPreviousConversions),
-    accountCurrentEarnings: _change(left.accountCurrentEarnings, right.accountCurrentEarnings),
-    accountCurrentConversions: _change(left.accountCurrentConversions, right.accountCurrentConversions),
-    accountUnrealizedGains: _change(left.accountUnrealizedGains, right.accountUnrealizedGains),
-    accountRounding: _change(left.accountRounding, right.accountRounding),
-    conversionCurrency: _change(left.conversionCurrency, right.conversionCurrency),
-    displayPrecision: _listDiff(left.displayPrecision, right.displayPrecision, _eq),
-    inferredToleranceDefault: _listDiff(left.inferredToleranceDefault, right.inferredToleranceDefault, _eq),
-    inferredToleranceMultiplier: _change(left.inferredToleranceMultiplier, right.inferredToleranceMultiplier),
-    toleranceMultiplier: _change(left.toleranceMultiplier, right.toleranceMultiplier),
-    inferToleranceFromCost: _change(left.inferToleranceFromCost, right.inferToleranceFromCost),
-    documents: _listDiff(left.documents, right.documents, _eq),
-    operatingCurrency: _listDiff(left.operatingCurrency, right.operatingCurrency, _eq),
-    renderCommas: _change(left.renderCommas, right.renderCommas),
-    pluginProcessingMode: _change(left.pluginProcessingMode, right.pluginProcessingMode),
-    longStringMaxlines: _change(left.longStringMaxlines, right.longStringMaxlines),
-    bookingMethod: _change(left.bookingMethod, right.bookingMethod),
-    usePreciseInterpolation: _change(left.usePreciseInterpolation, right.usePreciseInterpolation),
-    insertPythonpath: _change(left.insertPythonpath, right.insertPythonpath),
-    allowPipeSeparator: _change(left.allowPipeSeparator, right.allowPipeSeparator),
-    allowDeprecatedNoneForTagsAndLinks: _change(
-      left.allowDeprecatedNoneForTagsAndLinks,
-      right.allowDeprecatedNoneForTagsAndLinks,
-    ),
-  );
-}
+OptionsDiff _diffOptions(LedgerOptions left, LedgerOptions right) => OptionsDiff(
+  accountPrefixes: _change(left.accountPrefixes, right.accountPrefixes),
+  title: _change(left.title, right.title),
+  accountPreviousBalances: _change(left.accountPreviousBalances, right.accountPreviousBalances),
+  accountPreviousEarnings: _change(left.accountPreviousEarnings, right.accountPreviousEarnings),
+  accountPreviousConversions: _change(left.accountPreviousConversions, right.accountPreviousConversions),
+  accountCurrentEarnings: _change(left.accountCurrentEarnings, right.accountCurrentEarnings),
+  accountCurrentConversions: _change(left.accountCurrentConversions, right.accountCurrentConversions),
+  accountUnrealizedGains: _change(left.accountUnrealizedGains, right.accountUnrealizedGains),
+  accountRounding: _change(left.accountRounding, right.accountRounding),
+  conversionCurrency: _change(left.conversionCurrency, right.conversionCurrency),
+  displayPrecision: _listDiff(left.displayPrecision, right.displayPrecision, _eq),
+  inferredToleranceDefault: _listDiff(left.inferredToleranceDefault, right.inferredToleranceDefault, _eq),
+  inferredToleranceMultiplier: _change(left.inferredToleranceMultiplier, right.inferredToleranceMultiplier),
+  toleranceMultiplier: _change(left.toleranceMultiplier, right.toleranceMultiplier),
+  inferToleranceFromCost: _change(left.inferToleranceFromCost, right.inferToleranceFromCost),
+  documents: _listDiff(left.documents, right.documents, _eq),
+  operatingCurrency: _listDiff(left.operatingCurrency, right.operatingCurrency, _eq),
+  renderCommas: _change(left.renderCommas, right.renderCommas),
+  pluginProcessingMode: _change(left.pluginProcessingMode, right.pluginProcessingMode),
+  longStringMaxlines: _change(left.longStringMaxlines, right.longStringMaxlines),
+  bookingMethod: _change(left.bookingMethod, right.bookingMethod),
+  usePreciseInterpolation: _change(left.usePreciseInterpolation, right.usePreciseInterpolation),
+  insertPythonpath: _change(left.insertPythonpath, right.insertPythonpath),
+  allowPipeSeparator: _change(left.allowPipeSeparator, right.allowPipeSeparator),
+  allowDeprecatedNoneForTagsAndLinks: _change(
+    left.allowDeprecatedNoneForTagsAndLinks,
+    right.allowDeprecatedNoneForTagsAndLinks,
+  ),
+);
 
-InfoDiff _diffInfo(ProcessingInfo left, ProcessingInfo right, {required bool considerLocations}) {
-  return InfoDiff(
-    filename: considerLocations ? _change(left.filename, right.filename) : null,
-    include: _listDiff(left.include, right.include, _eq),
-    commodities: _listDiff(left.commodities, right.commodities, _eq),
-    plugin: _listDiff(left.plugin, right.plugin, (a, b) => _samePlugin(a, b, considerLocations)),
-    displayContext: _listDiff(left.displayContext.precisions, right.displayContext.precisions, _eq),
-    optionSettings: _listDiff(
-      left.optionSettings,
-      right.optionSettings,
-      (a, b) => _sameSetting(a, b, considerLocations),
-    ),
-  );
-}
+InfoDiff _diffInfo(ProcessingInfo left, ProcessingInfo right, {required bool considerLocations}) => InfoDiff(
+  filename: considerLocations ? _change(left.filename, right.filename) : null,
+  include: _listDiff(left.include, right.include, _eq),
+  commodities: _listDiff(left.commodities, right.commodities, _eq),
+  plugin: _listDiff(left.plugin, right.plugin, (Plugin a, Plugin b) => _samePlugin(a, b, considerLocations)),
+  displayContext: _listDiff(left.displayContext.precisions, right.displayContext.precisions, _eq),
+  optionSettings: _listDiff(
+    left.optionSettings,
+    right.optionSettings,
+    (OptionSetting a, OptionSetting b) => _sameSetting(a, b, considerLocations),
+  ),
+);
 
-FieldChange<T>? _change<T>(T left, T right) => left == right ? null : FieldChange(left: left, right: right);
+FieldChange<T>? _change<T>(T left, T right) => left == right ? null : FieldChange<T>(left: left, right: right);
 
 bool _eq<T>(T left, T right) => left == right;
 
-ListDiff<T> _listDiff<T>(List<T> left, List<T> right, bool Function(T, T) same) {
-  final used = List<bool>.filled(right.length, false);
-  final onlyInLeft = <T>[];
-  for (final item in left) {
-    var found = false;
-    for (var i = 0; i < right.length; i++) {
+ListDiff<T> _listDiff<T>(List<T> left, List<T> right, bool Function(T left, T right) same) {
+  final List<bool> used = List<bool>.filled(right.length, false);
+  final List<T> onlyInLeft = <T>[];
+  for (final T item in left) {
+    bool found = false;
+    for (int i = 0; i < right.length; i++) {
       if (!used[i] && same(item, right[i])) {
         used[i] = true;
         found = true;
@@ -158,10 +176,10 @@ ListDiff<T> _listDiff<T>(List<T> left, List<T> right, bool Function(T, T) same) 
       onlyInLeft.add(item);
     }
   }
-  return ListDiff(
+  return ListDiff<T>(
     onlyInLeft: onlyInLeft,
-    onlyInRight: [
-      for (var i = 0; i < right.length; i++)
+    onlyInRight: <T>[
+      for (int i = 0; i < right.length; i++)
         if (!used[i]) right[i],
     ],
   );
@@ -195,14 +213,16 @@ bool _sameWarning(ParseWarning left, ParseWarning right, bool considerLocations)
   return !considerLocations || left.location == right.location;
 }
 
-ParsedDirective _withoutLocations(ParsedDirective directive) {
-  return directive.copyWith(
-    location: _nowhere,
-    body: switch (directive.body) {
-      TransactionBody(:final value) => DirectiveBody.transaction(
-        value.copyWith(postings: [for (final posting in value.postings) posting.copyWith(location: _nowhere)]),
+ParsedDirective _withoutLocations(ParsedDirective directive) => directive.copyWith(
+  location: _nowhere,
+  body: switch (directive.body) {
+    TransactionBody(:final ParsedTransaction value) => DirectiveBody.transaction(
+      value.copyWith(
+        postings: <ParsedPosting>[
+          for (final ParsedPosting posting in value.postings) posting.copyWith(location: _nowhere),
+        ],
       ),
-      _ => directive.body,
-    },
-  );
-}
+    ),
+    _ => directive.body,
+  },
+);

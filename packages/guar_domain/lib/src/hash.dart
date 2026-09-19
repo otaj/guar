@@ -3,108 +3,115 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:decimal/decimal.dart';
+import 'package:guar_domain/src/account.dart';
 
-import 'amount.dart';
-import 'cost.dart';
-import 'date.dart';
-import 'directive.dart';
-import 'flag.dart';
-import 'posting.dart';
+import 'package:guar_domain/src/amount.dart';
+import 'package:guar_domain/src/cost.dart';
+import 'package:guar_domain/src/date.dart';
+import 'package:guar_domain/src/directive.dart';
+import 'package:guar_domain/src/flag.dart';
+import 'package:guar_domain/src/posting.dart';
+import 'package:guar_domain/src/transaction.dart';
 
 String hashDirective(BeanDate date, DirectiveBody body) {
-  final sink = _HashSink()
+  final _HashSink sink = _HashSink()
     ..add(date.toString())
     ..add(_body(body));
   return sink.digest();
 }
 
-String _body(DirectiveBody body) {
-  return switch (body) {
-    TransactionBody(:final value) => _join([
-      'transaction',
-      _flag(value.flag),
-      value.payee ?? '',
-      value.narration,
-      _sorted(value.tags.map((tag) => tag.name)),
-      _sorted(value.links.map((link) => link.name)),
-      _join([for (final posting in value.postings) _posting(posting)]),
-    ]),
-    OpenBody(:final account, :final currencies, :final booking) => _join([
-      'open',
-      account.name,
-      _sorted(currencies.map((currency) => currency.name)),
-      booking?.name ?? '',
-    ]),
-    CloseBody(:final account) => _join(['close', account.name]),
-    CommodityBody(:final currency) => _join(['commodity', currency.name]),
-    PriceBody(:final currency, :final amount) => _join(['price', currency.name, _amount(amount)]),
-    BalanceBody(:final account, :final amount, :final tolerance) => _join([
-      'balance',
-      account.name,
-      _amount(amount),
-      tolerance?.toString() ?? '',
-    ]),
-    PadBody(:final account, :final sourceAccount) => _join(['pad', account.name, sourceAccount.name]),
-    DocumentBody(:final account, :final filename, :final tags, :final links) => _join([
+String _body(DirectiveBody body) => switch (body) {
+  TransactionBody(:final Transaction value) => _join(<String>[
+    'transaction',
+    _flag(value.flag),
+    value.payee ?? '',
+    value.narration,
+    _sorted(value.tags.map((Tag tag) => tag.name)),
+    _sorted(value.links.map((Link link) => link.name)),
+    _join(<String>[for (final Posting posting in value.postings) _posting(posting)]),
+  ]),
+  OpenBody(:final Account account, :final List<Currency> currencies, :final BookingMethod? booking) => _join(<String>[
+    'open',
+    account.name,
+    _sorted(currencies.map((Currency currency) => currency.name)),
+    booking?.name ?? '',
+  ]),
+  CloseBody(:final Account account) => _join(<String>['close', account.name]),
+  CommodityBody(:final Currency currency) => _join(<String>['commodity', currency.name]),
+  PriceBody(:final Currency currency, :final Amount amount) => _join(<String>['price', currency.name, _amount(amount)]),
+  BalanceBody(:final Account account, :final Amount amount, :final Decimal? tolerance) => _join(<String>[
+    'balance',
+    account.name,
+    _amount(amount),
+    tolerance?.toString() ?? '',
+  ]),
+  PadBody(:final Account account, :final Account sourceAccount) => _join(<String>[
+    'pad',
+    account.name,
+    sourceAccount.name,
+  ]),
+  DocumentBody(:final Account account, :final String filename, :final List<Tag> tags, :final List<Link> links) => _join(
+    <String>[
       'document',
       account.name,
       filename,
-      _sorted(tags.map((tag) => tag.name)),
-      _sorted(links.map((link) => link.name)),
-    ]),
-    NoteBody(:final account, :final comment, :final tags, :final links) => _join([
+      _sorted(tags.map((Tag tag) => tag.name)),
+      _sorted(links.map((Link link) => link.name)),
+    ],
+  ),
+  NoteBody(:final Account account, :final String comment, :final List<Tag> tags, :final List<Link> links) => _join(
+    <String>[
       'note',
       account.name,
       comment,
-      _sorted(tags.map((tag) => tag.name)),
-      _sorted(links.map((link) => link.name)),
-    ]),
-    EventBody(:final name, :final description) => _join(['event', name, description]),
-    QueryBody(:final name, :final queryString) => _join(['query', name, queryString]),
-    CustomBody(:final type, :final values) => _join([
-      'custom',
-      type,
-      _join([for (final value in values) _custom(value)]),
-    ]),
-    BudgetBody(:final account, :final interval, :final amount) => _join([
-      'budget',
-      account.name,
-      interval.name,
-      _amount(amount),
-    ]),
-    BudgetOffBody(:final account, :final currency) =>
-      currency == null ? _join(['budget-off', account.name]) : _join(['budget-off', account.name, currency.name]),
-  };
-}
+      _sorted(tags.map((Tag tag) => tag.name)),
+      _sorted(links.map((Link link) => link.name)),
+    ],
+  ),
+  EventBody(:final String name, :final String description) => _join(<String>['event', name, description]),
+  QueryBody(:final String name, :final String queryString) => _join(<String>['query', name, queryString]),
+  CustomBody(:final String type, :final List<CustomValue> values) => _join(<String>[
+    'custom',
+    type,
+    _join(<String>[for (final CustomValue value in values) _custom(value)]),
+  ]),
+  BudgetBody(:final Account account, :final BudgetInterval interval, :final Amount amount) => _join(<String>[
+    'budget',
+    account.name,
+    interval.name,
+    _amount(amount),
+  ]),
+  BudgetOffBody(:final Account account, :final Currency? currency) =>
+    currency == null
+        ? _join(<String>['budget-off', account.name])
+        : _join(<String>['budget-off', account.name, currency.name]),
+};
 
-String _posting(Posting posting) {
-  return _join([
-    posting.flag == null ? '' : _flag(posting.flag!),
-    posting.account.name,
-    _amount(posting.units),
-    posting.cost == null ? '' : _cost(posting.cost!),
-    posting.price == null ? '' : _amount(posting.price!),
-  ]);
-}
+String _posting(Posting posting) => _join(<String>[
+  if (posting.flag == null) '' else _flag(posting.flag!),
+  posting.account.name,
+  _amount(posting.units),
+  if (posting.cost == null) '' else _cost(posting.cost!),
+  if (posting.price == null) '' else _amount(posting.price!),
+]);
 
-String _custom(CustomValue value) {
-  return switch (value) {
-    CustomText(:final value) => 'text:$value',
-    CustomAccount(:final value) => 'account:${value.name}',
-    CustomDate(:final value) => 'date:$value',
-    CustomBoolean(:final value) => 'bool:$value',
-    CustomNumber(:final value) => 'number:$value',
-    CustomAmount(:final value) => 'amount:${_amount(value)}',
-    CustomCurrency(:final value) => 'currency:${value.name}',
-  };
-}
+String _custom(CustomValue value) => switch (value) {
+  CustomText(:final String value) => 'text:$value',
+  CustomAccount(:final Account value) => 'account:${value.name}',
+  CustomDate(:final BeanDate value) => 'date:$value',
+  CustomBoolean(:final bool value) => 'bool:$value',
+  CustomNumber(:final Decimal value) => 'number:$value',
+  CustomAmount(:final Amount value) => 'amount:${_amount(value)}',
+  CustomCurrency(:final Currency value) => 'currency:${value.name}',
+};
 
 String _amount(Amount amount) => '${amount.number}|${amount.scale}|${amount.currency.name}';
 
 String _cost(Cost cost) => '${cost.number}|${cost.currency.name}|${cost.date}|${cost.label ?? ''}';
 
 String _flag(Flag flag) => switch (flag) {
-  SpecialFlagValue(:final value) => switch (value) {
+  SpecialFlagValue(:final SpecialFlag value) => switch (value) {
     SpecialFlag.asterisk => '*',
     SpecialFlag.exclamation => '!',
     SpecialFlag.hash => '#',
@@ -112,18 +119,18 @@ String _flag(Flag flag) => switch (flag) {
     SpecialFlag.question => '?',
     SpecialFlag.percent => '%',
   },
-  LetterFlag(:final value) => value,
+  LetterFlag(:final String value) => value,
 };
 
 String _sorted(Iterable<String> values) {
-  final sorted = values.toList()..sort();
+  final List<String> sorted = values.toList()..sort();
   return _join(sorted);
 }
 
-String _join(Iterable<String> parts) => parts.map((part) => '${part.length}:$part').join('|');
+String _join(Iterable<String> parts) => parts.map((String part) => '${part.length}:$part').join('|');
 
 class _HashSink {
-  final _chunks = <int>[];
+  final List<int> _chunks = <int>[];
 
   void add(String value) {
     _chunks.addAll(utf8.encode('${value.length}:$value;'));

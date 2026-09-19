@@ -3,16 +3,15 @@
 import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'amount.dart';
-import 'cost.dart';
+import 'package:guar_domain/src/amount.dart';
+import 'package:guar_domain/src/cost.dart';
 
 part 'position.freezed.dart';
 
 @freezed
 abstract class Position with _$Position {
-  const Position._();
-
   const factory Position({required Amount units, Cost? cost}) = _Position;
+  const Position._();
 
   @override
   String toString({bool detail = true}) {
@@ -33,19 +32,19 @@ abstract class Position with _$Position {
   (String, String?) get currencyPair => (units.currency.name, cost?.currency.name);
 
   static int compare(Position left, Position right) {
-    final byCurrency = left.units.currency.name.compareTo(right.units.currency.name);
+    final int byCurrency = left.units.currency.name.compareTo(right.units.currency.name);
     if (byCurrency != 0) {
       return byCurrency;
     }
-    final leftCost = left.cost?.number ?? Decimal.zero;
-    final rightCost = right.cost?.number ?? Decimal.zero;
-    final byCost = leftCost.compareTo(rightCost);
+    final Decimal leftCost = left.cost?.number ?? Decimal.zero;
+    final Decimal rightCost = right.cost?.number ?? Decimal.zero;
+    final int byCost = leftCost.compareTo(rightCost);
     if (byCost != 0) {
       return byCost;
     }
-    final leftCostCurrency = left.cost?.currency.name ?? '';
-    final rightCostCurrency = right.cost?.currency.name ?? '';
-    final byCostCurrency = leftCostCurrency.compareTo(rightCostCurrency);
+    final String leftCostCurrency = left.cost?.currency.name ?? '';
+    final String rightCostCurrency = right.cost?.currency.name ?? '';
+    final int byCostCurrency = leftCostCurrency.compareTo(rightCostCurrency);
     if (byCostCurrency != 0) {
       return byCostCurrency;
     }

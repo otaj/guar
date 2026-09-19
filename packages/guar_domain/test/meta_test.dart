@@ -5,8 +5,8 @@ import 'package:test/test.dart';
 
 void main() {
   test('lookup returns the first matching value', () {
-    final meta = Meta(
-      entries: [
+    final Meta meta = Meta(
+      entries: <MetaEntry>[
         const MetaEntry(key: 'note', value: MetaValue.text('hello')),
         MetaEntry(
           key: 'account',
@@ -19,7 +19,7 @@ void main() {
   });
 
   test('lookup returns a null value when the key is present without a value', () {
-    const meta = Meta(entries: [MetaEntry(key: 'empty')]);
+    const Meta meta = Meta(entries: <MetaEntry>[MetaEntry(key: 'empty')]);
     expect(meta.lookup('empty'), isNull);
   });
 }

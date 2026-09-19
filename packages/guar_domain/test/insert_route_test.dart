@@ -5,11 +5,11 @@ import 'package:guar_domain/guar_domain.dart';
 import 'package:test/test.dart';
 
 void main() {
-  const root = 'ledger.beancount';
-  const expenses = 'expenses.beancount';
-  const other = 'other.beancount';
-  final info = ProcessingInfo(filename: root, include: const [expenses, other]);
-  final date = BeanDate(year: 2024, month: 6, day: 1);
+  const String root = 'ledger.beancount';
+  const String expenses = 'expenses.beancount';
+  const String other = 'other.beancount';
+  const ProcessingInfo info = ProcessingInfo(filename: root, include: <String>[expenses, other]);
+  final BeanDate date = BeanDate(year: 2024, month: 6, day: 1);
 
   Origin source(String filename, int line) =>
       Origin.source(BeanLocation(filename: filename, linenoBegin: line, linenoEnd: line));
@@ -20,41 +20,37 @@ void main() {
     required BeanDate at,
     required String option,
     String? value,
-  }) {
-    return Directive(
-      origin: source(filename, line),
-      date: at,
-      body: DirectiveBody.custom(
-        type: 'fava-option',
-        values: [CustomValue.text(option), if (value != null) CustomValue.text(value)],
-      ),
-    );
-  }
+  }) => Directive(
+    origin: source(filename, line),
+    date: at,
+    body: DirectiveBody.custom(
+      type: 'fava-option',
+      values: <CustomValue>[CustomValue.text(option), if (value != null) CustomValue.text(value)],
+    ),
+  );
 
-  Directive open(String account, {String filename = root, int line = 1, BeanDate? at}) {
-    return Directive(
-      origin: source(filename, line),
-      date: at ?? BeanDate(year: 2014, month: 1, day: 1),
-      body: DirectiveBody.open(
-        account: Account(name: account, type: AccountType.assets),
-      ),
-    );
-  }
+  Directive open(String account, {String filename = root, int line = 1, BeanDate? at}) => Directive(
+    origin: source(filename, line),
+    date: at ?? BeanDate(year: 2014, month: 1, day: 1),
+    body: DirectiveBody.open(
+      account: Account(name: account, type: AccountType.assets),
+    ),
+  );
 
   test('unrouted entries go to the root', () {
-    final location = insertLocation(
+    final BeanLocation location = insertLocation(
       date: date,
       body: DirectiveBody.open(
         account: Account(name: 'Assets:Cash', type: AccountType.assets),
       ),
-      existing: [open('Assets:Cash')],
+      existing: <Directive>[open('Assets:Cash')],
       info: info,
     );
     expect(location.filename, root);
   });
 
   test('insert-entry is prefix-anchored and uses the rule file', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 3,
@@ -63,7 +59,7 @@ void main() {
         value: 'Expenses',
       ),
     ];
-    final location = insertLocation(
+    final BeanLocation location = insertLocation(
       date: date,
       body: DirectiveBody.open(
         account: Account(name: 'Expenses:Food', type: AccountType.expenses),
@@ -73,7 +69,7 @@ void main() {
     );
     expect(location.filename, expenses);
     expect(location.linenoBegin, 3);
-    final missed = insertLocation(
+    final BeanLocation missed = insertLocation(
       date: date,
       body: DirectiveBody.open(
         account: Account(name: 'Assets:Food', type: AccountType.assets),
@@ -85,7 +81,7 @@ void main() {
   });
 
   test('transactions match posting accounts in reverse order', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 1,
@@ -101,41 +97,49 @@ void main() {
         value: 'Assets',
       ),
     ];
-    DirectiveBody txn(List<String> accounts) {
-      return DirectiveBody.transaction(
-        Transaction(
-          origin: source(root, 1),
-          flag: const Flag.special(SpecialFlag.asterisk),
-          postings: [
-            for (final name in accounts)
-              Posting(
-                origin: source(root, 2),
-                account: Account(
-                  name: name,
-                  type: name.startsWith('Expenses') ? AccountType.expenses : AccountType.assets,
-                ),
-                units: Amount(
-                  number: Decimal.one,
-                  currency: Currency(name: 'USD'),
-                ),
+    DirectiveBody txn(List<String> accounts) => DirectiveBody.transaction(
+      Transaction(
+        origin: source(root, 1),
+        flag: const Flag.special(SpecialFlag.asterisk),
+        postings: <Posting>[
+          for (final String name in accounts)
+            Posting(
+              origin: source(root, 2),
+              account: Account(
+                name: name,
+                type: name.startsWith('Expenses') ? AccountType.expenses : AccountType.assets,
               ),
-          ],
-        ),
-      );
-    }
+              units: Amount(
+                number: Decimal.one,
+                currency: Currency(name: 'USD'),
+              ),
+            ),
+        ],
+      ),
+    );
 
     expect(
-      insertLocation(date: date, body: txn(['Expenses:Food', 'Assets:Cash']), existing: rules, info: info).filename,
+      insertLocation(
+        date: date,
+        body: txn(<String>['Expenses:Food', 'Assets:Cash']),
+        existing: rules,
+        info: info,
+      ).filename,
       other,
     );
     expect(
-      insertLocation(date: date, body: txn(['Assets:Cash', 'Expenses:Food']), existing: rules, info: info).filename,
+      insertLocation(
+        date: date,
+        body: txn(<String>['Assets:Cash', 'Expenses:Food']),
+        existing: rules,
+        info: info,
+      ).filename,
       expenses,
     );
   });
 
   test('pad matches padded account before source account', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 1,
@@ -151,7 +155,7 @@ void main() {
         value: 'Equity',
       ),
     ];
-    final location = insertLocation(
+    final BeanLocation location = insertLocation(
       date: date,
       body: DirectiveBody.pad(
         account: Account(name: 'Assets:Cash', type: AccountType.assets),
@@ -164,7 +168,7 @@ void main() {
   });
 
   test('commodity and price never match insert-entry', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 1,
@@ -200,7 +204,7 @@ void main() {
   });
 
   test('a rule applies only when its date is strictly before the entry', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 1,
@@ -223,7 +227,7 @@ void main() {
   });
 
   test('latest applicable insert-entry for the winning account wins', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: other,
         line: 1,
@@ -264,7 +268,7 @@ void main() {
   });
 
   test('account priority beats a later-dated rule on a lower-priority account', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 1,
@@ -295,7 +299,7 @@ void main() {
   });
 
   test('unmatched entries use default-file when that file is already in the tree', () {
-    final existing = [
+    final List<Directive> existing = <Directive>[
       custom(
         filename: root,
         line: 1,
@@ -316,7 +320,7 @@ void main() {
   });
 
   test('default-file with no path uses the file that contains the directive', () {
-    final existing = [
+    final List<Directive> existing = <Directive>[
       custom(filename: other, line: 1, at: BeanDate(year: 2020, month: 1, day: 1), option: 'default-file'),
     ];
     expect(
@@ -331,7 +335,7 @@ void main() {
   });
 
   test('default-file outside the include tree is ignored', () {
-    final existing = [
+    final List<Directive> existing = <Directive>[
       custom(
         filename: root,
         line: 1,
@@ -352,7 +356,7 @@ void main() {
   });
 
   test('open, close, balance, note, and document route by their account', () {
-    final rules = [
+    final List<Directive> rules = <Directive>[
       custom(
         filename: expenses,
         line: 4,
@@ -411,11 +415,11 @@ void main() {
   });
 
   test('option and plugin inserts are the root file, never an included file', () {
-    final location = optionPluginLocation(info);
+    final BeanLocation location = optionPluginLocation(info);
     expect(location.filename, root);
     expect(location.filename, isNot(expenses));
     expect(location.filename, isNot(other));
-    expect(info.include, containsAll([expenses, other]));
+    expect(info.include, containsAll(<dynamic>[expenses, other]));
     expect(optionPluginLocation(const ProcessingInfo()).filename, '');
   });
 }

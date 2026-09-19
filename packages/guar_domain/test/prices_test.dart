@@ -6,21 +6,19 @@ import 'package:test/test.dart';
 
 import 'helpers/amounts.dart';
 
-Directive price(BeanDate date, String base, String rate, String quote) {
-  return Directive(
-    origin: Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1)),
-    date: date,
-    body: DirectiveBody.price(
-      currency: Currency(name: base),
-      amount: amount(rate, quote),
-    ),
-  );
-}
+Directive price(BeanDate date, String base, String rate, String quote) => Directive(
+  origin: Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1)),
+  date: date,
+  body: DirectiveBody.price(
+    currency: Currency(name: base),
+    amount: amount(rate, quote),
+  ),
+);
 
 void main() {
   group('PriceMap', () {
     test('build keeps last price on the same date and stores inverse', () {
-      final map = PriceMap.build([
+      final PriceMap map = PriceMap.build(<Directive>[
         price(BeanDate(year: 2013, month: 6, day: 1), 'USD', '1.10', 'CAD'),
         price(BeanDate(year: 2013, month: 6, day: 2), 'USD', '1.11', 'CAD'),
         price(BeanDate(year: 2013, month: 6, day: 2), 'USD', '1.12', 'CAD'),
@@ -30,19 +28,19 @@ void main() {
         price(BeanDate(year: 2013, month: 6, day: 6), 'CAD', '0.86207', 'USD'),
       ]);
 
-      final pair = CurrencyPair(
+      final CurrencyPair pair = CurrencyPair(
         base: Currency(name: 'USD'),
         quote: Currency(name: 'CAD'),
       );
-      expect(map.rates.keys.toSet(), {
+      expect(map.rates.keys.toSet(), <CurrencyPair>{
         pair,
         CurrencyPair(
           base: Currency(name: 'CAD'),
           quote: Currency(name: 'USD'),
         ),
       });
-      final values = map.allPrices(pair);
-      expect(values.map((p) => (p.date, p.rate.round(scale: 2))).toList(), [
+      final List<PricePoint> values = map.allPrices(pair);
+      expect(values.map((PricePoint p) => (p.date, p.rate.round(scale: 2))).toList(), <(BeanDate, Decimal)>[
         (BeanDate(year: 2013, month: 6, day: 1), Decimal.parse('1.10')),
         (BeanDate(year: 2013, month: 6, day: 2), Decimal.parse('1.13')),
         (BeanDate(year: 2013, month: 6, day: 3), Decimal.parse('1.14')),
@@ -52,12 +50,12 @@ void main() {
     });
 
     test('priceAt returns as-of rate', () {
-      final map = PriceMap.build([
+      final PriceMap map = PriceMap.build(<Directive>[
         price(BeanDate(year: 2013, month: 6, day: 1), 'USD', '1.00', 'CAD'),
         price(BeanDate(year: 2013, month: 6, day: 10), 'USD', '1.50', 'CAD'),
         price(BeanDate(year: 2013, month: 7, day: 1), 'USD', '2.00', 'CAD'),
       ]);
-      final pair = CurrencyPair(
+      final CurrencyPair pair = CurrencyPair(
         base: Currency(name: 'USD'),
         quote: Currency(name: 'CAD'),
       );
@@ -74,14 +72,14 @@ void main() {
     });
 
     test('project inserts combined quote rates without mutating the original', () {
-      final map = PriceMap.build([
+      final PriceMap map = PriceMap.build(<Directive>[
         price(BeanDate(year: 2013, month: 6, day: 1), 'USD', '1.12', 'CAD'),
         price(BeanDate(year: 2013, month: 6, day: 15), 'HOOL', '1000.00', 'USD'),
         price(BeanDate(year: 2013, month: 6, day: 15), 'MFFT', '200.00', 'USD'),
         price(BeanDate(year: 2013, month: 7, day: 1), 'USD', '1.13', 'CAD'),
         price(BeanDate(year: 2013, month: 7, day: 15), 'HOOL', '1010.00', 'USD'),
       ]);
-      final projected = map.project(Currency(name: 'USD'), Currency(name: 'CAD'));
+      final PriceMap projected = map.project(Currency(name: 'USD'), Currency(name: 'CAD'));
       expect(
         map.rates.containsKey(
           CurrencyPair(
@@ -98,15 +96,15 @@ void main() {
             quote: Currency(name: 'CAD'),
           ),
         ),
-        [
+        <PricePoint>[
           PricePoint(date: BeanDate(year: 2013, month: 6, day: 15), rate: Decimal.parse('1120.00')),
           PricePoint(date: BeanDate(year: 2013, month: 7, day: 15), rate: Decimal.parse('1141.30')),
         ],
       );
-      final constrained = map.project(
+      final PriceMap constrained = map.project(
         Currency(name: 'USD'),
         Currency(name: 'CAD'),
-        baseCurrencies: {Currency(name: 'MFFT')},
+        baseCurrencies: <Currency>{Currency(name: 'MFFT')},
       );
       expect(
         constrained.rates.containsKey(
@@ -120,11 +118,11 @@ void main() {
     });
 
     test('build inserts rates from posting prices and augmenting costs', () {
-      final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-      final date = BeanDate(year: 2025, month: 3, day: 1);
-      final shares = account('Assets:Shares:IBM', AccountType.assets);
-      final cash = account('Assets:Cash', AccountType.assets);
-      final map = PriceMap.build([
+      final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+      final BeanDate date = BeanDate(year: 2025, month: 3, day: 1);
+      final Account shares = account('Assets:Shares:IBM', AccountType.assets);
+      final Account cash = account('Assets:Cash', AccountType.assets);
+      final PriceMap map = PriceMap.build(<Directive>[
         Directive(
           origin: origin,
           date: date,
@@ -133,7 +131,7 @@ void main() {
               origin: origin,
               flag: const Flag.special(SpecialFlag.asterisk),
               narration: 'buy with cost',
-              postings: [
+              postings: <Posting>[
                 Posting(origin: origin, account: shares, units: amount('5', 'IBM'), cost: cost('300.00', 'NZD', date)),
                 Posting(origin: origin, account: cash, units: amount('-1500.00', 'NZD')),
               ],
@@ -148,7 +146,7 @@ void main() {
               origin: origin,
               flag: const Flag.special(SpecialFlag.asterisk),
               narration: 'fx with price',
-              postings: [
+              postings: <Posting>[
                 Posting(origin: origin, account: cash, units: amount('-100', 'GBP'), price: amount('2.00', 'NZD')),
                 Posting(origin: origin, account: cash, units: amount('200', 'NZD')),
               ],
@@ -163,7 +161,7 @@ void main() {
               origin: origin,
               flag: const Flag.special(SpecialFlag.asterisk),
               narration: 'sell reducing lot does not insert cost price',
-              postings: [
+              postings: <Posting>[
                 Posting(origin: origin, account: shares, units: amount('-2', 'IBM'), cost: cost('300.00', 'NZD', date)),
                 Posting(origin: origin, account: cash, units: amount('600', 'NZD')),
               ],
@@ -203,7 +201,7 @@ void main() {
             quote: Currency(name: 'NZD'),
           ),
         ),
-        [PricePoint(date: date, rate: Decimal.parse('300.00'))],
+        <PricePoint>[PricePoint(date: date, rate: Decimal.parse('300.00'))],
       );
     });
   });

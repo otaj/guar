@@ -7,9 +7,9 @@ import 'helpers/amounts.dart';
 
 void main() {
   test('successful ledger holds directives only', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final ledger = Ledger.directives(
-      directives: [
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Ledger ledger = Ledger.directives(
+      directives: <Directive>[
         Directive(
           origin: origin,
           date: BeanDate(year: 2025, month: 1, day: 1),
@@ -23,8 +23,8 @@ void main() {
   });
 
   test('failed ledger holds errors only', () {
-    final ledger = Ledger.errors(
-      errors: [
+    final Ledger ledger = Ledger.errors(
+      errors: <ProcessingError>[
         ProcessingError(
           message: 'Invalid reference to unknown account',
           location: BeanLocation(linenoBegin: 10, linenoEnd: 10),
@@ -37,20 +37,22 @@ void main() {
   });
 
   test('recover-shaped ledger holds directives and errors together', () {
-    final origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
-    final ledger = Ledger.directives(
-      directives: [
+    final Origin origin = Origin.source(BeanLocation(linenoBegin: 1, linenoEnd: 1));
+    final Ledger ledger = Ledger.directives(
+      directives: <Directive>[
         Directive(
           origin: origin,
           date: BeanDate(year: 2025, month: 1, day: 1),
           body: DirectiveBody.open(account: account('Assets:Cash', AccountType.assets)),
         ),
       ],
-      errors: [ProcessingError(message: 'Balance failed', location: BeanLocation(linenoBegin: 4, linenoEnd: 4))],
+      errors: <ProcessingError>[
+        ProcessingError(message: 'Balance failed', location: BeanLocation(linenoBegin: 4, linenoEnd: 4)),
+      ],
       options: LedgerOptions(),
     );
     expect(ledger, isA<LedgerDirectives>());
-    final recovered = ledger as LedgerDirectives;
+    final LedgerDirectives recovered = ledger as LedgerDirectives;
     expect(recovered.directives, hasLength(1));
     expect(recovered.errors, hasLength(1));
     expect(recovered.errors.single.message, 'Balance failed');
