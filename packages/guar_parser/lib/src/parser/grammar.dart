@@ -17,15 +17,15 @@ class BeancountGrammar {
   final IncludeController includes;
   final bool recover;
 
-  ParsedLedger parse(String source, {LedgerOptions? initialOptions}) {
+  ParsedLedger parse(String source, {LedgerOptions? initialOptions, bool isRoot = true, bool honorOptions = true}) {
     final state = _ParseState();
     if (initialOptions != null) {
       state.options = initialOptions;
     }
-    return _parseInto(source, state, isRoot: true);
+    return _parseInto(source, state, isRoot: isRoot, honorOptions: honorOptions);
   }
 
-  ParsedLedger _parseInto(String source, _ParseState state, {required bool isRoot}) {
+  ParsedLedger _parseInto(String source, _ParseState state, {required bool isRoot, bool honorOptions = true}) {
     final normalized = source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     final lines = normalized.split('\n');
     ProcessingInfo info() {
@@ -150,7 +150,7 @@ class BeancountGrammar {
                 filename: hit.path,
                 includes: includes,
                 recover: recover,
-              )._parseInto(hit.source, state, isRoot: false);
+              )._parseInto(hit.source, state, isRoot: false, honorOptions: false);
               if (state.aborted) {
                 return ParsedLedger.errors(
                   errors: state.errors,
@@ -180,6 +180,10 @@ class BeancountGrammar {
           }
           continue;
         }
+        if (!honorOptions) {
+          noteWarning('option ignored in included file', lineNo);
+          continue;
+        }
         state.optionSettings.add(
           OptionSetting(
             location: BeanLocation(filename: filename, linenoBegin: lineNo, linenoEnd: lineNo),
@@ -203,7 +207,11 @@ class BeancountGrammar {
       }
       final plugin = _parsePlugin(code, lineNo);
       if (plugin != null) {
-        state.plugins.add(plugin);
+        if (honorOptions) {
+          state.plugins.add(plugin);
+        } else {
+          noteWarning('plugin ignored in included file', lineNo);
+        }
         continue;
       }
       if (code.startsWith('plugin')) {
@@ -1128,7 +1136,7 @@ class BeancountGrammar {
 }
 
 int compareParsedDirectives(ParsedDirective a, ParsedDirective b) {
-  final byDate = _dateKey(a.date).compareTo(_dateKey(b.date));
+  final byDate = compareBeanDate(a.date, b.date);
   if (byDate != 0) {
     return byDate;
   }
@@ -1138,8 +1146,6 @@ int compareParsedDirectives(ParsedDirective a, ParsedDirective b) {
   }
   return a.location.linenoBegin.compareTo(b.location.linenoBegin);
 }
-
-int _dateKey(BeanDate date) => date.year * 10000 + date.month * 100 + date.day;
 
 int _typeOrder(DirectiveBody body) {
   return switch (body) {

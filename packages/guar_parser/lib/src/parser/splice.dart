@@ -20,7 +20,7 @@ ParsedLedger spliceLedger(
     filename: filename,
     firstLine: startLine,
     includes: IncludeController.io(),
-  ).parse(snippet, initialOptions: ledger.options);
+  ).parse(snippet, initialOptions: ledger.options, honorOptions: filename == (ledger.info.filename ?? ''));
   return switch ((ledger, parsed)) {
     (_, ParsedLedgerErrors(:final errors, :final info)) => ParsedLedger.errors(
       errors: [..._keptErrors(ledger, filename, startLine, oldEnd, delta), ...errors],

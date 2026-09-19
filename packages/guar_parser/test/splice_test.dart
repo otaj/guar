@@ -81,6 +81,49 @@ void main() {
     expect(accounts(spliced), unorderedEquals(['Assets:Cash', 'Assets:Other']));
   });
 
+  test('does not apply an option spliced into a non-root file', () {
+    final base = parser.parse('option "title" "Root"\n2014-01-01 open Assets:Cash\n', filename: file);
+    final spliced = parser.splice(
+      base,
+      'option "title" "Other"\n',
+      filename: 'other.beancount',
+      startLine: 1,
+      endLine: 1,
+    );
+    final result = directives(spliced);
+    expect(result.options.title, 'Root');
+    expect(result.info.optionSettings.every((setting) => setting.value != 'Other'), isTrue);
+    expect(result.warnings.single.message, 'option ignored in included file');
+    expect(result.warnings.single.location.filename, 'other.beancount');
+  });
+
+  test('does not record a plugin spliced into a non-root file', () {
+    final base = parser.parse('2014-01-01 open Assets:Cash\n', filename: file);
+    final spliced = parser.splice(
+      base,
+      'plugin "beancount.plugins.auto_accounts"\n',
+      filename: 'other.beancount',
+      startLine: 1,
+      endLine: 1,
+    );
+    expect(directives(spliced).info.plugin, isEmpty);
+    expect(directives(spliced).warnings.single.message, 'plugin ignored in included file');
+    expect(directives(spliced).warnings.single.location.filename, 'other.beancount');
+  });
+
+  test('unknown option spliced into a non-root file still fails', () {
+    final base = parser.parse('2014-01-01 open Assets:Cash\n', filename: file);
+    final spliced = parser.splice(
+      base,
+      'option "not_an_option" "x"\n',
+      filename: 'other.beancount',
+      startLine: 1,
+      endLine: 1,
+    );
+    expect(spliced, isA<ParsedLedgerErrors>());
+    expect((spliced as ParsedLedgerErrors).errors.single.message, 'unknown option');
+  });
+
   test('drops a multi-line transaction that overlaps the replaced span', () {
     final base = parser.parse(
       '2014-01-01 * "Payee"\n  Assets:Cash  1 USD\n  Assets:Cash  -1 USD\n2014-01-02 open Assets:Other\n',
