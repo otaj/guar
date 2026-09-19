@@ -35,7 +35,7 @@ sealed class Statement with _$Statement {
     SelectStatement? query,
   }) = CreateTableStatement;
 
-  const factory Statement.insert({required TableRef table, List<Expr>? columns, required List<Expr> values}) =
+  const factory Statement.insert({required TableRef table, required List<Expr> values, List<Expr>? columns}) =
       InsertStatement;
 }
 
@@ -130,7 +130,7 @@ bool literalEquals(Object? a, Object? b) {
   if (a is Decimal && b is Decimal) return a == b;
   if (a is List && b is List) {
     if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
+    for (int i = 0; i < a.length; i++) {
       if (!literalEquals(a[i], b[i])) return false;
     }
     return true;
