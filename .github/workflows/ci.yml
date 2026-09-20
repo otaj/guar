@@ -77,8 +77,43 @@ jobs:
       - name: Install dependencies
         run: dart pub get
 
+      - name: Restore generated Dart
+        id: codegen
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            packages/guar_parser/.dart_tool/build
+            packages/guar_parser/.dart_tool/build_resolvers
+            packages/guar_domain/.dart_tool/build
+            packages/guar_domain/.dart_tool/build_resolvers
+            packages/guar_query/.dart_tool/build
+            packages/guar_query/.dart_tool/build_resolvers
+            packages/guar_parser/**/*.freezed.dart
+            packages/guar_domain/**/*.freezed.dart
+            packages/guar_query/**/*.freezed.dart
+          key: codegen-${{ runner.os }}-${{ hashFiles('.fvmrc', 'pubspec.lock', 'pubspec.yaml', 'packages/guar_parser/pubspec.yaml', 'packages/guar_parser/lib/**/*.dart', 'packages/guar_domain/pubspec.yaml', 'packages/guar_domain/lib/**/*.dart', 'packages/guar_query/pubspec.yaml', 'packages/guar_query/lib/**/*.dart') }}
+          restore-keys: |
+            codegen-${{ runner.os }}-
+
       - name: Generate code
+        if: steps.codegen.outputs.cache-hit != 'true'
         run: ./scripts/generate.sh
+
+      - name: Save generated Dart
+        if: steps.codegen.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            packages/guar_parser/.dart_tool/build
+            packages/guar_parser/.dart_tool/build_resolvers
+            packages/guar_domain/.dart_tool/build
+            packages/guar_domain/.dart_tool/build_resolvers
+            packages/guar_query/.dart_tool/build
+            packages/guar_query/.dart_tool/build_resolvers
+            packages/guar_parser/**/*.freezed.dart
+            packages/guar_domain/**/*.freezed.dart
+            packages/guar_query/**/*.freezed.dart
+          key: ${{ steps.codegen.outputs.cache-primary-key }}
 
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed .
