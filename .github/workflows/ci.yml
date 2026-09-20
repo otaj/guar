@@ -53,6 +53,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: latest-known
+
       - name: Check pubspec versionCode
         run: ./scripts/check_pubspec_version_code.sh
 
