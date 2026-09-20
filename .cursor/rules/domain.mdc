@@ -49,3 +49,9 @@ alwaysApply: true
 - Result cells are a `QueryValue` union in this package that wraps existing `guar_domain` types plus Dart primitives. Do not invent parallel Amount/Position/Inventory types.
 - Do not depend on `guar_parser` from `lib/` (tests may parse and book fixtures). Do not import `protobean` from `lib/`.
 - `OPEN` / `CLOSE` / `CLEAR` are query-time summarization, not booking. Do not invent booking/interpolation semantics here.
+
+## App (`guar`)
+
+- Flutter Android UI in `packages/guar`. Application id and namespace are `dev.otaj.guar`. Android-only.
+- Do not add GMS / Firebase / ML Kit / Play libraries. `scripts/check_no_google_libs.sh` must stay green.
+- Do not invent booking, interpolation, or BQL semantics here; consume `guar_book` / `guar_query` when the UI needs them.
