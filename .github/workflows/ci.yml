@@ -1,4 +1,4 @@
-# Lint, analyze, test, and outdated-deps checks (no Android flavor).
+# Lint, analyze, test, and (on main) debug split-per-ABI APKs.
 name: CI
 
 on:
@@ -53,6 +53,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Check pubspec versionCode
+        run: ./scripts/check_pubspec_version_code.sh
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -72,8 +81,97 @@ jobs:
       - name: Analyze Dart
         run: dart analyze --fatal-warnings --fatal-infos
 
+      - name: Analyze Kotlin
+        run: |
+          set -euo pipefail
+          # detekt CLI — avoids booting AGP / compiling Flutter's Gradle
+          # includeBuild / resolving the Android dependency graph (~4+ min).
+          ./scripts/analyze_kotlin.sh
+
       - name: Check outdated packages
         run: python3 scripts/check_pub_outdated.py
 
       - name: Test
         run: ./scripts/test.sh
+
+  debug-apk:
+    name: Debug APKs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Build debug split-per-ABI APKs
+        working-directory: packages/guar
+        run: flutter build apk --debug --split-per-abi
+
+      - name: Rename APKs
+        id: apks
+        run: |
+          set -euo pipefail
+          eval "$(./scripts/fdroid_build.sh --print-pubspec)"
+          mkdir -p debug-apks
+          shopt -s nullglob
+          apks=(packages/guar/build/app/outputs/flutter-apk/app-*-debug.apk)
+          if [ "${#apks[@]}" -eq 0 ]; then
+            echo "No split debug APKs found under packages/guar/build/app/outputs/flutter-apk/"
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            base=$(basename "$apk")
+            if [ "$base" = "app-debug.apk" ]; then
+              continue
+            fi
+            abi=${base#app-}
+            abi=${abi%-debug.apk}
+            dest="debug-apks/guar-debug-${VERSION_NAME}-${abi}.apk"
+            cp "$apk" "$dest"
+            echo "Prepared $dest"
+          done
+          echo "VERSION_NAME=${VERSION_NAME}" >> "$GITHUB_ENV"
+
+      - name: Ensure no proprietary Google libraries
+        env:
+          GRADLE_CONFIGURATION: debugRuntimeClasspath
+        run: ./scripts/check_no_google_libs.sh debug-apks/*.apk
+
+      - name: Upload armeabi-v7a APK
+        uses: ./.github/actions/upload-apk
+        with:
+          version: ${{ env.VERSION_NAME }}
+          abi: armeabi-v7a
+          prefix: guar-debug
+          directory: debug-apks
+
+      - name: Upload arm64-v8a APK
+        uses: ./.github/actions/upload-apk
+        with:
+          version: ${{ env.VERSION_NAME }}
+          abi: arm64-v8a
+          prefix: guar-debug
+          directory: debug-apks
+
+      - name: Upload x86_64 APK
+        uses: ./.github/actions/upload-apk
+        with:
+          version: ${{ env.VERSION_NAME }}
+          abi: x86_64
+          prefix: guar-debug
+          directory: debug-apks
