@@ -31,7 +31,7 @@ abstract class PriceQuote with _$PriceQuote {
 @freezed
 abstract class PriceMap with _$PriceMap {
   const factory PriceMap({
-    @Default(<dynamic, dynamic>{}) Map<CurrencyPair, List<PricePoint>> rates,
+    @Default(<CurrencyPair, List<PricePoint>>{}) Map<CurrencyPair, List<PricePoint>> rates,
     @Default(<CurrencyPair>[]) List<CurrencyPair> forwardPairs,
   }) = _PriceMap;
   const PriceMap._();
