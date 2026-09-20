@@ -150,6 +150,9 @@ jobs:
       - name: Ensure no proprietary Google libraries
         env:
           GRADLE_CONFIGURATION: debugRuntimeClasspath
+          # Unminified debug DEX still contains Flutter's Play Store deferred-
+          # component stub (Lcom/google/android/play/) without a Play SDK dep.
+          SKIP_DEX: "1"
         run: ./scripts/check_no_google_libs.sh debug-apks/*.apk
 
       - name: Upload armeabi-v7a APK

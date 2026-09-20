@@ -13,6 +13,9 @@
 # Usage:
 #   ./scripts/check_no_google_libs.sh
 #   ./scripts/check_no_google_libs.sh path/to/app-release.apk [...]
+#   SKIP_DEX=1 ./scripts/check_no_google_libs.sh path/to/app-debug.apk
+#     (skip DEX descriptors; unminified Flutter embeds Play deferred-component
+#     stubs without a Play SDK dependency)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -121,6 +124,11 @@ check_apk() {
     fail "APK contains Google Play Dependency metadata signing block (0x504b4453): ${apk}"
   fi
   echo "    OK — no Dependency metadata signing block"
+
+  if [[ "${SKIP_DEX:-}" == "1" ]]; then
+    echo "    skip DEX class-descriptor check (SKIP_DEX=1)"
+    return 0
+  fi
 
   # Belt-and-braces: proprietary class descriptors should not appear in DEX.
   local dex_hits
