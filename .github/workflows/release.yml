@@ -1,0 +1,191 @@
+# Signed split-per-ABI APKs on main snapshots and published GitHub releases.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  build-apk:
+    name: Build signed APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Check signing secrets
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_PASSWORD KEY_ALIAS; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Missing required repository secrets: ${missing[*]}"
+            if [ "${{ github.event_name }}" = "release" ]; then
+              echo "Add them under Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+            echo "Skipping signed snapshot build on push."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Java
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        if: steps.signing.outputs.available == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: stable
+          cache: true
+
+      - name: Set version from pubspec (release tags)
+        if: github.event_name == 'release' && steps.signing.outputs.available == 'true'
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          eval "$(./scripts/fdroid_build.sh --print-pubspec)"
+          tag="${TAG_NAME#v}"
+          tag="${tag%%+*}"
+          if [[ "$tag" != "$VERSION_NAME" ]]; then
+            echo "Release tag '$TAG_NAME' does not match pubspec versionName '$VERSION_NAME'."
+            echo "Bump packages/guar/pubspec.yaml version and tag v${VERSION_NAME} on that commit."
+            exit 1
+          fi
+          echo "VERSION_NAME=${VERSION_NAME}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE_BASE=${VERSION_CODE_BASE}" >> "$GITHUB_ENV"
+          echo "Set version to ${VERSION_NAME} (version-code-base ${VERSION_CODE_BASE})"
+
+      - name: Set snapshot version from git
+        if: github.event_name == 'push' && steps.signing.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          # AUR-style pkgver: .r.g
+          # https://wiki.archlinux.org/title/VCS_package_guidelines#Git
+          version=$(
+            set -o pipefail
+            git describe --long --tags --abbrev=7 2>/dev/null \
+              | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' \
+              || printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+          )
+          version_code_base=$(git rev-list --count HEAD)
+          echo "VERSION_NAME=${version}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE_BASE=${version_code_base}" >> "$GITHUB_ENV"
+          echo "Set snapshot version to ${version} (version-code-base ${version_code_base})"
+
+      - name: Decode release keystore
+        if: steps.signing.outputs.available == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_BASE64" | base64 -d > packages/guar/guar-release.jks
+          printf '%s\n' \
+            "storePassword=${STORE_PASSWORD}" \
+            "keyPassword=${KEY_PASSWORD}" \
+            "keyAlias=${KEY_ALIAS}" \
+            "storeFile=../../guar-release.jks" \
+            > packages/guar/android/key.properties
+
+      - name: Build per-ABI release APKs
+        if: steps.signing.outputs.available == 'true'
+        env:
+          # subosito/flutter-action sets this to $HOME/.pub-cache on Linux.
+          # Pin it so F-Droid can use the same path for reproducible builds.
+          PUB_CACHE: /home/runner/.pub-cache
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "${{ github.event_name }}" = "push" ]; then
+            extra=(--build-name "$VERSION_NAME" --version-code-base "$VERSION_CODE_BASE")
+          fi
+          for platform in android-arm android-arm64 android-x64; do
+            ./scripts/fdroid_build.sh "$platform" "${extra[@]}"
+          done
+
+      - name: Rename APKs for release
+        if: steps.signing.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p release-apks
+          shopt -s nullglob
+          apks=(packages/guar/build/app/outputs/flutter-apk/app-*-release.apk)
+          if [ "${#apks[@]}" -eq 0 ]; then
+            echo "No split APKs found under packages/guar/build/app/outputs/flutter-apk/"
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            base=$(basename "$apk")
+            if [ "$base" = "app-release.apk" ]; then
+              continue
+            fi
+            abi=${base#app-}
+            abi=${abi%-release.apk}
+            dest="release-apks/guar-${VERSION_NAME}-${abi}.apk"
+            cp "$apk" "$dest"
+            echo "Prepared $dest"
+          done
+
+      - name: Ensure no proprietary Google libraries
+        if: steps.signing.outputs.available == 'true'
+        run: ./scripts/check_no_google_libs.sh release-apks/*.apk
+
+      - name: Upload APKs to release
+        if: github.event_name == 'release' && steps.signing.outputs.available == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: release-apks/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload armeabi-v7a APK
+        if: github.event_name == 'push' && steps.signing.outputs.available == 'true'
+        uses: ./.github/actions/upload-apk
+        with:
+          version: ${{ env.VERSION_NAME }}
+          abi: armeabi-v7a
+
+      - name: Upload arm64-v8a APK
+        if: github.event_name == 'push' && steps.signing.outputs.available == 'true'
+        uses: ./.github/actions/upload-apk
+        with:
+          version: ${{ env.VERSION_NAME }}
+          abi: arm64-v8a
+
+      - name: Upload x86_64 APK
+        if: github.event_name == 'push' && steps.signing.outputs.available == 'true'
+        uses: ./.github/actions/upload-apk
+        with:
+          version: ${{ env.VERSION_NAME }}
+          abi: x86_64
