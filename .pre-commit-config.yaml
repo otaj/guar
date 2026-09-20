@@ -38,6 +38,20 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      - id: kotlin-analyze
+        name: android analyze (Kotlin)
+        entry: bash scripts/analyze_kotlin.sh
+        language: system
+        pass_filenames: false
+        files: '^packages/guar/android/.*\.(kt|kts)$|packages/guar/android/config/detekt/.*'
+        stages: [pre-commit]
+      - id: pubspec-version-code
+        name: pubspec versionCode formula
+        entry: bash scripts/check_pubspec_version_code.sh
+        language: system
+        pass_filenames: false
+        files: ^packages/guar/pubspec\.yaml$
+        stages: [pre-commit]
       # Real ShellCheck binary via uvx (shellcheck-py); keep version pin in sync with CI.
       - id: shellcheck
         name: shellcheck (uvx)
