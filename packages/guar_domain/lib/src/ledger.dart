@@ -12,15 +12,15 @@ sealed class Ledger with _$Ledger {
   const factory Ledger.directives({
     required List<Directive> directives,
     required LedgerOptions options,
-    @Default(<dynamic>[]) List<ProcessingError> errors,
-    @Default(<dynamic>[]) List<ProcessingWarning> warnings,
+    @Default(<ProcessingError>[]) List<ProcessingError> errors,
+    @Default(<ProcessingWarning>[]) List<ProcessingWarning> warnings,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerDirectives;
 
   const factory Ledger.errors({
     required List<ProcessingError> errors,
     required LedgerOptions options,
-    @Default(<dynamic>[]) List<ProcessingWarning> warnings,
+    @Default(<ProcessingWarning>[]) List<ProcessingWarning> warnings,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = LedgerErrors;
 }

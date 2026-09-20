@@ -16,8 +16,8 @@ abstract class Transaction with _$Transaction {
     required Flag flag,
     String? payee,
     @Default('') String narration,
-    @Default(<dynamic>[]) List<Tag> tags,
-    @Default(<dynamic>[]) List<Link> links,
-    @Default(<dynamic>[]) List<Posting> postings,
+    @Default(<Tag>[]) List<Tag> tags,
+    @Default(<Link>[]) List<Link> links,
+    @Default(<Posting>[]) List<Posting> postings,
   }) = _Transaction;
 }

@@ -20,7 +20,7 @@ abstract class InventoryAdd with _$InventoryAdd {
 
 @freezed
 abstract class Inventory with _$Inventory {
-  const factory Inventory({@Default(<dynamic>[]) List<Position> positions}) = _Inventory;
+  const factory Inventory({@Default(<Position>[]) List<Position> positions}) = _Inventory;
   const Inventory._();
 
   bool get isEmpty => positions.isEmpty;
@@ -127,7 +127,7 @@ abstract class AccountInventory with _$AccountInventory {
 
 @freezed
 abstract class LedgerInventory with _$LedgerInventory {
-  const factory LedgerInventory({@Default(<dynamic>[]) List<AccountInventory> accounts}) = _LedgerInventory;
+  const factory LedgerInventory({@Default(<AccountInventory>[]) List<AccountInventory> accounts}) = _LedgerInventory;
   const LedgerInventory._();
 
   LedgerInventory addPosition(Account account, Position position) {

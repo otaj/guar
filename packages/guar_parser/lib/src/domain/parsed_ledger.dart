@@ -11,15 +11,15 @@ part 'parsed_ledger.freezed.dart';
 sealed class ParsedLedger with _$ParsedLedger {
   const factory ParsedLedger.directives({
     required List<ParsedDirective> directives,
-    @Default(<dynamic>[]) List<ParseError> errors,
-    @Default(<dynamic>[]) List<ParseWarning> warnings,
+    @Default(<ParseError>[]) List<ParseError> errors,
+    @Default(<ParseWarning>[]) List<ParseWarning> warnings,
     @Default(LedgerOptions()) LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = ParsedLedgerDirectives;
 
   const factory ParsedLedger.errors({
     required List<ParseError> errors,
-    @Default(<dynamic>[]) List<ParseWarning> warnings,
+    @Default(<ParseWarning>[]) List<ParseWarning> warnings,
     @Default(LedgerOptions()) LedgerOptions options,
     @Default(ProcessingInfo()) ProcessingInfo info,
   }) = ParsedLedgerErrors;

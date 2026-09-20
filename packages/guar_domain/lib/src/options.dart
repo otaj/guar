@@ -72,18 +72,18 @@ abstract class InferredTolerance with _$InferredTolerance {
 
 @freezed
 abstract class DisplayContext with _$DisplayContext {
-  const factory DisplayContext({@Default(<dynamic>[]) List<DisplayPrecision> precisions}) = _DisplayContext;
+  const factory DisplayContext({@Default(<DisplayPrecision>[]) List<DisplayPrecision> precisions}) = _DisplayContext;
 }
 
 @freezed
 abstract class ProcessingInfo with _$ProcessingInfo {
   const factory ProcessingInfo({
     String? filename,
-    @Default(<dynamic>[]) List<String> include,
-    @Default(<dynamic>[]) List<Currency> commodities,
-    @Default(<dynamic>[]) List<Plugin> plugin,
+    @Default(<String>[]) List<String> include,
+    @Default(<Currency>[]) List<Currency> commodities,
+    @Default(<Plugin>[]) List<Plugin> plugin,
     @Default(DisplayContext()) DisplayContext displayContext,
-    @Default(<dynamic>[]) List<OptionSetting> optionSettings,
+    @Default(<OptionSetting>[]) List<OptionSetting> optionSettings,
   }) = _ProcessingInfo;
 }
 
@@ -186,11 +186,11 @@ abstract class LedgerOptions with _$LedgerOptions {
     @Default(AccountPrefixes()) AccountPrefixes accountPrefixes,
     @Default('Beancount') String title,
     Account? accountRounding,
-    @Default(<dynamic>[]) List<DisplayPrecision> displayPrecision,
-    @Default(<dynamic>[]) List<InferredTolerance> inferredToleranceDefault,
+    @Default(<DisplayPrecision>[]) List<DisplayPrecision> displayPrecision,
+    @Default(<InferredTolerance>[]) List<InferredTolerance> inferredToleranceDefault,
     @Default(false) bool inferToleranceFromCost,
-    @Default(<dynamic>[]) List<String> documents,
-    @Default(<dynamic>[]) List<Currency> operatingCurrency,
+    @Default(<String>[]) List<String> documents,
+    @Default(<Currency>[]) List<Currency> operatingCurrency,
     @Default(false) bool renderCommas,
     @Default(PluginProcessingMode.defaultMode) PluginProcessingMode pluginProcessingMode,
     @Default(64) int longStringMaxlines,

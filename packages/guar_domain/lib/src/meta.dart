@@ -29,7 +29,7 @@ abstract class MetaEntry with _$MetaEntry {
 
 @freezed
 abstract class Meta with _$Meta {
-  const factory Meta({@Default(<dynamic>[]) List<MetaEntry> entries}) = _Meta;
+  const factory Meta({@Default(<MetaEntry>[]) List<MetaEntry> entries}) = _Meta;
   const Meta._();
 
   MetaValue? lookup(String key) {

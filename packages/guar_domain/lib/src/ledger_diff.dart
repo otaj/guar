@@ -128,12 +128,12 @@ abstract class InfoDiff with _$InfoDiff {
 @freezed
 abstract class LedgerDiff with _$LedgerDiff {
   const factory LedgerDiff({
-    @Default(<dynamic>[]) List<Directive> onlyInLeft,
-    @Default(<dynamic>[]) List<Directive> onlyInRight,
-    @Default(<dynamic>[]) List<ProcessingError> errorsOnlyInLeft,
-    @Default(<dynamic>[]) List<ProcessingError> errorsOnlyInRight,
-    @Default(<dynamic>[]) List<ProcessingWarning> warningsOnlyInLeft,
-    @Default(<dynamic>[]) List<ProcessingWarning> warningsOnlyInRight,
+    @Default(<Directive>[]) List<Directive> onlyInLeft,
+    @Default(<Directive>[]) List<Directive> onlyInRight,
+    @Default(<ProcessingError>[]) List<ProcessingError> errorsOnlyInLeft,
+    @Default(<ProcessingError>[]) List<ProcessingError> errorsOnlyInRight,
+    @Default(<ProcessingWarning>[]) List<ProcessingWarning> warningsOnlyInLeft,
+    @Default(<ProcessingWarning>[]) List<ProcessingWarning> warningsOnlyInRight,
     @Default(OptionsDiff()) OptionsDiff options,
     @Default(InfoDiff()) InfoDiff info,
   }) = _LedgerDiff;

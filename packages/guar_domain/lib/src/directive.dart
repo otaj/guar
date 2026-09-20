@@ -38,7 +38,7 @@ sealed class DirectiveBody with _$DirectiveBody {
       BalanceBody;
   const factory DirectiveBody.open({
     required Account account,
-    @Default(<dynamic>[]) List<Currency> currencies,
+    @Default(<Currency>[]) List<Currency> currencies,
     BookingMethod? booking,
   }) = OpenBody;
   const factory DirectiveBody.close({required Account account}) = CloseBody;
@@ -47,18 +47,18 @@ sealed class DirectiveBody with _$DirectiveBody {
   const factory DirectiveBody.document({
     required Account account,
     required String filename,
-    @Default(<dynamic>[]) List<Tag> tags,
-    @Default(<dynamic>[]) List<Link> links,
+    @Default(<Tag>[]) List<Tag> tags,
+    @Default(<Link>[]) List<Link> links,
   }) = DocumentBody;
   const factory DirectiveBody.note({
     required Account account,
     required String comment,
-    @Default(<dynamic>[]) List<Tag> tags,
-    @Default(<dynamic>[]) List<Link> links,
+    @Default(<Tag>[]) List<Tag> tags,
+    @Default(<Link>[]) List<Link> links,
   }) = NoteBody;
   const factory DirectiveBody.event({required String name, required String description}) = EventBody;
   const factory DirectiveBody.query({required String name, required String queryString}) = QueryBody;
-  const factory DirectiveBody.custom({required String type, @Default(<dynamic>[]) List<CustomValue> values}) =
+  const factory DirectiveBody.custom({required String type, @Default(<CustomValue>[]) List<CustomValue> values}) =
       CustomBody;
   const factory DirectiveBody.budget({
     required Account account,

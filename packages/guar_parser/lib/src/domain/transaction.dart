@@ -14,8 +14,8 @@ abstract class ParsedTransaction with _$ParsedTransaction {
     required Flag flag,
     String? payee,
     @Default('') String narration,
-    @Default(<dynamic>[]) List<Tag> tags,
-    @Default(<dynamic>[]) List<Link> links,
-    @Default(<dynamic>[]) List<ParsedPosting> postings,
+    @Default(<Tag>[]) List<Tag> tags,
+    @Default(<Link>[]) List<Link> links,
+    @Default(<ParsedPosting>[]) List<ParsedPosting> postings,
   }) = _ParsedTransaction;
 }

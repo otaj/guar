@@ -30,8 +30,8 @@ abstract class BudgetCurrencyStatus with _$BudgetCurrencyStatus {
 @freezed
 abstract class BudgetPeriod with _$BudgetPeriod {
   const factory BudgetPeriod({
-    @Default(<dynamic>[]) List<BudgetCurrencyStatus> currencies,
-    @Default(<dynamic>[]) List<ProcessingWarning> warnings,
+    @Default(<BudgetCurrencyStatus>[]) List<BudgetCurrencyStatus> currencies,
+    @Default(<ProcessingWarning>[]) List<ProcessingWarning> warnings,
   }) = _BudgetPeriod;
   const BudgetPeriod._();
 
