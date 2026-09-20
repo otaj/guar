@@ -1,0 +1,2 @@
+# Package analysis uses the workspace lint set.
+include: ../../analysis_options.yaml

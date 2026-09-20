@@ -1,0 +1,26 @@
+name: guar
+description: Android app for Beancount ledgers.
+publish_to: none
+
+# Tagged releases use this versionName (X.Y.Z). Git tags must be vX.Y.Z.
+# +N is the pre-ABI Android versionCode: 10000*major + 100*minor + patch.
+# ABI packing is only in android/app/build.gradle.kts: 10*N + ABI
+# (1=armeabi-v7a, 2=arm64-v8a, 3=x86_64). v0.0.1+1 → 11/12/13.
+version: 0.0.1+1
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
