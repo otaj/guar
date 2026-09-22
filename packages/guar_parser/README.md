@@ -2,7 +2,7 @@
 
 Beancount parser for guar. It turns ledger source into Freezed domain models.
 
-This package is unpublished (`publish_to: none`) and developed against lima-derived golden fixtures. Booking, interpolation, and plugin execution are out of scope; that work belongs to a later `ProcessedLedger` layer.
+This package is unpublished (`publish_to: none`) and developed against lima-derived golden fixtures. Booking, interpolation, and plugins belong to `guar_book`, `guar_domain`, and `guar_plugins`.
 
 ## Architecture
 
