@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Geometric G foreground for the adaptive launcher icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M 77.7724 65.5946 A 26.4492 26.4492 0 1 1 77.7724 42.4054"
+        android:fillColor="#00000000"
+        android:strokeWidth="14.0616"
+        android:strokeColor="#1EB980"
+        android:strokeLineCap="round"/>
+    <path
+        android:pathData="M 53.0291 54.0000 L 86.8104 54.0000"
+        android:fillColor="#00000000"
+        android:strokeWidth="12.6554"
+        android:strokeColor="#1EB980"
+        android:strokeLineCap="round"/>
+    <path
+        android:pathData="M 79.1539 54.0000 L 86.8104 54.0000"
+        android:fillColor="#00000000"
+        android:strokeWidth="12.6554"
+        android:strokeColor="#37EFBA"
+        android:strokeLineCap="round"/>
+</vector>
