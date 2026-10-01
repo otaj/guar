@@ -17,6 +17,8 @@ abstract interface class LedgerDocuments {
   Future<LedgerDocument?> openExisting();
 
   Future<LedgerDocument?> createNew();
+
+  Future<void> writeContent(LedgerDocument document, String content);
 }
 
 class PlatformLedgerDocuments implements LedgerDocuments {
@@ -30,6 +32,10 @@ class PlatformLedgerDocuments implements LedgerDocuments {
 
   @override
   Future<LedgerDocument?> createNew() => _invoke('create');
+
+  @override
+  Future<void> writeContent(LedgerDocument document, String content) =>
+      _channel.invokeMethod<void>('write', <String, Object?>{'uri': document.uri, 'content': content});
 
   Future<LedgerDocument?> _invoke(String method) async =>
       ledgerDocumentFromChannel(await _channel.invokeMethod<Object?>(method));

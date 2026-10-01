@@ -16,6 +16,10 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  guar_domain:
+    path: ../guar_domain
+  guar_parser:
+    path: ../guar_parser
 
 dev_dependencies:
   flutter_test:

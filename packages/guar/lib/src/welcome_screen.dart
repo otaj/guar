@@ -4,6 +4,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:guar/src/ledger_documents.dart';
+import 'package:guar/src/settings_screen.dart';
+import 'package:guar_domain/guar_domain.dart';
 
 const EdgeInsets _pagePadding = EdgeInsets.symmetric(horizontal: 28, vertical: 36);
 
@@ -67,6 +69,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         if (chosen != null) ...<Widget>[
                           const SizedBox(height: 28),
                           _SelectedLedger(name: chosen.displayName),
+                          const SizedBox(height: 12),
+                          FilledButton.tonal(
+                            onPressed: _busy ? null : () => unawaited(_openSettings(chosen)),
+                            child: const Text('Settings'),
+                          ),
                         ],
                         if (error != null) ...<Widget>[
                           const SizedBox(height: 20),
@@ -120,6 +127,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _open() => _choose(widget.documents.openExisting);
 
   Future<void> _create() => _choose(widget.documents.createNew);
+
+  Future<void> _openSettings(LedgerDocument document) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => SettingsScreen(
+          documents: document,
+          options: LedgerOptions(),
+        ),
+      ),
+    );
+  }
 
   Future<void> _choose(Future<LedgerDocument?> Function() pick) async {
     setState(() {

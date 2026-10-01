@@ -174,4 +174,7 @@ class _FakeLedgerDocuments implements LedgerDocuments {
     createCount += 1;
     return created;
   }
+
+  @override
+  Future<void> writeContent(LedgerDocument document, String content) async {}
 }
