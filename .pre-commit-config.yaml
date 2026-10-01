@@ -39,7 +39,7 @@ repos:
         always_run: true
         stages: [pre-commit]
       - id: kotlin-analyze
-        name: android analyze (Kotlin)
+        name: android analyze and typecheck (Kotlin)
         entry: bash scripts/analyze_kotlin.sh
         language: system
         pass_filenames: false
