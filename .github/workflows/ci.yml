@@ -1,4 +1,4 @@
-# Lint, analyze, test, and build debug split-per-ABI APKs.
+# Lint, analyze, test, and (on main) debug split-per-ABI APKs.
 name: CI
 
 on:
@@ -101,6 +101,7 @@ jobs:
 
   debug-apk:
     name: Debug APKs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
