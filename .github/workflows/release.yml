@@ -86,6 +86,14 @@ jobs:
             "storeFile=../../guar-release.jks" \
             > packages/guar/android/key.properties
 
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Generate Freezed
+        uses: ./.github/actions/codegen
+        with:
+          save: "false"
+
       - name: Build per-ABI release APKs
         env:
           # subosito/flutter-action sets this to $HOME/.pub-cache on Linux.

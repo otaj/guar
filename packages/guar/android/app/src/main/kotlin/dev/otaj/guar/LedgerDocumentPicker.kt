@@ -10,6 +10,7 @@ import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContract
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.IOException
 
@@ -136,7 +137,7 @@ class LedgerDocumentPicker(
     }
 
     private fun readText(
-        call: MethodChannel.MethodCall,
+        call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val uri = call.argument<String>("uri")
@@ -158,7 +159,7 @@ class LedgerDocumentPicker(
     }
 
     private fun writeText(
-        call: MethodChannel.MethodCall,
+        call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val uri = call.argument<String>("uri")

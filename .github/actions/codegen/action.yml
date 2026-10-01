@@ -1,0 +1,51 @@
+# Restore or generate gitignored Freezed sources before Dart compilation.
+name: Generate Freezed
+description: Restore cached Freezed output, or run build_runner when the sources changed
+
+inputs:
+  save:
+    description: Save a cache miss. Set false when a parallel job may save the same key.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Restore generated Dart
+      id: codegen
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          packages/guar_parser/.dart_tool/build
+          packages/guar_parser/.dart_tool/build_resolvers
+          packages/guar_domain/.dart_tool/build
+          packages/guar_domain/.dart_tool/build_resolvers
+          packages/guar_query/.dart_tool/build
+          packages/guar_query/.dart_tool/build_resolvers
+          packages/guar_parser/**/*.freezed.dart
+          packages/guar_domain/**/*.freezed.dart
+          packages/guar_query/**/*.freezed.dart
+        key: codegen-${{ runner.os }}-${{ hashFiles('.fvmrc', 'pubspec.lock', 'pubspec.yaml', 'packages/guar_parser/pubspec.yaml', 'packages/guar_parser/lib/**/*.dart', 'packages/guar_domain/pubspec.yaml', 'packages/guar_domain/lib/**/*.dart', 'packages/guar_query/pubspec.yaml', 'packages/guar_query/lib/**/*.dart') }}
+        restore-keys: |
+          codegen-${{ runner.os }}-
+
+    - name: Generate code
+      if: steps.codegen.outputs.cache-hit != 'true'
+      shell: bash
+      run: ./scripts/generate.sh
+
+    - name: Save generated Dart
+      if: inputs.save == 'true' && steps.codegen.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          packages/guar_parser/.dart_tool/build
+          packages/guar_parser/.dart_tool/build_resolvers
+          packages/guar_domain/.dart_tool/build
+          packages/guar_domain/.dart_tool/build_resolvers
+          packages/guar_query/.dart_tool/build
+          packages/guar_query/.dart_tool/build_resolvers
+          packages/guar_parser/**/*.freezed.dart
+          packages/guar_domain/**/*.freezed.dart
+          packages/guar_query/**/*.freezed.dart
+        key: ${{ steps.codegen.outputs.cache-primary-key }}

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Fast Kotlin static analysis via detekt CLI.
-# Prefer this over `./gradlew :app:analyze` in CI/hooks: Gradle boots AGP,
-# compiles Flutter's includeBuild plugin, and resolves the full Android
-# dependency graph — minutes of work for a sub-second lint of our sources.
+# Kotlin analysis for the Android app: detekt, then the Kotlin compiler.
+# Detekt does not resolve the Android or Flutter classpath, so an unresolved
+# type such as MethodChannel.MethodCall is invisible to it. compileDebugKotlin
+# is the analysis that reports those errors, without packaging an APK.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -51,10 +51,23 @@ fi
 
 input_csv="$(IFS=,; echo "${inputs[*]}")"
 
-exec java -jar "${CLI_JAR}" \
+java -jar "${CLI_JAR}" \
   --build-upon-default-config \
   --config "${CONFIG}" \
   --plugins "${FORMATTING_JAR}" \
   --input "${input_csv}" \
   --excludes '**/GeneratedPluginRegistrant.java' \
   --parallel
+
+# pre-commit exports GIT_DIR. Flutter and Gradle then inspect the wrong repository.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR || true
+
+(
+  cd "${APP_DIR}"
+  "${ROOT}/scripts/run_fvm.sh" flutter build apk --config-only
+)
+(
+  cd "${APP_DIR}/android"
+  ./gradlew :app:compileDebugKotlin --console=plain
+)
