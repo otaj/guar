@@ -1,7 +1,7 @@
-// Guar app: greeting screen for choosing a Beancount ledger file.
+// Guar app: ledger settings for the chosen Beancount file.
 import 'package:flutter/material.dart';
 import 'package:guar/src/ledger_documents.dart';
-import 'package:guar/src/welcome_screen.dart';
+import 'package:guar/src/settings_screen.dart';
 
 void main() => runApp(const MainApp(documents: PlatformLedgerDocuments()));
 
@@ -14,7 +14,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     theme: _theme(Brightness.light),
     darkTheme: _theme(Brightness.dark),
-    home: WelcomeScreen(documents: documents),
+    home: SettingsScreen(documents: documents),
   );
 }
 

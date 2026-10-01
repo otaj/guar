@@ -17,6 +17,10 @@ abstract interface class LedgerDocuments {
   Future<LedgerDocument?> openExisting();
 
   Future<LedgerDocument?> createNew();
+
+  Future<String> read(LedgerDocument document);
+
+  Future<void> write(LedgerDocument document, String text);
 }
 
 class PlatformLedgerDocuments implements LedgerDocuments {
@@ -30,6 +34,20 @@ class PlatformLedgerDocuments implements LedgerDocuments {
 
   @override
   Future<LedgerDocument?> createNew() => _invoke('create');
+
+  @override
+  Future<String> read(LedgerDocument document) async {
+    final Object? value = await _channel.invokeMethod<Object?>('read', <String, String>{'uri': document.uri});
+    if (value is! String) {
+      throw const FormatException('Unexpected ledger text');
+    }
+    return value;
+  }
+
+  @override
+  Future<void> write(LedgerDocument document, String text) async {
+    await _channel.invokeMethod<void>('write', <String, String>{'uri': document.uri, 'text': text});
+  }
 
   Future<LedgerDocument?> _invoke(String method) async =>
       ledgerDocumentFromChannel(await _channel.invokeMethod<Object?>(method));

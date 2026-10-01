@@ -23,6 +23,24 @@ void main() {
     return parser.parse(root.readAsStringSync(), filename: root.path);
   }
 
+  test('followIncludes false keeps root options when the include is missing', () {
+    final ParsedLedgerDirectives ledger = ok(
+      parser.parse(
+        'option "title" "Root"\ninclude "missing.beancount"\noption "booking_method" "FIFO"\n',
+        followIncludes: false,
+      ),
+    );
+    expect(ledger.options.title, 'Root');
+    expect(ledger.options.bookingMethod, BookingMethod.fifo);
+    expect(ledger.info.optionSettings, hasLength(2));
+  });
+
+  test('followIncludes defaults to loading includes', () {
+    final ParsedLedger ledger = parser.parse('include "missing.beancount"\n');
+    expect(ledger, isA<ParsedLedgerErrors>());
+    expect((ledger as ParsedLedgerErrors).errors.single.message, 'include failed');
+  });
+
   test('ignores option directives from included files', () {
     final ParsedLedgerDirectives ledger = ok(
       parseTree(
