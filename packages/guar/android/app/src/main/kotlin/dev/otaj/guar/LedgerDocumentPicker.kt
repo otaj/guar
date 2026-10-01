@@ -46,6 +46,8 @@ class LedgerDocumentPicker(
                 "current" -> result.success(current())
                 "open" -> beginPick(result) { openLauncher.launch(Unit) }
                 "create" -> beginPick(result) { createLauncher.launch(Unit) }
+                "read" -> readText(call, result)
+                "write" -> writeText(call, result)
                 else -> result.notImplemented()
             }
         }
@@ -131,6 +133,59 @@ class LedgerDocumentPicker(
             }
         }
         throw failure ?: SecurityException("Guar was not allowed to keep access to that file.")
+    }
+
+    private fun readText(
+        call: MethodChannel.MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val uri = call.argument<String>("uri")
+        if (uri.isNullOrEmpty()) {
+            result.error("unavailable", "Guar could not read that ledger.", null)
+            return
+        }
+        try {
+            result.success(read(Uri.parse(uri)))
+        } catch (caught: SecurityException) {
+            result.error(
+                "permission_denied",
+                "Guar was not allowed to keep access to that file.",
+                caught.message,
+            )
+        } catch (caught: IOException) {
+            result.error("read_failed", "Guar could not read that ledger.", caught.message)
+        }
+    }
+
+    private fun writeText(
+        call: MethodChannel.MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val uri = call.argument<String>("uri")
+        val text = call.argument<String>("text")
+        if (uri.isNullOrEmpty() || text == null) {
+            result.error("unavailable", "Guar could not write that ledger.", null)
+            return
+        }
+        try {
+            write(Uri.parse(uri), text)
+            result.success(null)
+        } catch (caught: SecurityException) {
+            result.error(
+                "permission_denied",
+                "Guar was not allowed to keep access to that file.",
+                caught.message,
+            )
+        } catch (caught: IOException) {
+            result.error("write_failed", "Guar could not write that ledger.", caught.message)
+        }
+    }
+
+    private fun read(uri: Uri): String {
+        val stream =
+            activity.contentResolver.openInputStream(uri)
+                ?: throw IOException("Guar could not read that ledger.")
+        return stream.use { input -> input.readBytes().toString(Charsets.UTF_8) }
     }
 
     private fun write(

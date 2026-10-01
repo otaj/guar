@@ -25,6 +25,8 @@ final class IncludeLoaded extends IncludeOutcome {
 class IncludeController {
   IncludeController({required this.readFile});
 
+  factory IncludeController.skip() => SkippingIncludeController();
+
   factory IncludeController.io() => IncludeController(
     readFile: (String path) {
       final File file = File(path);
@@ -124,4 +126,14 @@ class IncludeController {
     buf.write(r'$');
     return RegExp(buf.toString()).hasMatch(name);
   }
+}
+
+final class SkippingIncludeController extends IncludeController {
+  SkippingIncludeController() : super(readFile: _ignore);
+
+  static String? _ignore(String _) => null;
+
+  @override
+  IncludeOutcome open({required String pattern, required String fromFilename, required String contextKey}) =>
+      IncludeSkip();
 }

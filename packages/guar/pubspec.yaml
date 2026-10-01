@@ -14,8 +14,13 @@ environment:
 resolution: workspace
 
 dependencies:
+  decimal: ^3.2.4
   flutter:
     sdk: flutter
+  guar_book:
+    path: ../guar_book
+  guar_domain:
+    path: ../guar_domain
 
 dev_dependencies:
   flutter_test:
