@@ -135,7 +135,7 @@ flutter {
 
 // Freezed output is gitignored. compileFlutter fails on a fresh checkout unless
 // these part files exist, including CI jobs that only build the APK.
-val repoRoot = rootProject.projectDir.resolve("../..").canonicalFile
+val repoRoot = rootProject.projectDir.resolve("../../..").canonicalFile
 val flutterSdkPath =
     rootProject.file("local.properties").takeIf { it.exists() }?.let { file ->
         Properties().apply { load(file.inputStream()) }.getProperty("flutter.sdk")
