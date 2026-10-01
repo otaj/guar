@@ -133,6 +133,30 @@ flutter {
     source = "../.."
 }
 
+// Freezed output is gitignored. compileFlutter fails on a fresh checkout unless
+// these part files exist, including CI jobs that only build the APK.
+val repoRoot = rootProject.projectDir.resolve("../..").canonicalFile
+val flutterSdkPath =
+    rootProject.file("local.properties").takeIf { it.exists() }?.let { file ->
+        Properties().apply { load(file.inputStream()) }.getProperty("flutter.sdk")
+    } ?: System.getenv("FLUTTER_ROOT")
+val generateFreezed =
+    tasks.register<Exec>("generateFreezed") {
+        group = "build"
+        description = "Generate gitignored Freezed sources the app compile needs"
+        workingDir = repoRoot
+        commandLine("bash", repoRoot.resolve("scripts/generate.sh").absolutePath)
+        if (!flutterSdkPath.isNullOrEmpty()) {
+            environment("PATH", "$flutterSdkPath/bin${File.pathSeparator}${System.getenv("PATH").orEmpty()}")
+        }
+    }
+
+tasks.configureEach {
+    if (name.startsWith("compileFlutter")) {
+        dependsOn(generateFreezed)
+    }
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
