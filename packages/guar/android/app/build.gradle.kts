@@ -160,4 +160,5 @@ tasks.configureEach {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
+    testImplementation("junit:junit:4.13.2")
 }

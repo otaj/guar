@@ -12,7 +12,10 @@ import androidx.activity.result.contract.ActivityResultContract
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 
 private const val CHANNEL_NAME = "dev.otaj.guar/ledger_documents"
 private const val PREFS_NAME = "dev.otaj.guar.ledger"
@@ -193,11 +196,13 @@ class LedgerDocumentPicker(
         uri: Uri,
         text: String,
     ) {
-        val stream =
-            activity.contentResolver.openOutputStream(uri)
+        val descriptor =
+            activity.contentResolver.openFileDescriptor(uri, "w")
                 ?: throw IOException("Guar could not write the new ledger.")
-        stream.use { output ->
-            output.write(text.toByteArray(Charsets.UTF_8))
+        descriptor.use { pfd ->
+            FileOutputStream(pfd.fileDescriptor).use { output ->
+                overwriteLedgerText(output.channel, text)
+            }
         }
     }
 
@@ -320,6 +325,23 @@ private fun openOrCreate(
         intent.putExtra(Intent.EXTRA_TITLE, suggestedName)
     }
     return intent
+}
+
+// openOutputStream overwrites from byte 0 and leaves the previous tail when the new text is shorter.
+internal fun overwriteLedgerText(
+    channel: FileChannel,
+    text: String,
+) {
+    val bytes = text.toByteArray(Charsets.UTF_8)
+    channel.truncate(0)
+    channel.position(0)
+    val buffer = ByteBuffer.wrap(bytes)
+    while (buffer.hasRemaining()) {
+        if (channel.write(buffer) == 0) {
+            throw IOException("Guar could not write the new ledger.")
+        }
+    }
+    channel.truncate(bytes.size.toLong())
 }
 
 private fun picked(
