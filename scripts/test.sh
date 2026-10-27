@@ -18,6 +18,7 @@ run_android_unit_tests() {
   # pre-commit exports GIT_DIR. Flutter and Gradle then inspect the wrong repository.
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
     GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR || true
+  "${ROOT}/scripts/ensure_android_ndk.sh"
   (cd "${pkg}" && "${RUN_FVM}" flutter build apk --config-only)
   (cd "${pkg}/android" && ./gradlew :app:testDebugUnitTest --console=plain)
 }

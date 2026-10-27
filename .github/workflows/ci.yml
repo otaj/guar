@@ -124,6 +124,9 @@ jobs:
         with:
           save: "false"
 
+      - name: Install Android NDK
+        run: ./scripts/ensure_android_ndk.sh
+
       - name: Build debug split-per-ABI APKs
         working-directory: packages/guar
         run: flutter build apk --debug --split-per-abi
