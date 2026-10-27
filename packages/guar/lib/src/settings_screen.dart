@@ -51,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<String> _parseErrors = <String>[];
   Timer? _timer;
 
+  bool _advancedUi = false;
   bool _renderCommas = false;
   bool _insertPythonpath = false;
   bool _allowPipeSeparator = false;
@@ -135,6 +136,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(fieldError, style: text.bodyMedium?.copyWith(color: colors.error)),
                   ),
+                _switch(
+                  'Advanced UI',
+                  _advancedUi,
+                  (bool value) => _toggle(() => _advancedUi = value),
+                  key: const Key('advancedUi'),
+                ),
                 _textField('title', 'Title'),
                 _stringList('Documents', _documents, _documentFocus, _addDocument, _removeDocument),
                 _stringList('Operating currencies', _currencies, _currencyFocus, _addCurrency, _removeCurrency),
@@ -235,8 +242,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ),
   );
 
-  Widget _switch(String label, bool value, ValueChanged<bool> onChanged) =>
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(label), value: value, onChanged: onChanged);
+  Widget _switch(String label, bool value, ValueChanged<bool> onChanged, {Key? key}) => SwitchListTile(
+    key: key,
+    contentPadding: EdgeInsets.zero,
+    title: Text(label),
+    value: value,
+    onChanged: onChanged,
+  );
 
   Widget _menu<T>(
     String label,
@@ -415,7 +427,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     final LoadedLedgerOptions loaded = readLedgerOptions(source);
-    _bind(loaded.options);
+    _bind(loaded);
     setState(() {
       _document = document;
       _source = source;
@@ -426,8 +438,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _bind(LedgerOptions options) {
+  void _bind(LoadedLedgerOptions loaded) {
+    final LedgerOptions options = loaded.options;
     _mute = true;
+    _advancedUi = loaded.guar.advancedUi;
     _booking = options.bookingMethod;
     _pluginMode = options.pluginProcessingMode;
     _renderCommas = options.renderCommas;
@@ -675,7 +689,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted && _fieldError != null) {
       setState(() => _fieldError = null);
     }
-    final String next = writeLedgerOptions(_source, options);
+    final String next = writeLedgerOptions(_source, options, guar: GuarOptions(advancedUi: _advancedUi));
     if (next == _source) {
       return;
     }

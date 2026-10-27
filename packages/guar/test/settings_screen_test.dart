@@ -27,6 +27,7 @@ void main() {
       lessThan(tester.getTopLeft(find.text('No ledger is selected.')).dy),
     );
     expect(find.text('Title'), findsNothing);
+    expect(find.text('Advanced UI'), findsNothing);
   });
 
   testWidgets('shows a ledger file that was already granted', (WidgetTester tester) async {
@@ -204,6 +205,46 @@ void main() {
 
     expect(documents.writeCount, 0);
     expect(find.text('not a valid currency code'), findsOneWidget);
+  });
+
+  testWidgets('writes advanced_ui when the switch is turned on', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isFalse);
+
+    await tester.ensureVisible(find.byKey(const Key('advancedUi')));
+    await tester.tap(find.byKey(const Key('advancedUi')));
+    await tester.pumpAndSettle();
+
+    final DateTime now = DateTime.now();
+    final String today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(documents.files[document.uri], '$today custom "guar_option" "advanced_ui" "TRUE"\n');
+  });
+
+  testWidgets('turns advanced UI off by removing the guar option', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{
+        'content://ledger/1': '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n',
+      },
+    );
+    await _pumpApp(tester, documents);
+
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isTrue);
+    expect(documents.writeCount, 0);
+
+    await tester.ensureVisible(find.byKey(const Key('advancedUi')));
+    await tester.tap(find.byKey(const Key('advancedUi')));
+    await tester.pumpAndSettle();
+
+    expect(documents.files[document.uri], '');
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isFalse);
   });
 }
 

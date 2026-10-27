@@ -14,6 +14,7 @@ void main() {
     expect(loaded.options.toleranceMultiplier.toString(), '0.5');
     expect(loaded.options.conversionCurrency, Currency(name: 'NOTHING'));
     expect(loaded.options.accountPreviousBalances.name, 'Equity:Opening-Balances');
+    expect(loaded.guar.advancedUi, isFalse);
   });
 
   test('keeps options that follow a broken line', () {
@@ -104,5 +105,133 @@ void main() {
 
   test('refuses a quote inside an option value', () {
     expect(() => writeLedgerOptions('', LedgerOptions(title: 'say "hi"')), throwsArgumentError);
+  });
+
+  test('reads advanced_ui from a guar_option directive', () {
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n').guar.advancedUi,
+      isTrue,
+    );
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "advanced_ui" TRUE\n').guar.advancedUi,
+      isTrue,
+    );
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "advanced_ui" "false"\n').guar.advancedUi,
+      isFalse,
+    );
+    const String latest =
+        '2020-06-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '2020-01-01 custom "guar_option" "advanced_ui" "FALSE"\n';
+    expect(readLedgerOptions(latest).guar.advancedUi, isTrue);
+    const String sameDay =
+        '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '2020-01-01 custom "guar_option" "advanced_ui" "FALSE"\n';
+    expect(readLedgerOptions(sameDay).guar.advancedUi, isFalse);
+  });
+
+  test('reports a bad advanced_ui value and keeps a later valid one', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "advanced_ui" "maybe"\n'
+        '2020-01-02 custom "guar_option" "advanced_ui" "true"\n';
+    final LoadedLedgerOptions loaded = readLedgerOptions(source);
+    expect(loaded.guar.advancedUi, isTrue);
+    expect(loaded.errors, <String>['advanced_ui expects TRUE or FALSE']);
+  });
+
+  test('writes advanced_ui after option lines', () {
+    final String written = writeLedgerOptions(
+      '2020-01-01 open Assets:Cash\n',
+      LedgerOptions(title: 'Mine'),
+      guar: const GuarOptions(advancedUi: true),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(
+      written,
+      'option "title" "Mine"\n'
+      '2020-01-02 custom "guar_option" "advanced_ui" "TRUE"\n'
+      '2020-01-01 open Assets:Cash\n',
+    );
+    final LoadedLedgerOptions loaded = readLedgerOptions(written);
+    expect(loaded.guar.advancedUi, isTrue);
+    expect(loaded.options.title, 'Mine');
+  });
+
+  test('inserts advanced_ui after a wrapped option value', () {
+    final String written = writeLedgerOptions(
+      '',
+      LedgerOptions(title: 'hello\nworld'),
+      guar: const GuarOptions(advancedUi: true),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(
+      written,
+      'option "title" "hello\nworld"\n'
+      '2020-01-02 custom "guar_option" "advanced_ui" "TRUE"\n',
+    );
+  });
+
+  test('updates an existing advanced_ui line in place', () {
+    const String source =
+        '2020-01-01 open Assets:Cash\n'
+        '2024-03-04 custom "guar_option" "advanced_ui" "FALSE"\n';
+    expect(
+      writeLedgerOptions(
+        source,
+        LedgerOptions(),
+        guar: const GuarOptions(advancedUi: true),
+        today: DateTime(1999),
+      ),
+      '2020-01-01 open Assets:Cash\n'
+      '2024-03-04 custom "guar_option" "advanced_ui" "TRUE"\n',
+    );
+  });
+
+  test('collapses several advanced_ui lines when the value changes', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "advanced_ui" "FALSE"\n'
+        '2020-06-01 custom "guar_option" "advanced_ui" "FALSE"\n'
+        '2020-01-02 open Assets:Cash\n';
+    expect(
+      writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions(advancedUi: true)),
+      '2020-06-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+      '2020-01-02 open Assets:Cash\n',
+    );
+  });
+
+  test('removes advanced_ui and its metadata when turned off', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '  note: "keep"\n'
+        '; comment\n'
+        '2020-02-01 open Assets:Cash\n';
+    expect(
+      writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions()),
+      '; comment\n'
+      '2020-02-01 open Assets:Cash\n',
+    );
+  });
+
+  test('keeps a matching advanced_ui line as written', () {
+    const String source = '2020-05-01 custom "guar_option" "advanced_ui" TRUE\n';
+    expect(writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions(advancedUi: true)), source);
+  });
+
+  test('option rewrites leave guar_option lines alone unless asked', () {
+    const String source =
+        '2020-01-01 custom "fava-option" "interval" "month"\n'
+        '2020-02-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '2020-03-01 custom "guar_option" "theme" "dark"\n';
+    expect(
+      writeLedgerOptions(source, LedgerOptions(bookingMethod: BookingMethod.fifo)),
+      'option "booking_method" "FIFO"\n$source',
+    );
+    expect(readLedgerOptions(source).guar.advancedUi, isTrue);
+    expect(readLedgerOptions(source).errors, isEmpty);
+    expect(
+      writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions()),
+      '2020-01-01 custom "fava-option" "interval" "month"\n'
+      '2020-03-01 custom "guar_option" "theme" "dark"\n',
+    );
   });
 }
