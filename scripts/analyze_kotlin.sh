@@ -63,6 +63,7 @@ java -jar "${CLI_JAR}" \
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR || true
 
+"${ROOT}/scripts/ensure_android_ndk.sh"
 (
   cd "${APP_DIR}"
   "${ROOT}/scripts/run_fvm.sh" flutter build apk --config-only
