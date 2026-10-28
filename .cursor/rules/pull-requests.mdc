@@ -1,0 +1,29 @@
+---
+description: Open every pull request from the latest origin/main
+alwaysApply: true
+---
+
+# Pull requests start from current main
+
+Every commit that goes into a pull request is based on the latest `origin/main`. Fetch it immediately before creating the branch or committing.
+
+```sh
+git fetch origin main
+git checkout -b feat/example origin/main
+```
+
+- The pull request base is `main`.
+- If `origin/main` moved after the branch was created, rebase onto the fetched tip and update the remote branch with `git push --force-with-lease` before opening or updating the pull request.
+- Drop commits that are already on `origin/main`.
+- Do not force-push `main`.
+
+```
+# ❌ BAD
+git checkout feat/other-work
+git checkout -b feat/new-thing
+# parent is another feature branch, or a local main that was not just fetched
+
+# ✅ GOOD
+git fetch origin main
+git checkout -b feat/new-thing origin/main
+```
