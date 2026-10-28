@@ -52,6 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Timer? _timer;
 
   bool _advancedUi = false;
+  bool _writeDefaultOptions = false;
   bool _renderCommas = false;
   bool _insertPythonpath = false;
   bool _allowPipeSeparator = false;
@@ -141,6 +142,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _advancedUi,
                   (bool value) => _toggle(() => _advancedUi = value),
                   key: const Key('advancedUi'),
+                ),
+                _switch(
+                  'Write default options',
+                  _writeDefaultOptions,
+                  (bool value) => _toggle(() => _writeDefaultOptions = value),
+                  key: const Key('writeDefaultOptions'),
                 ),
                 _textField('title', 'Title'),
                 _stringList('Documents', _documents, _documentFocus, _addDocument, _removeDocument),
@@ -442,6 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final LedgerOptions options = loaded.options;
     _mute = true;
     _advancedUi = loaded.guar.advancedUi;
+    _writeDefaultOptions = loaded.guar.writeDefaultOptions;
     _booking = options.bookingMethod;
     _pluginMode = options.pluginProcessingMode;
     _renderCommas = options.renderCommas;
@@ -689,7 +697,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted && _fieldError != null) {
       setState(() => _fieldError = null);
     }
-    final String next = writeLedgerOptions(_source, options, guar: GuarOptions(advancedUi: _advancedUi));
+    final String next = writeLedgerOptions(
+      _source,
+      options,
+      guar: GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions),
+    );
     if (next == _source) {
       return;
     }

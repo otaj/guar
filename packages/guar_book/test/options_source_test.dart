@@ -15,6 +15,7 @@ void main() {
     expect(loaded.options.conversionCurrency, Currency(name: 'NOTHING'));
     expect(loaded.options.accountPreviousBalances.name, 'Equity:Opening-Balances');
     expect(loaded.guar.advancedUi, isFalse);
+    expect(loaded.guar.writeDefaultOptions, isFalse);
   });
 
   test('keeps options that follow a broken line', () {
@@ -233,5 +234,148 @@ void main() {
       '2020-01-01 custom "fava-option" "interval" "month"\n'
       '2020-03-01 custom "guar_option" "theme" "dark"\n',
     );
+  });
+
+  test('reads write_default_options from a guar_option directive', () {
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "write_default_options" "TRUE"\n').guar.writeDefaultOptions,
+      isTrue,
+    );
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "write_default_options" TRUE\n').guar.writeDefaultOptions,
+      isTrue,
+    );
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "write_default_options" "false"\n').guar.writeDefaultOptions,
+      isFalse,
+    );
+    const String latest =
+        '2020-06-01 custom "guar_option" "write_default_options" "TRUE"\n'
+        '2020-01-01 custom "guar_option" "write_default_options" "FALSE"\n';
+    expect(readLedgerOptions(latest).guar.writeDefaultOptions, isTrue);
+    const String sameDay =
+        '2020-01-01 custom "guar_option" "write_default_options" "TRUE"\n'
+        '2020-01-01 custom "guar_option" "write_default_options" "FALSE"\n';
+    expect(readLedgerOptions(sameDay).guar.writeDefaultOptions, isFalse);
+  });
+
+  test('reports a bad write_default_options value and keeps a later valid one', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "advanced_ui" "maybe"\n'
+        '2020-01-02 custom "guar_option" "write_default_options" "maybe"\n'
+        '2020-01-03 custom "guar_option" "write_default_options" "true"\n';
+    final LoadedLedgerOptions loaded = readLedgerOptions(source);
+    expect(loaded.guar.advancedUi, isFalse);
+    expect(loaded.guar.writeDefaultOptions, isTrue);
+    expect(loaded.errors, <String>[
+      'advanced_ui expects TRUE or FALSE',
+      'write_default_options expects TRUE or FALSE',
+    ]);
+  });
+
+  test('writes default option lines when write_default_options is on', () {
+    final List<String> lines = explicitOptionLines(LedgerOptions(), writeDefaults: true);
+    expect(lines, hasLength(20));
+    expect(lines, contains('option "title" "Beancount"'));
+    expect(lines, contains('option "conversion_currency" "NOTHING"'));
+    expect(lines, contains('option "render_commas" "FALSE"'));
+    expect(lines, contains('option "plugin_processing_mode" "DEFAULT"'));
+    expect(lines, contains('option "name_assets" "Assets"'));
+    expect(lines, contains('option "account_previous_balances" "Equity:Opening-Balances"'));
+    expect(lines, contains('option "account_unrealized_gains" "Income:Earnings:Unrealized"'));
+    expect(lines, contains('option "booking_method" "STRICT"'));
+    expect(lines, contains('option "tolerance_multiplier" "0.5"'));
+    expect(lines.any((String line) => line.contains('insert_pythonpath')), isFalse);
+    expect(lines.any((String line) => line.contains('allow_pipe_separator')), isFalse);
+    expect(lines.any((String line) => line.contains('allow_deprecated_none')), isFalse);
+    expect(lines.any((String line) => line.contains('inferred_tolerance_multiplier')), isFalse);
+    expect(lines.any((String line) => line.contains('account_rounding')), isFalse);
+
+    final String written = writeLedgerOptions(
+      '2020-01-01 open Assets:Cash\n',
+      LedgerOptions(title: 'Mine', bookingMethod: BookingMethod.fifo),
+      guar: const GuarOptions(writeDefaultOptions: true),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(written.contains('option "title" "Mine"'), isTrue);
+    expect(written.contains('option "booking_method" "FIFO"'), isTrue);
+    expect(written.contains('option "title" "Beancount"'), isFalse);
+    expect(written.contains('option "name_equity" "Equity"'), isTrue);
+    expect(written.contains('insert_pythonpath'), isFalse);
+    expect(
+      written.endsWith(
+        '2020-01-02 custom "guar_option" "write_default_options" "TRUE"\n'
+        '2020-01-01 open Assets:Cash\n',
+      ),
+      isTrue,
+    );
+    final LoadedLedgerOptions loaded = readLedgerOptions(written);
+    expect(loaded.errors, isEmpty);
+    expect(loaded.guar.writeDefaultOptions, isTrue);
+    expect(loaded.options.title, 'Mine');
+    expect(loaded.options.bookingMethod, BookingMethod.fifo);
+    expect(writeLedgerOptions(written, loaded.options, guar: loaded.guar, today: DateTime(1999)), written);
+  });
+
+  test('write_default_options includes accounts implied by a renamed prefix', () {
+    final String written = writeLedgerOptions(
+      '',
+      LedgerOptions(accountPrefixes: const AccountPrefixes(equity: 'Capitaux')),
+      guar: const GuarOptions(writeDefaultOptions: true),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(written.contains('option "name_equity" "Capitaux"'), isTrue);
+    expect(written.contains('option "account_previous_balances" "Capitaux:Opening-Balances"'), isTrue);
+    expect(written.contains('option "account_unrealized_gains" "Income:Earnings:Unrealized"'), isTrue);
+  });
+
+  test('turning write_default_options off drops default lines and the custom directive', () {
+    const String source =
+        'option "title" "Beancount"\n'
+        'option "booking_method" "FIFO"\n'
+        '2020-01-02 custom "guar_option" "write_default_options" "TRUE"\n'
+        '  note: "keep"\n'
+        '2020-01-01 open Assets:Cash\n';
+    expect(
+      writeLedgerOptions(source, LedgerOptions(bookingMethod: BookingMethod.fifo), guar: const GuarOptions()),
+      'option "booking_method" "FIFO"\n'
+      '2020-01-01 open Assets:Cash\n',
+    );
+  });
+
+  test('keeps a matching write_default_options line and still fills defaults', () {
+    const String source = '2020-05-01 custom "guar_option" "write_default_options" TRUE\n';
+    final String written = writeLedgerOptions(
+      source,
+      LedgerOptions(),
+      guar: const GuarOptions(writeDefaultOptions: true),
+    );
+    expect(written.endsWith(source), isTrue);
+    expect(written.contains('option "title" "Beancount"'), isTrue);
+  });
+
+  test('advanced_ui and write_default_options are written independently', () {
+    final String written = writeLedgerOptions(
+      '',
+      LedgerOptions(),
+      guar: const GuarOptions(advancedUi: true, writeDefaultOptions: true),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(
+      written.endsWith(
+        '2020-01-02 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '2020-01-02 custom "guar_option" "write_default_options" "TRUE"\n',
+      ),
+      isTrue,
+    );
+    final String advancedOff = writeLedgerOptions(
+      written,
+      LedgerOptions(),
+      guar: const GuarOptions(writeDefaultOptions: true),
+      today: DateTime(1999),
+    );
+    expect(advancedOff.contains('advanced_ui'), isFalse);
+    expect(advancedOff.contains('write_default_options'), isTrue);
+    expect(advancedOff.contains('option "title" "Beancount"'), isTrue);
   });
 }
