@@ -246,6 +246,52 @@ void main() {
     expect(documents.files[document.uri], '');
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isFalse);
   });
+
+  testWidgets('writes default option lines when the switch is turned on', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('writeDefaultOptions'))).value, isFalse);
+
+    await tester.ensureVisible(find.byKey(const Key('writeDefaultOptions')));
+    await tester.tap(find.byKey(const Key('writeDefaultOptions')));
+    await tester.pumpAndSettle();
+
+    final DateTime now = DateTime.now();
+    final String today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    final String? written = documents.files[document.uri];
+    expect(written, contains('option "title" "Beancount"'));
+    expect(written, contains('option "booking_method" "STRICT"'));
+    expect(written, contains('$today custom "guar_option" "write_default_options" "TRUE"'));
+    expect(written, isNot(contains('advanced_ui')));
+  });
+
+  testWidgets('turns write default options off by removing defaults and the guar option', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{
+        'content://ledger/1':
+            'option "title" "Beancount"\n'
+            '2020-01-01 custom "guar_option" "write_default_options" "TRUE"\n',
+      },
+    );
+    await _pumpApp(tester, documents);
+
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('writeDefaultOptions'))).value, isTrue);
+    expect(documents.writeCount, 0);
+
+    await tester.ensureVisible(find.byKey(const Key('writeDefaultOptions')));
+    await tester.tap(find.byKey(const Key('writeDefaultOptions')));
+    await tester.pumpAndSettle();
+
+    expect(documents.files[document.uri], '');
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('writeDefaultOptions'))).value, isFalse);
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {

@@ -5,9 +5,10 @@ import 'package:guar_domain/guar_domain.dart' as d;
 import 'package:guar_parser/guar_parser.dart' as p;
 
 class GuarOptions {
-  const GuarOptions({this.advancedUi = false});
+  const GuarOptions({this.advancedUi = false, this.writeDefaultOptions = false});
 
   final bool advancedUi;
+  final bool writeDefaultOptions;
 }
 
 class LoadedLedgerOptions {
@@ -20,24 +21,37 @@ class LoadedLedgerOptions {
 
 LoadedLedgerOptions readLedgerOptions(String source) {
   final p.ParsedLedger parsed = _parse(source);
-  final _AdvancedUiScan guar = _scanAdvancedUi(source, parsed);
+  final _GuarBoolScan advancedUi = _scanGuarBool(source, parsed, 'advanced_ui');
+  final _GuarBoolScan writeDefaults = _scanGuarBool(source, parsed, 'write_default_options');
   return LoadedLedgerOptions(
     options: defaultOptions(parsed.options),
-    errors: <String>[for (final p.ParseError error in parsed.errors) error.message, ...guar.errors],
-    guar: GuarOptions(advancedUi: guar.value),
+    errors: <String>[
+      for (final p.ParseError error in parsed.errors) error.message,
+      ...advancedUi.errors,
+      ...writeDefaults.errors,
+    ],
+    guar: GuarOptions(advancedUi: advancedUi.value, writeDefaultOptions: writeDefaults.value),
   );
 }
 
 String writeLedgerOptions(String source, d.LedgerOptions options, {GuarOptions? guar, DateTime? today}) {
-  final String written = _writeOptionLines(source, options);
+  final String written = _writeOptionLines(source, options, writeDefaults: guar?.writeDefaultOptions ?? false);
   if (guar == null) {
     return written;
   }
-  return _writeAdvancedUi(written, enabled: guar.advancedUi, today: today ?? DateTime.now());
+  final DateTime date = today ?? DateTime.now();
+  // Insert advanced_ui second so a newly added pair stays in switch order.
+  final String withDefaults = _writeGuarBool(
+    written,
+    key: 'write_default_options',
+    enabled: guar.writeDefaultOptions,
+    today: date,
+  );
+  return _writeGuarBool(withDefaults, key: 'advanced_ui', enabled: guar.advancedUi, today: date);
 }
 
-String _writeOptionLines(String source, d.LedgerOptions options) {
-  final List<String> rendered = explicitOptionLines(options);
+String _writeOptionLines(String source, d.LedgerOptions options, {required bool writeDefaults}) {
+  final List<String> rendered = explicitOptionLines(options, writeDefaults: writeDefaults);
   final p.ParsedLedger parsed = _parse(source);
   final p.ProcessingInfo info = switch (parsed) {
     p.ParsedLedgerDirectives(:final p.ProcessingInfo info) => info,
@@ -70,7 +84,7 @@ String _writeOptionLines(String source, d.LedgerOptions options) {
   return _join(lines, text.separator, trailing);
 }
 
-List<String> explicitOptionLines(d.LedgerOptions options) {
+List<String> explicitOptionLines(d.LedgerOptions options, {bool writeDefaults = false}) {
   final d.LedgerOptions stock = d.LedgerOptions();
   final d.LedgerOptions derived = d.LedgerOptions(accountPrefixes: options.accountPrefixes);
   final List<String> lines = <String>[];
@@ -79,7 +93,13 @@ List<String> explicitOptionLines(d.LedgerOptions options) {
     lines.add('option ${_quote(key)} ${_quote(value)}');
   }
 
-  if (options.title != stock.title) {
+  void flag(String key, {required bool value}) {
+    if (writeDefaults || value) {
+      add(key, value ? 'TRUE' : 'FALSE');
+    }
+  }
+
+  if (writeDefaults || options.title != stock.title) {
     add('title', options.title);
   }
   for (final String document in options.documents) {
@@ -88,18 +108,17 @@ List<String> explicitOptionLines(d.LedgerOptions options) {
   for (final d.Currency currency in options.operatingCurrency) {
     add('operating_currency', currency.name);
   }
-  if (options.conversionCurrency.name != stock.conversionCurrency.name) {
+  if (writeDefaults || options.conversionCurrency.name != stock.conversionCurrency.name) {
     add('conversion_currency', options.conversionCurrency.name);
   }
-  if (options.renderCommas) {
-    add('render_commas', 'TRUE');
-  }
-  if (options.longStringMaxlines != stock.longStringMaxlines) {
+  flag('render_commas', value: options.renderCommas);
+  if (writeDefaults || options.longStringMaxlines != stock.longStringMaxlines) {
     add('long_string_maxlines', '${options.longStringMaxlines}');
   }
-  if (options.pluginProcessingMode == d.PluginProcessingMode.raw) {
-    add('plugin_processing_mode', 'RAW');
+  if (writeDefaults || options.pluginProcessingMode == d.PluginProcessingMode.raw) {
+    add('plugin_processing_mode', options.pluginProcessingMode == d.PluginProcessingMode.raw ? 'RAW' : 'DEFAULT');
   }
+  // These keys warn whenever they appear, so a default stays out of the file.
   if (options.insertPythonpath) {
     add('insert_pythonpath', 'TRUE');
   }
@@ -109,32 +128,107 @@ List<String> explicitOptionLines(d.LedgerOptions options) {
   if (options.allowDeprecatedNoneForTagsAndLinks) {
     add('allow_deprecated_none_for_tags_and_links', 'TRUE');
   }
-  _prefix(add, 'name_assets', options.accountPrefixes.assets, stock.accountPrefixes.assets);
-  _prefix(add, 'name_liabilities', options.accountPrefixes.liabilities, stock.accountPrefixes.liabilities);
-  _prefix(add, 'name_equity', options.accountPrefixes.equity, stock.accountPrefixes.equity);
-  _prefix(add, 'name_income', options.accountPrefixes.income, stock.accountPrefixes.income);
-  _prefix(add, 'name_expenses', options.accountPrefixes.expenses, stock.accountPrefixes.expenses);
-  _account(add, 'account_previous_balances', options.accountPreviousBalances, derived.accountPreviousBalances);
-  _account(add, 'account_previous_earnings', options.accountPreviousEarnings, derived.accountPreviousEarnings);
-  _account(add, 'account_previous_conversions', options.accountPreviousConversions, derived.accountPreviousConversions);
-  _account(add, 'account_current_earnings', options.accountCurrentEarnings, derived.accountCurrentEarnings);
-  _account(add, 'account_current_conversions', options.accountCurrentConversions, derived.accountCurrentConversions);
+  _prefix(
+    add,
+    'name_assets',
+    options.accountPrefixes.assets,
+    stock.accountPrefixes.assets,
+    writeDefaults: writeDefaults,
+  );
+  _prefix(
+    add,
+    'name_liabilities',
+    options.accountPrefixes.liabilities,
+    stock.accountPrefixes.liabilities,
+    writeDefaults: writeDefaults,
+  );
+  _prefix(
+    add,
+    'name_equity',
+    options.accountPrefixes.equity,
+    stock.accountPrefixes.equity,
+    writeDefaults: writeDefaults,
+  );
+  _prefix(
+    add,
+    'name_income',
+    options.accountPrefixes.income,
+    stock.accountPrefixes.income,
+    writeDefaults: writeDefaults,
+  );
+  _prefix(
+    add,
+    'name_expenses',
+    options.accountPrefixes.expenses,
+    stock.accountPrefixes.expenses,
+    writeDefaults: writeDefaults,
+  );
+  _account(
+    add,
+    'account_previous_balances',
+    options.accountPreviousBalances,
+    derived.accountPreviousBalances,
+    writeDefaults: writeDefaults,
+  );
+  _account(
+    add,
+    'account_previous_earnings',
+    options.accountPreviousEarnings,
+    derived.accountPreviousEarnings,
+    writeDefaults: writeDefaults,
+  );
+  _account(
+    add,
+    'account_previous_conversions',
+    options.accountPreviousConversions,
+    derived.accountPreviousConversions,
+    writeDefaults: writeDefaults,
+  );
+  _account(
+    add,
+    'account_current_earnings',
+    options.accountCurrentEarnings,
+    derived.accountCurrentEarnings,
+    writeDefaults: writeDefaults,
+  );
+  _account(
+    add,
+    'account_current_conversions',
+    options.accountCurrentConversions,
+    derived.accountCurrentConversions,
+    writeDefaults: writeDefaults,
+  );
   final d.Account? rounding = options.accountRounding;
   if (rounding != null) {
     add('account_rounding', rounding.name);
   }
-  _account(add, 'account_unrealized_gains', options.accountUnrealizedGains, derived.accountUnrealizedGains);
-  if (options.bookingMethod != stock.bookingMethod) {
+  _account(
+    add,
+    'account_unrealized_gains',
+    options.accountUnrealizedGains,
+    derived.accountUnrealizedGains,
+    writeDefaults: writeDefaults,
+  );
+  if (writeDefaults || options.bookingMethod != stock.bookingMethod) {
     add('booking_method', _booking(options.bookingMethod));
   }
-  if (options.usePreciseInterpolation) {
-    add('use_precise_interpolation', 'TRUE');
-  }
-  if (options.inferToleranceFromCost) {
-    add('infer_tolerance_from_cost', 'TRUE');
-  }
-  _number(add, 'tolerance_multiplier', options.toleranceMultiplier, stock.toleranceMultiplier);
-  _number(add, 'inferred_tolerance_multiplier', options.inferredToleranceMultiplier, stock.inferredToleranceMultiplier);
+  flag('use_precise_interpolation', value: options.usePreciseInterpolation);
+  flag('infer_tolerance_from_cost', value: options.inferToleranceFromCost);
+  _number(
+    add,
+    'tolerance_multiplier',
+    options.toleranceMultiplier,
+    stock.toleranceMultiplier,
+    writeDefaults: writeDefaults,
+  );
+  // Renamed option; writing the default would warn on every open.
+  _number(
+    add,
+    'inferred_tolerance_multiplier',
+    options.inferredToleranceMultiplier,
+    stock.inferredToleranceMultiplier,
+    writeDefaults: false,
+  );
   for (final d.InferredTolerance tolerance in options.inferredToleranceDefault) {
     add('inferred_tolerance_default', '${_currencyKey(tolerance.key)}:${tolerance.value}');
   }
@@ -144,20 +238,38 @@ List<String> explicitOptionLines(d.LedgerOptions options) {
   return lines;
 }
 
-void _prefix(void Function(String key, String value) add, String key, String value, String fallback) {
-  if (value != fallback) {
+void _prefix(
+  void Function(String key, String value) add,
+  String key,
+  String value,
+  String fallback, {
+  required bool writeDefaults,
+}) {
+  if (writeDefaults || value != fallback) {
     add(key, value);
   }
 }
 
-void _account(void Function(String key, String value) add, String key, d.Account value, d.Account fallback) {
-  if (value.name != fallback.name) {
+void _account(
+  void Function(String key, String value) add,
+  String key,
+  d.Account value,
+  d.Account fallback, {
+  required bool writeDefaults,
+}) {
+  if (writeDefaults || value.name != fallback.name) {
     add(key, value.name);
   }
 }
 
-void _number(void Function(String key, String value) add, String key, d.OptionNumber value, d.OptionNumber fallback) {
-  if (value.value != fallback.value) {
+void _number(
+  void Function(String key, String value) add,
+  String key,
+  d.OptionNumber value,
+  d.OptionNumber fallback, {
+  required bool writeDefaults,
+}) {
+  if (writeDefaults || value.value != fallback.value) {
     add(key, value.verbatim);
   }
 }
@@ -281,27 +393,25 @@ String _join(List<String> lines, String separator, bool trailing) {
   return trailing ? '$body$separator' : body;
 }
 
-const String _advancedUiValueError = 'advanced_ui expects TRUE or FALSE';
-
-class _AdvancedUiHit {
-  const _AdvancedUiHit({required this.start, required this.end, required this.date});
+class _GuarHit {
+  const _GuarHit({required this.start, required this.end, required this.date});
 
   final int start;
   final int end;
   final String date;
 }
 
-class _AdvancedUiScan {
-  const _AdvancedUiScan({required this.value, required this.errors, required this.hits, required this.insertAt});
+class _GuarBoolScan {
+  const _GuarBoolScan({required this.value, required this.errors, required this.hits, required this.insertAt});
 
   final bool value;
   final List<String> errors;
-  final List<_AdvancedUiHit> hits;
+  final List<_GuarHit> hits;
   final int insertAt;
 }
 
-String _writeAdvancedUi(String source, {required bool enabled, required DateTime today}) {
-  final _AdvancedUiScan scan = _scanAdvancedUi(source, _parse(source));
+String _writeGuarBool(String source, {required String key, required bool enabled, required DateTime today}) {
+  final _GuarBoolScan scan = _scanGuarBool(source, _parse(source), key);
   if (scan.value == enabled) {
     return source;
   }
@@ -311,14 +421,13 @@ String _writeAdvancedUi(String source, {required bool enabled, required DateTime
     _removeHits(lines, scan.hits);
   } else if (scan.hits.isEmpty) {
     final int at = scan.insertAt > lines.length ? lines.length : scan.insertAt;
-    lines.insert(at, _advancedUiLine(_isoDate(today)));
+    lines.insert(at, _guarBoolLine(_isoDate(today), key));
   } else {
-    final _AdvancedUiHit keep = scan.hits.last;
-    final List<_AdvancedUiHit> hits = <_AdvancedUiHit>[...scan.hits]
-      ..sort((_AdvancedUiHit a, _AdvancedUiHit b) => a.start.compareTo(b.start));
-    for (final _AdvancedUiHit hit in hits.reversed) {
+    final _GuarHit keep = scan.hits.last;
+    final List<_GuarHit> hits = <_GuarHit>[...scan.hits]..sort((_GuarHit a, _GuarHit b) => a.start.compareTo(b.start));
+    for (final _GuarHit hit in hits.reversed) {
       if (hit.start == keep.start) {
-        _replaceSpan(lines, hit.start, hit.end, _advancedUiLine(hit.date));
+        _replaceSpan(lines, hit.start, hit.end, _guarBoolLine(hit.date, key));
       } else {
         _removeSpan(lines, hit.start, hit.end);
       }
@@ -328,15 +437,14 @@ String _writeAdvancedUi(String source, {required bool enabled, required DateTime
   return _join(lines, text.separator, trailing);
 }
 
-void _removeHits(List<String> lines, List<_AdvancedUiHit> hits) {
-  final List<_AdvancedUiHit> ordered = <_AdvancedUiHit>[...hits]
-    ..sort((_AdvancedUiHit a, _AdvancedUiHit b) => a.start.compareTo(b.start));
-  for (final _AdvancedUiHit hit in ordered.reversed) {
+void _removeHits(List<String> lines, List<_GuarHit> hits) {
+  final List<_GuarHit> ordered = <_GuarHit>[...hits]..sort((_GuarHit a, _GuarHit b) => a.start.compareTo(b.start));
+  for (final _GuarHit hit in ordered.reversed) {
     _removeSpan(lines, hit.start, hit.end);
   }
 }
 
-_AdvancedUiScan _scanAdvancedUi(String source, p.ParsedLedger parsed) {
+_GuarBoolScan _scanGuarBool(String source, p.ParsedLedger parsed, String key) {
   final List<p.ParsedDirective> directives = switch (parsed) {
     p.ParsedLedgerDirectives(:final List<p.ParsedDirective> directives) => directives,
     p.ParsedLedgerErrors() => const <p.ParsedDirective>[],
@@ -344,30 +452,29 @@ _AdvancedUiScan _scanAdvancedUi(String source, p.ParsedLedger parsed) {
   final _Text text = _split(source);
   bool value = false;
   final List<String> errors = <String>[];
-  final List<_AdvancedUiHit> hits = <_AdvancedUiHit>[];
+  final List<_GuarHit> hits = <_GuarHit>[];
+  final String valueError = '$key expects TRUE or FALSE';
   for (final p.ParsedDirective directive in directives) {
     final p.DirectiveBody body = directive.body;
     if (body is! p.CustomBody || body.type != 'guar_option' || body.values.isEmpty) {
       continue;
     }
-    final p.CustomValue key = body.values.first;
-    if (key is! p.CustomText || key.value != 'advanced_ui') {
+    final p.CustomValue name = body.values.first;
+    if (name is! p.CustomText || name.value != key) {
       continue;
     }
     final int start = directive.location.linenoBegin - 1;
     // Quoted values can run past the first line; metadata follows on indented lines.
     final int quotedEnd = start >= 0 && start < text.lines.length ? _spanEnd(text.lines, start) : start;
     final int metaEnd = directive.location.linenoEnd - 1;
-    hits.add(
-      _AdvancedUiHit(start: start, end: metaEnd > quotedEnd ? metaEnd : quotedEnd, date: directive.date.toString()),
-    );
+    hits.add(_GuarHit(start: start, end: metaEnd > quotedEnd ? metaEnd : quotedEnd, date: directive.date.toString()));
     if (body.values.length < 2) {
-      errors.add(_advancedUiValueError);
+      errors.add(valueError);
       continue;
     }
     final bool? parsedValue = _guarBool(body.values[1]);
     if (parsedValue == null) {
-      errors.add(_advancedUiValueError);
+      errors.add(valueError);
       continue;
     }
     value = parsedValue;
@@ -383,7 +490,7 @@ _AdvancedUiScan _scanAdvancedUi(String source, p.ParsedLedger parsed) {
       insertAt = end + 1;
     }
   }
-  return _AdvancedUiScan(value: value, errors: errors, hits: hits, insertAt: insertAt);
+  return _GuarBoolScan(value: value, errors: errors, hits: hits, insertAt: insertAt);
 }
 
 bool? _guarBool(p.CustomValue value) => switch (value) {
@@ -398,7 +505,7 @@ bool? _guarTextBool(String value) => switch (value.toLowerCase()) {
   _ => null,
 };
 
-String _advancedUiLine(String date) => '$date custom "guar_option" "advanced_ui" "TRUE"';
+String _guarBoolLine(String date, String key) => '$date custom "guar_option" "$key" "TRUE"';
 
 String _isoDate(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
