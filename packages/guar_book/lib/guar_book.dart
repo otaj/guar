@@ -6,3 +6,4 @@ export 'src/inventory_from.dart';
 export 'src/options_defaults.dart' show accountTypeFor, defaultOptions, domainAccount, mapInfo, mapLocation;
 export 'src/options_source.dart'
     show GuarOptions, LoadedLedgerOptions, explicitOptionLines, readLedgerOptions, writeLedgerOptions;
+export 'src/plugins_source.dart' show LedgerPlugin, readLedgerPlugins, writeLedgerPlugins;
