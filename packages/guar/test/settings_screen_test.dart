@@ -7,13 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:guar/main.dart';
 import 'package:guar/src/ledger_documents.dart';
-import 'package:guar/src/settings_screen.dart';
+import 'package:guar/src/ledger_session.dart';
 
 void main() {
   testWidgets('opens on settings with the file picker first', (WidgetTester tester) async {
     await _pumpApp(tester, _FakeLedgerDocuments());
 
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
+    expect(find.text('Plugins'), findsOneWidget);
     expect(find.text('Open a ledger'), findsOneWidget);
     expect(find.text('Create a new ledger'), findsOneWidget);
     expect(find.text('No ledger is selected.'), findsOneWidget);

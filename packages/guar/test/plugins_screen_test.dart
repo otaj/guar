@@ -1,0 +1,176 @@
+// Plugins screen: toggle, describe, configure, and reorder plugins in the ledger.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:guar/main.dart';
+import 'package:guar/src/ledger_documents.dart';
+import 'package:guar/src/ledger_session.dart';
+import 'package:guar_plugins/guar_plugins.dart';
+
+void main() {
+  testWidgets('switches to the plugins screen from the bottom bar', (WidgetTester tester) async {
+    await _pumpApp(tester, _FakeLedgerDocuments());
+
+    expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
+    await tester.tap(find.text('Plugins'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'Plugins'), findsOneWidget);
+    expect(find.text('No ledger is selected. Choose one in Settings.'), findsOneWidget);
+    expect(find.text('Title'), findsNothing);
+  });
+
+  testWidgets('shows the catalog description and writes a plugin in order', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    final PluginDeclaration autoAccounts = pluginCatalog.firstWhere(
+      (PluginDeclaration plugin) => plugin.name == 'beancount.plugins.auto_accounts',
+    );
+    await _pumpApp(tester, documents);
+    await tester.tap(find.text('Plugins'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('taxes.beancount'), findsOneWidget);
+    expect(find.text('None of the plugins are turned on.'), findsOneWidget);
+    expect(find.text(autoAccounts.description), findsNothing);
+
+    await tester.ensureVisible(find.byKey(const Key('about-beancount.plugins.auto_accounts')));
+    await tester.tap(find.byKey(const Key('about-beancount.plugins.auto_accounts')));
+    await tester.pumpAndSettle();
+
+    expect(find.text(autoAccounts.description), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('about-beancount.plugins.auto_accounts')));
+    await tester.pumpAndSettle();
+    expect(find.text(autoAccounts.description), findsNothing);
+
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.auto')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.auto_accounts')));
+    await tester.pumpAndSettle();
+
+    expect(
+      documents.files[document.uri],
+      'plugin "beancount.plugins.auto"\n'
+      'plugin "beancount.plugins.auto_accounts"\n',
+    );
+
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.auto')));
+    await tester.pumpAndSettle();
+    expect(documents.files[document.uri], 'plugin "beancount.plugins.auto_accounts"\n');
+  });
+
+  testWidgets('writes a plugin configuration and can drag plugins into a new order', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+    await tester.tap(find.text('Plugins'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.currency_accounts')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('about-beancount.plugins.currency_accounts')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('config-beancount.plugins.currency_accounts-base')), 'Equity:Trading');
+    await tester.pump(ledgerOptionSaveDelay);
+    await tester.pump();
+
+    expect(
+      documents.files[document.uri],
+      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n',
+    );
+
+    await tester.ensureVisible(find.byKey(const Key('toggle-beancount.plugins.auto')));
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.auto')));
+    await tester.pumpAndSettle();
+    expect(
+      documents.files[document.uri],
+      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n'
+      'plugin "beancount.plugins.auto"\n',
+    );
+
+    await tester.tap(find.byKey(const Key('about-beancount.plugins.currency_accounts')));
+    await tester.pumpAndSettle();
+    await tester.timedDrag(
+      find.byKey(const Key('drag-beancount.plugins.currency_accounts')),
+      const Offset(0, 240),
+      const Duration(milliseconds: 400),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      documents.files[document.uri],
+      'plugin "beancount.plugins.auto"\n'
+      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n',
+    );
+  });
+
+  testWidgets('keeps an unknown plugin and does not drop options', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{'content://ledger/1': 'plugin "custom.mine" "keep"\n'},
+    );
+    await _pumpApp(tester, documents);
+    await tester.tap(find.text('Plugins'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('custom.mine'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('toggle-beancount.plugins.leafonly')));
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.leafonly')));
+    await tester.pumpAndSettle();
+
+    expect(
+      documents.files[document.uri],
+      'plugin "custom.mine" "keep"\n'
+      'plugin "beancount.plugins.leafonly"\n',
+    );
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('STRICT'));
+    await tester.tap(find.text('STRICT'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FIFO').last);
+    await tester.pumpAndSettle();
+
+    final String? written = documents.files[document.uri];
+    expect(written, contains('option "booking_method" "FIFO"'));
+    expect(written, contains('plugin "custom.mine" "keep"'));
+    expect(written, contains('plugin "beancount.plugins.leafonly"'));
+  });
+}
+
+Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {
+  tester.view.physicalSize = const Size(800, 6000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MainApp(documents: documents));
+  await tester.pumpAndSettle();
+}
+
+class _FakeLedgerDocuments implements LedgerDocuments {
+  _FakeLedgerDocuments({this.currentDocument, Map<String, String>? files})
+    : files = Map<String, String>.of(files ?? const <String, String>{});
+
+  final LedgerDocument? currentDocument;
+  final Map<String, String> files;
+
+  @override
+  Future<LedgerDocument?> current() async => currentDocument;
+
+  @override
+  Future<LedgerDocument?> openExisting() async => null;
+
+  @override
+  Future<LedgerDocument?> createNew() async => null;
+
+  @override
+  Future<String> read(LedgerDocument document) async => files[document.uri] ?? '';
+
+  @override
+  Future<void> write(LedgerDocument document, String text) async {
+    files[document.uri] = text;
+  }
+}
