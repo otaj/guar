@@ -1,5 +1,6 @@
 // Configuration codecs round-trip the literals each plugin already accepts.
 
+import 'package:decimal/decimal.dart';
 import 'package:guar_plugins/guar_plugins.dart';
 import 'package:guar_plugins/src/config_literal.dart';
 import 'package:test/test.dart';
@@ -11,17 +12,18 @@ void main() {
     final PluginSetup codec = setup('beancount.plugins.check_average_cost');
     expect(codec.encode(codec.decode(null)).config, isNull);
     expect(codec.encode(codec.decode('0.02')).config, '0.02');
-    expect(codec.encode(const PluginStored(text: <String, String>{'tolerance': '1'})).config, '1.0');
-    expect(codec.encode(const PluginStored(text: <String, String>{'tolerance': 'nope'})).error, 'Enter a number');
+    expect(codec.decode('0.02').decimals['tolerance'], Decimal.parse('0.02'));
+    expect(codec.encode(codec.decode('1')).config, '1.0');
   });
 
   test('commodity attributes encode lists and None', () {
     final PluginSetup codec = setup('beancount.plugins.commodity_attr');
     final PluginStored stored = codec.decode("{'strategy': ['bigtech', 'bonds'], 'name': None}");
-    expect(stored.tables['attributes'], <List<String>>[
-      <String>['strategy', 'bigtech, bonds'],
-      <String>['name', ''],
-    ]);
+    final List<List<PluginCell>> rows = stored.tables['attributes']!;
+    expect((rows[0][0] as PluginTextCell).value, 'strategy');
+    expect((rows[0][1] as PluginTextCell).value, 'bigtech, bonds');
+    expect((rows[1][0] as PluginTextCell).value, 'name');
+    expect((rows[1][1] as PluginTextCell).value, '');
     expect(codec.encode(stored).config, "{'strategy': ['bigtech', 'bonds'], 'name': None}");
     expect(codec.encode(codec.decode(null)).config, '{}');
   });
@@ -91,7 +93,10 @@ void main() {
     const String config =
         "{'zerosum_accounts': {'Assets:Zero': ['', 90]}, 'account_name_replace': ['Zero', 'Matched'], 'tolerance': 0.0098}";
     final PluginSetup codec = setup('beancount_reds_plugins.zerosum.zerosum');
-    final String? written = codec.encode(codec.decode(config)).config;
+    final PluginStored stored = codec.decode(config);
+    expect(stored.decimals['tolerance'], Decimal.parse('0.0098'));
+    expect((stored.tables['accounts']!.single[2] as PluginIntCell).value, 90);
+    final String? written = codec.encode(stored).config;
     expect(parseConfigLiteral(written!).value, parseConfigLiteral(config).value);
   });
 

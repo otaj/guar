@@ -74,7 +74,7 @@ final List<PluginDeclaration> redsCatalog = <PluginDeclaration>[
     apply: renameAccounts,
     setup: renameAccountsSetup,
   ),
-  const PluginDeclaration(
+  PluginDeclaration(
     name: 'beancount_reds_plugins.zerosum.zerosum',
     description:
         'Pairs postings in the listed accounts that sum to zero, within a tolerance and a number of days, '

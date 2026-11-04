@@ -6,8 +6,7 @@ import 'package:guar_plugins/src/config_literal.dart';
 import 'package:guar_plugins/src/helpers.dart';
 import 'package:guar_plugins/src/plugin.dart';
 
-const String checkAverageCostDefaultTolerance = '0.01';
-final Decimal _defaultTolerance = Decimal.parse(checkAverageCostDefaultTolerance);
+final Decimal checkAverageCostDefaultTolerance = Decimal.parse('0.01');
 
 BookPluginResult validateAverageCost(
   List<Directive> directives,
@@ -15,7 +14,7 @@ BookPluginResult validateAverageCost(
   ProcessingInfo info,
   String? config,
 ) {
-  Decimal tolerance = _defaultTolerance;
+  Decimal tolerance = checkAverageCostDefaultTolerance;
   if (config != null && config.trim().isNotEmpty) {
     final ConfigLiteral parsed = parseConfigLiteral(config);
     final Object? value = parsed.value;

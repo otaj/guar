@@ -105,6 +105,66 @@ void main() {
     );
   });
 
+  testWidgets('writes a decimal tolerance and rejects text that is not one', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+    await tester.tap(find.text('Plugins'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('toggle-beancount.plugins.check_average_cost')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('about-beancount.plugins.check_average_cost')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('config-beancount.plugins.check_average_cost-tolerance')),
+      'nope',
+    );
+    await tester.pump(ledgerOptionSaveDelay);
+    await tester.pump();
+
+    expect(find.text('Enter a decimal'), findsOneWidget);
+    expect(documents.files[document.uri], 'plugin "beancount.plugins.check_average_cost"\n');
+
+    await tester.enterText(find.byKey(const Key('config-beancount.plugins.check_average_cost-tolerance')), '1');
+    await tester.pump(ledgerOptionSaveDelay);
+    await tester.pump();
+
+    expect(
+      documents.files[document.uri],
+      'plugin "beancount.plugins.check_average_cost" "1.0"\n',
+    );
+  });
+
+  testWidgets('writes a whole number of days and rejects a fraction', (WidgetTester tester) async {
+    const String name = 'beancount_reds_plugins.zerosum.zerosum';
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+    await tester.tap(find.text('Plugins'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('toggle-$name')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('about-$name')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-$name-accounts')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('config-$name-accounts-0-0')), 'Assets:Zero');
+    await tester.enterText(find.byKey(const Key('config-$name-accounts-0-2')), '1.5');
+    await tester.pump(ledgerOptionSaveDelay);
+    await tester.pump();
+
+    expect(find.text('Enter a whole number'), findsOneWidget);
+    expect(documents.files[document.uri], 'plugin "$name"\n');
+
+    await tester.enterText(find.byKey(const Key('config-$name-accounts-0-2')), '90');
+    await tester.pump(ledgerOptionSaveDelay);
+    await tester.pump();
+
+    expect(documents.files[document.uri], contains("{'Assets:Zero': ['', 90]}"));
+  });
+
   testWidgets('keeps an unknown plugin and does not drop options', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar_plugins/guar_plugins.dart';
@@ -100,13 +101,16 @@ class _PluginEditorState extends State<PluginEditor> {
     }
     for (final PluginField field in setup.fields) {
       switch (field) {
-        case PluginTextField(:final String id) || PluginNumberField(:final String id):
+        case PluginTextField(:final String id):
           _text[id] = _input(stored.text[id] ?? '');
+        case PluginDecimalField(:final String id):
+          _text[id] = _input(stored.decimals[id]?.toString() ?? '');
         case PluginFlagField(:final String id):
           _flags[id] = stored.flags[id] ?? false;
-        case PluginTableField(:final String id, :final List<String> columns):
+        case PluginTableField(:final String id, :final List<PluginColumn> columns):
           _tables[id] = <List<_Input>>[
-            for (final List<String> row in stored.tables[id] ?? const <List<String>>[]) _cells(row, columns.length),
+            for (final List<PluginCell> row in stored.tables[id] ?? const <List<PluginCell>>[])
+              _cells(row, columns.length),
           ];
         case PluginRulesField(:final String id):
           _rulesId = id;
@@ -247,7 +251,7 @@ class _PluginEditorState extends State<PluginEditor> {
       for (final PluginField field in setup.fields) ...<Widget>[
         const SizedBox(height: 8),
         switch (field) {
-          PluginTextField() || PluginNumberField() => _textField(field),
+          PluginTextField() || PluginDecimalField() => _textField(field),
           PluginFlagField() => SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(field.label),
@@ -268,7 +272,7 @@ class _PluginEditorState extends State<PluginEditor> {
       key: Key('config-${widget.name}-${field.id}'),
       controller: input.controller,
       focusNode: input.focus,
-      keyboardType: field is PluginNumberField
+      keyboardType: field is PluginDecimalField
           ? const TextInputType.numberWithOptions(decimal: true, signed: true)
           : null,
       decoration: InputDecoration(
@@ -295,10 +299,12 @@ class _PluginEditorState extends State<PluginEditor> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: TextFormField(
+                      key: Key('config-${widget.name}-${field.id}-$index-$column'),
                       controller: rows[index][column].controller,
                       focusNode: rows[index][column].focus,
+                      keyboardType: _keyboard(field.columns[column].kind),
                       decoration: InputDecoration(
-                        labelText: field.columns[column],
+                        labelText: field.columns[column].label,
                         border: const OutlineInputBorder(),
                       ),
                     ),
@@ -317,7 +323,7 @@ class _PluginEditorState extends State<PluginEditor> {
           alignment: Alignment.centerLeft,
           child: TextButton(
             key: Key('add-${widget.name}-${field.id}'),
-            onPressed: () => _addTableRow(field.id, field.columns.length),
+            onPressed: () => _addTableRow(field),
             child: Text('Add ${field.label}'),
           ),
         ),
@@ -414,9 +420,21 @@ class _PluginEditorState extends State<PluginEditor> {
     return _Input(controller, focus);
   }
 
-  List<_Input> _cells(List<String> cells, int width) => <_Input>[
-    for (int index = 0; index < width; index++) _input(index < cells.length ? cells[index] : ''),
+  List<_Input> _cells(List<PluginCell> cells, int width) => <_Input>[
+    for (int index = 0; index < width; index++) _input(index < cells.length ? _display(cells[index]) : ''),
   ];
+
+  String _display(PluginCell cell) => switch (cell) {
+    PluginTextCell(:final String value) => value,
+    PluginDecimalCell(:final Decimal? value) => value?.toString() ?? '',
+    PluginIntCell(:final int? value) => value?.toString() ?? '',
+  };
+
+  TextInputType? _keyboard(PluginColumnKind kind) => switch (kind) {
+    PluginColumnKind.text => null,
+    PluginColumnKind.decimal => const TextInputType.numberWithOptions(decimal: true, signed: true),
+    PluginColumnKind.integer => const TextInputType.numberWithOptions(signed: true),
+  };
 
   void _schedule() {
     if (_closed) return;
@@ -446,19 +464,60 @@ class _PluginEditorState extends State<PluginEditor> {
       if (text.contains('\n') || text.contains('\r')) return const PluginWrite.bad(pluginLineError);
       return PluginWrite.ok(text.trim().isEmpty ? null : text);
     }
+    final PluginWrite? typedError = _typedError();
+    if (typedError != null) return typedError;
     return widget.setup!.encode(_collect());
   }
 
+  PluginWrite? _typedError() {
+    for (final PluginField field in widget.setup?.fields ?? const <PluginField>[]) {
+      switch (field) {
+        case PluginDecimalField(:final String id):
+          final String raw = _text[id]?.controller.text.trim() ?? '';
+          if (raw.isNotEmpty && Decimal.tryParse(raw) == null) return const PluginWrite.bad('Enter a decimal');
+        case PluginTableField(:final String id, :final List<PluginColumn> columns):
+          for (final List<_Input> row in _tables[id] ?? const <List<_Input>>[]) {
+            for (int column = 0; column < columns.length && column < row.length; column++) {
+              final String raw = row[column].controller.text.trim();
+              if (raw.isEmpty) continue;
+              final PluginWrite? error = _cellError(columns[column].kind, raw);
+              if (error != null) return error;
+            }
+          }
+        case PluginTextField() || PluginFlagField() || PluginRulesField():
+          break;
+      }
+    }
+    return null;
+  }
+
+  PluginWrite? _cellError(PluginColumnKind kind, String raw) => switch (kind) {
+    PluginColumnKind.text => null,
+    PluginColumnKind.decimal => Decimal.tryParse(raw) == null ? const PluginWrite.bad('Enter a decimal') : null,
+    PluginColumnKind.integer => int.tryParse(raw) == null ? const PluginWrite.bad('Enter a whole number') : null,
+  };
+
   PluginStored _collect() => PluginStored(
     text: <String, String>{
-      for (final MapEntry<String, _Input> entry in _text.entries) entry.key: entry.value.controller.text,
+      for (final PluginField field in widget.setup?.fields ?? const <PluginField>[])
+        if (field is PluginTextField) field.id: _text[field.id]!.controller.text,
+    },
+    decimals: <String, Decimal>{
+      for (final PluginField field in widget.setup?.fields ?? const <PluginField>[])
+        if (field is PluginDecimalField && _text[field.id]!.controller.text.trim().isNotEmpty)
+          field.id: Decimal.parse(_text[field.id]!.controller.text.trim()),
     },
     flags: Map<String, bool>.of(_flags),
-    tables: <String, List<List<String>>>{
-      for (final MapEntry<String, List<List<_Input>>> entry in _tables.entries)
-        entry.key: <List<String>>[
-          for (final List<_Input> row in entry.value) <String>[for (final _Input input in row) input.controller.text],
-        ],
+    tables: <String, List<List<PluginCell>>>{
+      for (final PluginField field in widget.setup?.fields ?? const <PluginField>[])
+        if (field is PluginTableField)
+          field.id: <List<PluginCell>>[
+            for (final List<_Input> row in _tables[field.id] ?? const <List<_Input>>[])
+              <PluginCell>[
+                for (int column = 0; column < field.columns.length; column++)
+                  _storedCell(field.columns[column], column < row.length ? row[column].controller.text : ''),
+              ],
+          ],
     },
     rules: _rulesId == null
         ? const <String, List<PluginRule>>{}
@@ -483,8 +542,17 @@ class _PluginEditorState extends State<PluginEditor> {
     unawaited(flush());
   }
 
-  void _addTableRow(String id, int width) {
-    setState(() => (_tables[id] ??= <List<_Input>>[]).add(_cells(const <String>[], width)));
+  PluginCell _storedCell(PluginColumn column, String raw) {
+    final String trimmed = raw.trim();
+    return switch (column.kind) {
+      PluginColumnKind.text => PluginTextCell(raw),
+      PluginColumnKind.decimal => PluginDecimalCell(trimmed.isEmpty ? null : Decimal.parse(trimmed)),
+      PluginColumnKind.integer => PluginIntCell(trimmed.isEmpty ? null : int.parse(trimmed)),
+    };
+  }
+
+  void _addTableRow(PluginTableField field) {
+    setState(() => (_tables[field.id] ??= <List<_Input>>[]).add(_cells(const <PluginCell>[], field.columns.length)));
     _dirty = true;
     unawaited(flush());
   }

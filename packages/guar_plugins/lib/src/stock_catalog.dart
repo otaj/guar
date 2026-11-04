@@ -33,7 +33,7 @@ final List<PluginDeclaration> stockCatalog = <PluginDeclaration>[
     description: 'Inserts an open directive for every account that is used before it is opened.',
     apply: autoInsertOpen,
   ),
-  const PluginDeclaration(
+  PluginDeclaration(
     name: 'beancount.plugins.check_average_cost',
     description:
         'For accounts booked NONE, checks that a reducing posting stays near the running average cost. '

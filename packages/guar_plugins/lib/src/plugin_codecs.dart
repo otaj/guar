@@ -1,5 +1,6 @@
 // Turn plugin configuration fields into the literal string a ledger stores.
 
+import 'package:decimal/decimal.dart';
 import 'package:guar_plugins/src/check_average_cost.dart';
 import 'package:guar_plugins/src/config_literal.dart';
 import 'package:guar_plugins/src/currency_accounts.dart';
@@ -7,9 +8,9 @@ import 'package:guar_plugins/src/plugin_info.dart';
 import 'package:guar_plugins/src/reds/daf_mirror.dart';
 import 'package:guar_plugins/src/reds/zerosum.dart';
 
-const PluginSetup averageCostSetup = PluginSetup(
+final PluginSetup averageCostSetup = PluginSetup(
   fields: <PluginField>[
-    PluginNumberField(
+    PluginDecimalField(
       id: 'tolerance',
       label: 'Tolerance',
       hint: 'Default $checkAverageCostDefaultTolerance. One percent is 0.01.',
@@ -25,7 +26,7 @@ const PluginSetup commodityCheckSetup = PluginSetup(
       id: 'ignore',
       label: 'Ignored commodities',
       hint: 'An account pattern and a commodity pattern to skip.',
-      columns: <String>['Account pattern', 'Commodity pattern'],
+      columns: <PluginColumn>[PluginColumn('Account pattern'), PluginColumn('Commodity pattern')],
     ),
   ],
   decode: decodeCommodityCheck,
@@ -38,7 +39,7 @@ const PluginSetup commodityAttrSetup = PluginSetup(
       id: 'attributes',
       label: 'Attributes',
       hint: 'Leave allowed values empty to accept any value. Separate values with commas.',
-      columns: <String>['Attribute', 'Allowed values'],
+      columns: <PluginColumn>[PluginColumn('Attribute'), PluginColumn('Allowed values')],
     ),
   ],
   decode: decodeCommodityAttr,
@@ -84,7 +85,12 @@ const PluginSetup gainLossSetup = PluginSetup(
       id: 'rules',
       label: 'Rules',
       hint: 'A negative amount uses the third column. A positive amount uses the fourth.',
-      columns: <String>['Account pattern', 'Text to replace', 'Negative amount', 'Positive amount'],
+      columns: <PluginColumn>[
+        PluginColumn('Account pattern'),
+        PluginColumn('Text to replace'),
+        PluginColumn('Negative amount'),
+        PluginColumn('Positive amount'),
+      ],
     ),
   ],
   decode: decodeGainLoss,
@@ -97,7 +103,12 @@ const PluginSetup longShortSetup = PluginSetup(
       id: 'rules',
       label: 'Rules',
       hint: 'Only the first rule is used. The third column is short-term and the fourth is long-term.',
-      columns: <String>['Account pattern', 'Text to replace', 'Short-term', 'Long-term'],
+      columns: <PluginColumn>[
+        PluginColumn('Account pattern'),
+        PluginColumn('Text to replace'),
+        PluginColumn('Short-term'),
+        PluginColumn('Long-term'),
+      ],
     ),
   ],
   decode: decodeLongShort,
@@ -110,7 +121,11 @@ const PluginSetup effectiveDateSetup = PluginSetup(
       id: 'holding',
       label: 'Holding accounts',
       hint: 'Leave empty to use the built-in Expenses and Income holding accounts.',
-      columns: <String>['Account prefix', 'Earlier account', 'Later account'],
+      columns: <PluginColumn>[
+        PluginColumn('Account prefix'),
+        PluginColumn('Earlier account'),
+        PluginColumn('Later account'),
+      ],
     ),
   ],
   decode: decodeEffectiveDate,
@@ -135,33 +150,37 @@ const PluginSetup renameAccountsSetup = PluginSetup(
       id: 'renames',
       label: 'Renames',
       hint: 'Each row is a regular expression and its replacement. Later rows see earlier replacements.',
-      columns: <String>['Pattern', 'Replacement'],
+      columns: <PluginColumn>[PluginColumn('Pattern'), PluginColumn('Replacement')],
     ),
   ],
   decode: decodeRenameAccounts,
   encode: encodeRenameAccounts,
 );
 
-const PluginSetup zerosumSetup = PluginSetup(
+final PluginSetup zerosumSetup = PluginSetup(
   fields: <PluginField>[
-    PluginTableField(
+    const PluginTableField(
       id: 'accounts',
       label: 'Zerosum accounts',
       hint: 'Account pattern, the account that receives a match, and how many days apart a pair may be.',
-      columns: <String>['Account pattern', 'Target account', 'Days'],
+      columns: <PluginColumn>[
+        PluginColumn('Account pattern'),
+        PluginColumn('Target account'),
+        PluginColumn('Days', kind: PluginColumnKind.integer),
+      ],
     ),
-    PluginTextField(id: 'replaceFrom', label: 'Text to replace'),
-    PluginTextField(id: 'replaceTo', label: 'Replacement'),
-    PluginNumberField(id: 'tolerance', label: 'Tolerance', hint: 'Default $zerosumDefaultTolerance.'),
-    PluginFlagField(id: 'matchMetadata', label: 'Match metadata'),
-    PluginTextField(
+    const PluginTextField(id: 'replaceFrom', label: 'Text to replace'),
+    const PluginTextField(id: 'replaceTo', label: 'Replacement'),
+    PluginDecimalField(id: 'tolerance', label: 'Tolerance', hint: 'Default $zerosumDefaultTolerance.'),
+    const PluginFlagField(id: 'matchMetadata', label: 'Match metadata'),
+    const PluginTextField(
       id: 'matchMetadataName',
       label: 'Metadata name',
       hint: 'Default $zerosumDefaultMetadataName.',
     ),
-    PluginFlagField(id: 'linkTransactions', label: 'Link transactions'),
-    PluginTextField(id: 'linkPrefix', label: 'Link prefix', hint: 'Default $zerosumDefaultLinkPrefix.'),
-    PluginFlagField(id: 'flagUnmatched', label: 'Flag unmatched'),
+    const PluginFlagField(id: 'linkTransactions', label: 'Link transactions'),
+    const PluginTextField(id: 'linkPrefix', label: 'Link prefix', hint: 'Default $zerosumDefaultLinkPrefix.'),
+    const PluginFlagField(id: 'flagUnmatched', label: 'Flag unmatched'),
   ],
   decode: decodeZerosum,
   encode: encodeZerosum,
@@ -170,20 +189,18 @@ const PluginSetup zerosumSetup = PluginSetup(
 PluginStored decodeAverageCost(String? config) {
   if (config == null || config.trim().isEmpty) return const PluginStored();
   final ConfigLiteral parsed = parseConfigLiteral(config);
-  final Object? value = parsed.value;
-  if (parsed.error != null || value is! num) {
-    return PluginStored.unparsed(config, parsed.error ?? 'Enter a number');
+  final Decimal? tolerance = _asDecimal(parsed.value);
+  if (parsed.error != null || tolerance == null) {
+    return PluginStored.unparsed(config, parsed.error ?? 'Enter a decimal');
   }
-  return PluginStored(text: <String, String>{'tolerance': _numberText(value)});
+  return PluginStored(decimals: <String, Decimal>{'tolerance': tolerance});
 }
 
 PluginWrite encodeAverageCost(PluginStored stored) {
   if (stored.raw != null) return _finishRaw(stored.raw);
-  final String text = (stored.text['tolerance'] ?? '').trim();
-  if (text.isEmpty) return const PluginWrite.ok(null);
-  final String? number = _floatLiteral(text);
-  if (number == null) return const PluginWrite.bad('Enter a number');
-  return _finish(number);
+  final Decimal? tolerance = stored.decimals['tolerance'];
+  if (tolerance == null) return const PluginWrite.ok(null);
+  return _finish(_decimalLiteral(tolerance));
 }
 
 PluginStored decodeCommodityCheck(String? config) => _decodeStringMap(config, 'ignore');
@@ -198,13 +215,13 @@ PluginStored decodeCommodityAttr(String? config) {
     case _Failed(:final String message):
       return PluginStored.unparsed(config!, message);
     case _Dict(:final Map<Object?, Object?> map):
-      final List<List<String>> rows = <List<String>>[];
+      final List<List<PluginCell>> rows = <List<PluginCell>>[];
       for (final MapEntry<Object?, Object?> entry in map.entries) {
         final Object? key = entry.key;
         if (key is! String) return PluginStored.unparsed(config!, 'Expected string keys');
         final Object? values = entry.value;
         if (values == null) {
-          rows.add(<String>[key, '']);
+          rows.add(_textRow(<String>[key, '']));
           continue;
         }
         if (values is! List) return PluginStored.unparsed(config!, 'Expected a list of allowed values');
@@ -213,16 +230,16 @@ PluginStored decodeCommodityAttr(String? config) {
           if (item is! String) return PluginStored.unparsed(config!, 'Expected string values');
           allowed.add(item);
         }
-        rows.add(<String>[key, allowed.join(', ')]);
+        rows.add(_textRow(<String>[key, allowed.join(', ')]));
       }
-      return PluginStored(tables: <String, List<List<String>>>{'attributes': rows});
+      return PluginStored(tables: <String, List<List<PluginCell>>>{'attributes': rows});
   }
 }
 
 PluginWrite encodeCommodityAttr(PluginStored stored) {
   if (stored.raw != null) return _finishRaw(stored.raw);
   final Map<String, Object?> map = <String, Object?>{};
-  for (final List<String> row in _table(stored, 'attributes')) {
+  for (final List<PluginCell> row in _table(stored, 'attributes')) {
     final String name = _at(row, 0);
     final String allowed = _at(row, 1);
     if (name.isEmpty && allowed.isEmpty) continue;
@@ -326,7 +343,7 @@ PluginStored decodeEffectiveDate(String? config) {
     case _Failed(:final String message):
       return PluginStored.unparsed(config!, message);
     case _Dict(:final Map<Object?, Object?> map):
-      final List<List<String>> rows = <List<String>>[];
+      final List<List<PluginCell>> rows = <List<PluginCell>>[];
       for (final MapEntry<Object?, Object?> entry in map.entries) {
         final Object? key = entry.key;
         final Object? value = entry.value;
@@ -337,16 +354,16 @@ PluginStored decodeEffectiveDate(String? config) {
         if (!inner.containsKey('earlier') || !inner.containsKey('later')) {
           return PluginStored.unparsed(config!, 'Each holding account needs earlier and later');
         }
-        rows.add(<String>[key, inner['earlier'].toString(), inner['later'].toString()]);
+        rows.add(_textRow(<String>[key, inner['earlier'].toString(), inner['later'].toString()]));
       }
-      return PluginStored(tables: <String, List<List<String>>>{'holding': rows});
+      return PluginStored(tables: <String, List<List<PluginCell>>>{'holding': rows});
   }
 }
 
 PluginWrite encodeEffectiveDate(PluginStored stored) {
   if (stored.raw != null) return _finishRaw(stored.raw);
   final Map<String, Object?> map = <String, Object?>{};
-  for (final List<String> row in _table(stored, 'holding')) {
+  for (final List<PluginCell> row in _table(stored, 'holding')) {
     final String prefix = _at(row, 0);
     final String earlier = _at(row, 1);
     final String later = _at(row, 2);
@@ -445,16 +462,24 @@ PluginStored decodeZerosum(String? config) {
       if (map.keys.any((Object? key) => key is! String || !known.contains(key))) {
         return PluginStored.unparsed(config!, 'Unrecognized zerosum configuration');
       }
-      final List<List<String>> accounts = <List<String>>[];
+      final List<List<PluginCell>> accounts = <List<PluginCell>>[];
       final Object? rawAccounts = map['zerosum_accounts'];
       if (rawAccounts != null) {
         if (rawAccounts is! Map) return PluginStored.unparsed(config!, 'Expected a dict of zerosum accounts');
         for (final MapEntry<Object?, Object?> entry in Map<Object?, Object?>.from(rawAccounts).entries) {
           final Object? spec = entry.value;
-          if (entry.key is! String || spec is! List || spec.length < 2 || spec[1] is! num) {
+          if (entry.key is! String || spec is! List || spec.length < 2) {
             return PluginStored.unparsed(config!, 'Each zerosum account needs a target and a number of days');
           }
-          accounts.add(<String>[entry.key! as String, spec[0]?.toString() ?? '', _numberText(spec[1] as num)]);
+          final int? days = _whole(spec[1]);
+          if (days == null) {
+            return PluginStored.unparsed(config!, 'Each zerosum account needs a target and a number of days');
+          }
+          accounts.add(<PluginCell>[
+            PluginTextCell(entry.key! as String),
+            PluginTextCell(spec[0]?.toString() ?? ''),
+            PluginIntCell(days),
+          ]);
         }
       }
       final Object? replace = map['account_name_replace'];
@@ -468,21 +493,26 @@ PluginStored decodeZerosum(String? config) {
         replaceTo = replace[1]?.toString() ?? '';
       }
       final Object? tolerance = map['tolerance'];
-      if (tolerance != null && tolerance is! num) return PluginStored.unparsed(config!, 'Tolerance must be a number');
+      final Decimal? toleranceDecimal = tolerance == null ? null : _asDecimal(tolerance);
+      if (tolerance != null && toleranceDecimal == null) {
+        return PluginStored.unparsed(config!, 'Tolerance must be a decimal');
+      }
       return PluginStored(
         text: <String, String>{
           'replaceFrom': replaceFrom,
           'replaceTo': replaceTo,
-          'tolerance': tolerance is num ? _numberText(tolerance) : '',
           'matchMetadataName': map['match_metadata_name']?.toString() ?? '',
           'linkPrefix': map['link_prefix']?.toString() ?? '',
         },
+        decimals: toleranceDecimal == null
+            ? const <String, Decimal>{}
+            : <String, Decimal>{'tolerance': toleranceDecimal},
         flags: <String, bool>{
           'matchMetadata': map['match_metadata'] == true,
           'linkTransactions': map['link_transactions'] == true,
           'flagUnmatched': map['flag_unmatched'] == true,
         },
-        tables: <String, List<List<String>>>{'accounts': accounts},
+        tables: <String, List<List<PluginCell>>>{'accounts': accounts},
       );
   }
 }
@@ -490,17 +520,15 @@ PluginStored decodeZerosum(String? config) {
 PluginWrite encodeZerosum(PluginStored stored) {
   if (stored.raw != null) return _finishRaw(stored.raw);
   final Map<String, Object?> accounts = <String, Object?>{};
-  for (final List<String> row in _table(stored, 'accounts')) {
+  for (final List<PluginCell> row in _table(stored, 'accounts')) {
     final String account = _at(row, 0);
     final String target = _at(row, 1);
-    final String days = _at(row, 2);
-    if (account.isEmpty && target.isEmpty && days.isEmpty) continue;
-    if (account.isEmpty || days.isEmpty) {
+    final int? days = _intAt(row, 2);
+    if (account.isEmpty && target.isEmpty && days == null) continue;
+    if (account.isEmpty || days == null) {
       return const PluginWrite.bad('Enter an account pattern and a number of days');
     }
-    final int? range = int.tryParse(days);
-    if (range == null) return const PluginWrite.bad('Enter a whole number of days');
-    accounts[account] = <Object?>[target, range];
+    accounts[account] = <Object?>[target, days];
   }
   final Map<String, Object?> map = <String, Object?>{};
   if (accounts.isNotEmpty) map['zerosum_accounts'] = accounts;
@@ -509,12 +537,8 @@ PluginWrite encodeZerosum(PluginStored stored) {
   if (replaceFrom.isNotEmpty || replaceTo.isNotEmpty) {
     map['account_name_replace'] = <Object?>[replaceFrom, replaceTo];
   }
-  final String tolerance = (stored.text['tolerance'] ?? '').trim();
-  if (tolerance.isNotEmpty) {
-    final Object? number = _typedNumber(tolerance);
-    if (number == null) return const PluginWrite.bad('Enter a number');
-    map['tolerance'] = number;
-  }
+  final Decimal? tolerance = stored.decimals['tolerance'];
+  if (tolerance != null) map['tolerance'] = tolerance;
   if (stored.flags['matchMetadata'] ?? false) map['match_metadata'] = true;
   final String metadataName = (stored.text['matchMetadataName'] ?? '').trim();
   if (metadataName.isNotEmpty && metadataName != zerosumDefaultMetadataName) {
@@ -535,21 +559,21 @@ PluginStored _decodeStringMap(String? config, String field) {
     case _Failed(:final String message):
       return PluginStored.unparsed(config!, message);
     case _Dict(:final Map<Object?, Object?> map):
-      final List<List<String>> rows = <List<String>>[];
+      final List<List<PluginCell>> rows = <List<PluginCell>>[];
       for (final MapEntry<Object?, Object?> entry in map.entries) {
         if (entry.key is! String || entry.value is! String) {
           return PluginStored.unparsed(config!, 'Expected a dict of strings');
         }
-        rows.add(<String>[entry.key! as String, entry.value! as String]);
+        rows.add(_textRow(<String>[entry.key! as String, entry.value! as String]));
       }
-      return PluginStored(tables: <String, List<List<String>>>{field: rows});
+      return PluginStored(tables: <String, List<List<PluginCell>>>{field: rows});
   }
 }
 
 PluginWrite _encodeStringMap(PluginStored stored, String field) {
   if (stored.raw != null) return _finishRaw(stored.raw);
   final Map<String, Object?> map = <String, Object?>{};
-  for (final List<String> row in _table(stored, field)) {
+  for (final List<PluginCell> row in _table(stored, field)) {
     final String key = _at(row, 0);
     final String value = _at(row, 1);
     if (key.isEmpty && value.isEmpty) continue;
@@ -567,7 +591,7 @@ PluginStored _decodeTuples(String? config, String field, int width) {
     case _Failed(:final String message):
       return PluginStored.unparsed(config!, message);
     case _Dict(:final Map<Object?, Object?> map):
-      final List<List<String>> rows = <List<String>>[];
+      final List<List<PluginCell>> rows = <List<PluginCell>>[];
       for (final MapEntry<Object?, Object?> entry in map.entries) {
         final Object? spec = entry.value;
         if (entry.key is! String || spec is! List || spec.length != width) {
@@ -578,16 +602,16 @@ PluginStored _decodeTuples(String? config, String field, int width) {
           if (item is! String) return PluginStored.unparsed(config!, 'Expected a dict of string lists');
           cells.add(item);
         }
-        rows.add(cells);
+        rows.add(_textRow(cells));
       }
-      return PluginStored(tables: <String, List<List<String>>>{field: rows});
+      return PluginStored(tables: <String, List<List<PluginCell>>>{field: rows});
   }
 }
 
 PluginWrite _encodeTuples(PluginStored stored, String field, int width) {
   if (stored.raw != null) return _finishRaw(stored.raw);
   final Map<String, Object?> map = <String, Object?>{};
-  for (final List<String> row in _table(stored, field)) {
+  for (final List<PluginCell> row in _table(stored, field)) {
     final List<String> cells = <String>[for (int index = 0; index < width; index++) _at(row, index)];
     if (cells.every((String cell) => cell.isEmpty)) continue;
     if (cells.any((String cell) => cell.isEmpty)) {
@@ -627,26 +651,44 @@ _Read _readDict(String? config) {
   return _Dict(value);
 }
 
-List<List<String>> _table(PluginStored stored, String field) => stored.tables[field] ?? const <List<String>>[];
+List<List<PluginCell>> _table(PluginStored stored, String field) => stored.tables[field] ?? const <List<PluginCell>>[];
 
-String _at(List<String> row, int index) => index < row.length ? row[index].trim() : '';
+List<PluginCell> _textRow(List<String> values) => <PluginCell>[
+  for (final String value in values) PluginTextCell(value),
+];
 
-String _numberText(num value) {
-  if (value is int) return '$value';
-  return value.toString();
+String _at(List<PluginCell> row, int index) {
+  if (index >= row.length) return '';
+  final PluginCell cell = row[index];
+  return switch (cell) {
+    PluginTextCell(:final String value) => value.trim(),
+    PluginDecimalCell(:final Decimal? value) => value?.toString() ?? '',
+    PluginIntCell(:final int? value) => value?.toString() ?? '',
+  };
 }
 
-String? _floatLiteral(String text) {
-  if (_typedNumber(text) == null) return null;
+int? _intAt(List<PluginCell> row, int index) {
+  if (index >= row.length) return null;
+  final PluginCell cell = row[index];
+  return cell is PluginIntCell ? cell.value : null;
+}
+
+int? _whole(Object? value) {
+  if (value is int) return value;
+  if (value is double && value == value.roundToDouble()) return value.toInt();
+  return null;
+}
+
+Decimal? _asDecimal(Object? value) {
+  if (value is Decimal) return value;
+  if (value is! num) return null;
+  return Decimal.tryParse(value.toString());
+}
+
+String _decimalLiteral(Decimal value) {
+  final String text = value.toString();
   if (text.contains('.') || text.contains('e') || text.contains('E')) return text;
   return '$text.0';
-}
-
-Object? _typedNumber(String text) {
-  final double? value = double.tryParse(text);
-  if (value == null || !value.isFinite) return null;
-  if (text.contains('.') || text.contains('e') || text.contains('E')) return value;
-  return int.tryParse(text);
 }
 
 PluginWrite _writeMap(Map<String, Object?> map, {bool emptyAsBraces = false}) {
@@ -670,6 +712,7 @@ String _pythonLiteral(Object? value) {
   if (value == null) return 'None';
   if (value is bool) return value ? 'True' : 'False';
   if (value is int) return '$value';
+  if (value is Decimal) return _decimalLiteral(value);
   if (value is double) {
     final String text = value.toString();
     if (text.contains('.') || text.contains('e') || text.contains('E')) return text;

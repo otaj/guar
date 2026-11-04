@@ -1,5 +1,6 @@
 // Description and configuration shape for one registered booking plugin.
 
+import 'package:decimal/decimal.dart';
 import 'package:guar_plugins/src/plugin.dart';
 
 typedef PluginDecode = PluginStored Function(String? config);
@@ -39,18 +40,49 @@ class PluginTextField extends PluginField {
   const PluginTextField({required super.id, required super.label, super.hint});
 }
 
-class PluginNumberField extends PluginField {
-  const PluginNumberField({required super.id, required super.label, super.hint});
+class PluginDecimalField extends PluginField {
+  const PluginDecimalField({required super.id, required super.label, super.hint});
 }
 
 class PluginFlagField extends PluginField {
   const PluginFlagField({required super.id, required super.label, super.hint});
 }
 
+enum PluginColumnKind { text, decimal, integer }
+
+class PluginColumn {
+  const PluginColumn(this.label, {this.kind = PluginColumnKind.text});
+
+  final String label;
+  final PluginColumnKind kind;
+}
+
 class PluginTableField extends PluginField {
   const PluginTableField({required super.id, required super.label, required this.columns, super.hint});
 
-  final List<String> columns;
+  final List<PluginColumn> columns;
+}
+
+sealed class PluginCell {
+  const PluginCell();
+}
+
+class PluginTextCell extends PluginCell {
+  const PluginTextCell(this.value);
+
+  final String value;
+}
+
+class PluginDecimalCell extends PluginCell {
+  const PluginDecimalCell([this.value]);
+
+  final Decimal? value;
+}
+
+class PluginIntCell extends PluginCell {
+  const PluginIntCell([this.value]);
+
+  final int? value;
 }
 
 class PluginRulesField extends PluginField {
@@ -75,8 +107,9 @@ class PluginRule {
 class PluginStored {
   const PluginStored({
     this.text = const <String, String>{},
+    this.decimals = const <String, Decimal>{},
     this.flags = const <String, bool>{},
-    this.tables = const <String, List<List<String>>>{},
+    this.tables = const <String, List<List<PluginCell>>>{},
     this.rules = const <String, List<PluginRule>>{},
     this.raw,
     this.message,
@@ -84,13 +117,15 @@ class PluginStored {
 
   const PluginStored.unparsed(this.raw, this.message)
     : text = const <String, String>{},
+      decimals = const <String, Decimal>{},
       flags = const <String, bool>{},
-      tables = const <String, List<List<String>>>{},
+      tables = const <String, List<List<PluginCell>>>{},
       rules = const <String, List<PluginRule>>{};
 
   final Map<String, String> text;
+  final Map<String, Decimal> decimals;
   final Map<String, bool> flags;
-  final Map<String, List<List<String>>> tables;
+  final Map<String, List<List<PluginCell>>> tables;
   final Map<String, List<PluginRule>> rules;
   final String? raw;
   final String? message;
