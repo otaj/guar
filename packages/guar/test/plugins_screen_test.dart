@@ -8,21 +8,33 @@ import 'package:guar/src/ledger_session.dart';
 import 'package:guar_plugins/guar_plugins.dart';
 
 void main() {
-  testWidgets('switches to the plugins screen from the bottom bar', (WidgetTester tester) async {
+  testWidgets('shows plugins only when advanced UI is on', (WidgetTester tester) async {
     await _pumpApp(tester, _FakeLedgerDocuments());
 
     expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    await _pumpApp(tester, _FakeLedgerDocuments(currentDocument: document));
+    expect(find.byType(NavigationBar), findsNothing);
+
+    await _pumpApp(tester, _ledger(document));
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx,
+      lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Settings')).dx),
+    );
     await tester.tap(find.text('Plugins'));
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(AppBar, 'Plugins'), findsOneWidget);
-    expect(find.text('No ledger is selected. Choose one in Settings.'), findsOneWidget);
+    expect(find.text('taxes.beancount'), findsOneWidget);
     expect(find.text('Title'), findsNothing);
   });
 
   testWidgets('shows the catalog description and writes a plugin in order', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
-    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    final _FakeLedgerDocuments documents = _ledger(document);
     final PluginDeclaration autoAccounts = pluginCatalog.firstWhere(
       (PluginDeclaration plugin) => plugin.name == 'beancount.plugins.auto_accounts',
     );
@@ -52,17 +64,18 @@ void main() {
     expect(
       documents.files[document.uri],
       'plugin "beancount.plugins.auto"\n'
-      'plugin "beancount.plugins.auto_accounts"\n',
+      'plugin "beancount.plugins.auto_accounts"\n'
+      '$_advanced',
     );
 
     await tester.tap(find.byKey(const Key('toggle-beancount.plugins.auto')));
     await tester.pumpAndSettle();
-    expect(documents.files[document.uri], 'plugin "beancount.plugins.auto_accounts"\n');
+    expect(documents.files[document.uri], 'plugin "beancount.plugins.auto_accounts"\n$_advanced');
   });
 
   testWidgets('writes a plugin configuration and can drag plugins into a new order', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
-    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    final _FakeLedgerDocuments documents = _ledger(document);
     await _pumpApp(tester, documents);
     await tester.tap(find.text('Plugins'));
     await tester.pumpAndSettle();
@@ -77,7 +90,8 @@ void main() {
 
     expect(
       documents.files[document.uri],
-      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n',
+      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n'
+      '$_advanced',
     );
 
     await tester.ensureVisible(find.byKey(const Key('toggle-beancount.plugins.auto')));
@@ -86,7 +100,8 @@ void main() {
     expect(
       documents.files[document.uri],
       'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n'
-      'plugin "beancount.plugins.auto"\n',
+      'plugin "beancount.plugins.auto"\n'
+      '$_advanced',
     );
 
     await tester.tap(find.byKey(const Key('about-beancount.plugins.currency_accounts')));
@@ -101,13 +116,14 @@ void main() {
     expect(
       documents.files[document.uri],
       'plugin "beancount.plugins.auto"\n'
-      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n',
+      'plugin "beancount.plugins.currency_accounts" "Equity:Trading"\n'
+      '$_advanced',
     );
   });
 
   testWidgets('writes a decimal tolerance and rejects text that is not one', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
-    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    final _FakeLedgerDocuments documents = _ledger(document);
     await _pumpApp(tester, documents);
     await tester.tap(find.text('Plugins'));
     await tester.pumpAndSettle();
@@ -124,7 +140,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enter a decimal'), findsOneWidget);
-    expect(documents.files[document.uri], 'plugin "beancount.plugins.check_average_cost"\n');
+    expect(documents.files[document.uri], 'plugin "beancount.plugins.check_average_cost"\n$_advanced');
 
     await tester.enterText(find.byKey(const Key('config-beancount.plugins.check_average_cost-tolerance')), '1');
     await tester.pump(ledgerOptionSaveDelay);
@@ -132,14 +148,15 @@ void main() {
 
     expect(
       documents.files[document.uri],
-      'plugin "beancount.plugins.check_average_cost" "1.0"\n',
+      'plugin "beancount.plugins.check_average_cost" "1.0"\n'
+      '$_advanced',
     );
   });
 
   testWidgets('writes a whole number of days and rejects a fraction', (WidgetTester tester) async {
     const String name = 'beancount_reds_plugins.zerosum.zerosum';
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
-    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    final _FakeLedgerDocuments documents = _ledger(document);
     await _pumpApp(tester, documents);
     await tester.tap(find.text('Plugins'));
     await tester.pumpAndSettle();
@@ -156,7 +173,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enter a whole number'), findsOneWidget);
-    expect(documents.files[document.uri], 'plugin "$name"\n');
+    expect(documents.files[document.uri], 'plugin "$name"\n$_advanced');
 
     await tester.enterText(find.byKey(const Key('config-$name-accounts-0-2')), '90');
     await tester.pump(ledgerOptionSaveDelay);
@@ -167,10 +184,7 @@ void main() {
 
   testWidgets('keeps an unknown plugin and does not drop options', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
-    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
-      currentDocument: document,
-      files: const <String, String>{'content://ledger/1': 'plugin "custom.mine" "keep"\n'},
-    );
+    final _FakeLedgerDocuments documents = _ledger(document, before: 'plugin "custom.mine" "keep"\n');
     await _pumpApp(tester, documents);
     await tester.tap(find.text('Plugins'));
     await tester.pumpAndSettle();
@@ -183,7 +197,8 @@ void main() {
     expect(
       documents.files[document.uri],
       'plugin "custom.mine" "keep"\n'
-      'plugin "beancount.plugins.leafonly"\n',
+      'plugin "beancount.plugins.leafonly"\n'
+      '$_advanced',
     );
 
     await tester.tap(find.text('Settings'));
@@ -200,6 +215,13 @@ void main() {
     expect(written, contains('plugin "beancount.plugins.leafonly"'));
   });
 }
+
+const String _advanced = '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n';
+
+_FakeLedgerDocuments _ledger(LedgerDocument document, {String before = ''}) => _FakeLedgerDocuments(
+  currentDocument: document,
+  files: <String, String>{document.uri: '$before$_advanced'},
+);
 
 Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {
   tester.view.physicalSize = const Size(800, 6000);

@@ -88,10 +88,8 @@ class LedgerSession extends ChangeNotifier {
       return;
     }
     source = text;
-    if (error != null) {
-      error = null;
-      _publishStatus();
-    }
+    error = null;
+    _publishStatus();
   }
 
   @override
