@@ -3,18 +3,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_option_draft.dart';
+import 'package:guar/src/ledger_session.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
 
-const Duration ledgerOptionSaveDelay = Duration(milliseconds: 500);
-
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({required this.documents, super.key});
+  const SettingsScreen({required this.session, super.key});
 
-  final LedgerDocuments documents;
+  final LedgerSession session;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -36,18 +34,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final List<FocusNode> _toleranceKeyFocus = <FocusNode>[];
   final List<FocusNode> _toleranceValueFocus = <FocusNode>[];
 
-  LedgerDocument? _document;
-  String _source = '';
   AccountPrefixes _baseline = const AccountPrefixes();
-  bool _busy = false;
-  bool _settled = false;
   bool _mute = false;
   bool _closed = false;
   bool _pumping = false;
   bool _again = false;
-  int _epoch = 0;
-  String? _error;
+  int _seen = 0;
   String? _fieldError;
+  VoidCallback? _unbindFlush;
+
+  LedgerDocument? get _document => widget.session.document;
+
+  bool get _busy => widget.session.busy;
+
+  bool get _settled => widget.session.settled;
+
+  String? get _error => widget.session.error;
   List<String> _parseErrors = <String>[];
   Timer? _timer;
 
@@ -65,13 +67,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    _unbindFlush = widget.session.bindFlush(flushPending);
+    widget.session.addListener(_onSession);
+    if (widget.session.generation != _seen) {
+      _seen = widget.session.generation;
+      _applyLoaded();
+    }
   }
 
   @override
   void dispose() {
     _closed = true;
     _timer?.cancel();
+    widget.session.removeListener(_onSession);
+    _unbindFlush?.call();
     for (final TextEditingController controller in _fields.values) {
       controller.dispose();
     }
@@ -92,148 +101,145 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final LedgerDocument? document = _document;
     final String? error = _error;
     final String? fieldError = _fieldError;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              FilledButton(
-                onPressed: _busy ? null : () => unawaited(_choose(widget.documents.openExisting)),
-                child: Text(document?.displayName ?? 'Open a ledger'),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Choose the root ledger file. That choice stays in the app.',
-                style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
-              ),
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            FilledButton(
+              onPressed: _busy ? null : () => unawaited(_choose(widget.session.documents.openExisting)),
+              child: Text(document?.displayName ?? 'Open a ledger'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Choose the root ledger file. That choice stays in the app.',
+              style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: _busy ? null : () => unawaited(_choose(widget.session.documents.createNew)),
+              child: const Text('Create a new ledger'),
+            ),
+            if (error != null) ...<Widget>[
               const SizedBox(height: 16),
-              FilledButton.tonal(
-                onPressed: _busy ? null : () => unawaited(_choose(widget.documents.createNew)),
-                child: const Text('Create a new ledger'),
-              ),
-              if (error != null) ...<Widget>[
-                const SizedBox(height: 16),
-                Text(error, style: text.bodyMedium?.copyWith(color: colors.error)),
-              ],
-              if (_busy) ...<Widget>[const SizedBox(height: 16), const LinearProgressIndicator()],
-              const SizedBox(height: 32),
-              Text('Options', style: text.titleLarge),
-              const SizedBox(height: 12),
-              if (!_settled)
-                const SizedBox.shrink()
-              else if (document == null)
-                Text('No ledger is selected.', style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant))
-              else ...<Widget>[
-                for (final String message in _parseErrors)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(message, style: text.bodyMedium?.copyWith(color: colors.error)),
-                  ),
-                if (fieldError != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(fieldError, style: text.bodyMedium?.copyWith(color: colors.error)),
-                  ),
-                _switch(
-                  'Advanced UI',
-                  _advancedUi,
-                  (bool value) => _toggle(() => _advancedUi = value),
-                  key: const Key('advancedUi'),
-                ),
-                _switch(
-                  'Write default options',
-                  _writeDefaultOptions,
-                  (bool value) => _toggle(() => _writeDefaultOptions = value),
-                  key: const Key('writeDefaultOptions'),
-                ),
-                _textField('title', 'Title'),
-                _stringList('Documents', _documents, _documentFocus, _addDocument, _removeDocument),
-                _stringList('Operating currencies', _currencies, _currencyFocus, _addCurrency, _removeCurrency),
-                _textField('conversion', 'Conversion currency', key: const Key('conversion')),
-                _switch('Render commas', _renderCommas, (bool value) => _toggle(() => _renderCommas = value)),
-                _textField('maxlines', 'Long string max lines'),
-                _menu<PluginProcessingMode>(
-                  'Plugin processing mode',
-                  _pluginMode,
-                  PluginProcessingMode.values,
-                  _pluginLabel,
-                  (PluginProcessingMode value) => _toggle(() => _pluginMode = value),
-                ),
-                _switch(
-                  'Insert pythonpath',
-                  _insertPythonpath,
-                  (bool value) => _toggle(() => _insertPythonpath = value),
-                ),
-                _switch(
-                  'Allow pipe separator',
-                  _allowPipeSeparator,
-                  (bool value) => _toggle(() => _allowPipeSeparator = value),
-                ),
-                _switch(
-                  'Allow deprecated none for tags and links',
-                  _allowDeprecatedNone,
-                  (bool value) => _toggle(() => _allowDeprecatedNone = value),
-                ),
-                _textField('assets', 'Assets'),
-                _textField('liabilities', 'Liabilities'),
-                _textField('equity', 'Equity'),
-                _textField('income', 'Income'),
-                _textField('expenses', 'Expenses'),
-                _textField('previousBalances', 'Previous balances'),
-                _textField('previousEarnings', 'Previous earnings'),
-                _textField('previousConversions', 'Previous conversions'),
-                _textField('currentEarnings', 'Current earnings'),
-                _textField('currentConversions', 'Current conversions'),
-                _textField('unrealizedGains', 'Unrealized gains'),
-                _textField('rounding', 'Rounding account'),
-                _menu<BookingMethod>(
-                  'Booking method',
-                  _booking,
-                  BookingMethod.values,
-                  _bookingLabel,
-                  (BookingMethod value) => _toggle(() => _booking = value),
-                  key: const Key('booking'),
-                ),
-                _switch(
-                  'Precise interpolation',
-                  _usePreciseInterpolation,
-                  (bool value) => _toggle(() => _usePreciseInterpolation = value),
-                ),
-                _switch(
-                  'Infer tolerance from cost',
-                  _inferToleranceFromCost,
-                  (bool value) => _toggle(() => _inferToleranceFromCost = value),
-                ),
-                _textField('tolerance', 'Tolerance multiplier'),
-                _textField('inferredMultiplier', 'Inferred tolerance multiplier'),
-                _pairList(
-                  'Inferred tolerance defaults',
-                  _toleranceKeys,
-                  _toleranceValues,
-                  _toleranceKeyFocus,
-                  _toleranceValueFocus,
-                  'Key',
-                  'Number',
-                  _addTolerance,
-                  _removeTolerance,
-                ),
-                _pairList(
-                  'Display precision',
-                  _precisionKeys,
-                  _precisionValues,
-                  _precisionKeyFocus,
-                  _precisionValueFocus,
-                  'Key',
-                  'Number',
-                  _addPrecision,
-                  _removePrecision,
-                ),
-              ],
+              Text(error, style: text.bodyMedium?.copyWith(color: colors.error)),
             ],
-          ),
+            if (_busy) ...<Widget>[const SizedBox(height: 16), const LinearProgressIndicator()],
+            const SizedBox(height: 32),
+            Text('Options', style: text.titleLarge),
+            const SizedBox(height: 12),
+            if (!_settled)
+              const SizedBox.shrink()
+            else if (document == null)
+              Text('No ledger is selected.', style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant))
+            else ...<Widget>[
+              for (final String message in _parseErrors)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(message, style: text.bodyMedium?.copyWith(color: colors.error)),
+                ),
+              if (fieldError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(fieldError, style: text.bodyMedium?.copyWith(color: colors.error)),
+                ),
+              _switch(
+                'Advanced UI',
+                _advancedUi,
+                (bool value) => _toggle(() => _advancedUi = value),
+                key: const Key('advancedUi'),
+              ),
+              _switch(
+                'Write default options',
+                _writeDefaultOptions,
+                (bool value) => _toggle(() => _writeDefaultOptions = value),
+                key: const Key('writeDefaultOptions'),
+              ),
+              _textField('title', 'Title'),
+              _stringList('Documents', _documents, _documentFocus, _addDocument, _removeDocument),
+              _stringList('Operating currencies', _currencies, _currencyFocus, _addCurrency, _removeCurrency),
+              _textField('conversion', 'Conversion currency', key: const Key('conversion')),
+              _switch('Render commas', _renderCommas, (bool value) => _toggle(() => _renderCommas = value)),
+              _textField('maxlines', 'Long string max lines'),
+              _menu<PluginProcessingMode>(
+                'Plugin processing mode',
+                _pluginMode,
+                PluginProcessingMode.values,
+                _pluginLabel,
+                (PluginProcessingMode value) => _toggle(() => _pluginMode = value),
+              ),
+              _switch(
+                'Insert pythonpath',
+                _insertPythonpath,
+                (bool value) => _toggle(() => _insertPythonpath = value),
+              ),
+              _switch(
+                'Allow pipe separator',
+                _allowPipeSeparator,
+                (bool value) => _toggle(() => _allowPipeSeparator = value),
+              ),
+              _switch(
+                'Allow deprecated none for tags and links',
+                _allowDeprecatedNone,
+                (bool value) => _toggle(() => _allowDeprecatedNone = value),
+              ),
+              _textField('assets', 'Assets'),
+              _textField('liabilities', 'Liabilities'),
+              _textField('equity', 'Equity'),
+              _textField('income', 'Income'),
+              _textField('expenses', 'Expenses'),
+              _textField('previousBalances', 'Previous balances'),
+              _textField('previousEarnings', 'Previous earnings'),
+              _textField('previousConversions', 'Previous conversions'),
+              _textField('currentEarnings', 'Current earnings'),
+              _textField('currentConversions', 'Current conversions'),
+              _textField('unrealizedGains', 'Unrealized gains'),
+              _textField('rounding', 'Rounding account'),
+              _menu<BookingMethod>(
+                'Booking method',
+                _booking,
+                BookingMethod.values,
+                _bookingLabel,
+                (BookingMethod value) => _toggle(() => _booking = value),
+                key: const Key('booking'),
+              ),
+              _switch(
+                'Precise interpolation',
+                _usePreciseInterpolation,
+                (bool value) => _toggle(() => _usePreciseInterpolation = value),
+              ),
+              _switch(
+                'Infer tolerance from cost',
+                _inferToleranceFromCost,
+                (bool value) => _toggle(() => _inferToleranceFromCost = value),
+              ),
+              _textField('tolerance', 'Tolerance multiplier'),
+              _textField('inferredMultiplier', 'Inferred tolerance multiplier'),
+              _pairList(
+                'Inferred tolerance defaults',
+                _toleranceKeys,
+                _toleranceValues,
+                _toleranceKeyFocus,
+                _toleranceValueFocus,
+                'Key',
+                'Number',
+                _addTolerance,
+                _removeTolerance,
+              ),
+              _pairList(
+                'Display precision',
+                _precisionKeys,
+                _precisionValues,
+                _precisionKeyFocus,
+                _precisionValueFocus,
+                'Key',
+                'Number',
+                _addPrecision,
+                _removePrecision,
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -353,96 +359,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ],
   );
 
-  Future<void> _load() async {
-    final int epoch = _epoch;
-    try {
-      final LedgerDocument? document = await widget.documents.current();
-      if (!mounted || epoch != _epoch) {
-        return;
-      }
-      await _show(document, epoch);
-    } on PlatformException catch (error) {
-      if (!mounted || epoch != _epoch) {
-        return;
-      }
-      setState(() {
-        _error = _message(error);
-        _settled = true;
-      });
+  Future<void> _choose(Future<LedgerDocument?> Function() pick) => widget.session.choose(pick);
+
+  void _onSession() {
+    if (!mounted || _closed) return;
+    if (_seen == widget.session.generation) {
+      setState(() {});
+      return;
     }
+    _seen = widget.session.generation;
+    _applyLoaded();
+    setState(() {});
   }
 
-  Future<void> _choose(Future<LedgerDocument?> Function() pick) async {
-    final int epoch = ++_epoch;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final LedgerDocument? document = await pick();
-      if (!mounted || epoch != _epoch) {
-        return;
-      }
-      if (document == null) {
-        setState(() {
-          _busy = false;
-          _settled = true;
-        });
-        return;
-      }
-      setState(() => _busy = false);
-      await _show(document, epoch);
-    } on PlatformException catch (error) {
-      if (!mounted || epoch != _epoch) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-        _settled = true;
-        _error = _message(error);
-      });
-    }
-  }
-
-  Future<void> _show(LedgerDocument? document, int epoch) async {
-    if (document == null) {
-      if (!mounted || epoch != _epoch) {
-        return;
-      }
-      setState(() {
-        _document = null;
-        _settled = true;
-        _parseErrors = <String>[];
-      });
-      return;
-    }
-    final String source;
-    try {
-      source = await widget.documents.read(document);
-    } on PlatformException catch (error) {
-      if (!mounted || epoch != _epoch) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-        _settled = true;
-        _error = _message(error);
-      });
-      return;
-    }
-    if (!mounted || epoch != _epoch) {
-      return;
-    }
-    final LoadedLedgerOptions loaded = readLedgerOptions(source);
-    _bind(loaded);
-    setState(() {
-      _document = document;
-      _source = source;
-      _parseErrors = loaded.errors;
+  void _applyLoaded() {
+    if (_document == null) {
+      _parseErrors = <String>[];
       _fieldError = null;
-      _settled = true;
-      _baseline = loaded.options.accountPrefixes;
-    });
+      return;
+    }
+    final LoadedLedgerOptions loaded = readLedgerOptions(widget.session.source);
+    _bind(loaded);
+    _parseErrors = loaded.errors;
+    _fieldError = null;
   }
 
   void _bind(LoadedLedgerOptions loaded) {
@@ -652,6 +591,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     unawaited(_pump());
   }
 
+  Future<void> flushPending() {
+    if (_closed) return Future<void>.value();
+    _timer?.cancel();
+    return _pump();
+  }
+
   Future<void> _pump() async {
     if (_document == null) {
       return;
@@ -698,22 +643,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _fieldError = null);
     }
     final String next = writeLedgerOptions(
-      _source,
+      widget.session.source,
       options,
       guar: GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions),
     );
-    if (next == _source) {
+    if (next == widget.session.source) {
       return;
     }
-    try {
-      await widget.documents.write(document, next);
-    } on PlatformException catch (error) {
-      if (mounted) {
-        setState(() => _error = _message(error));
-      }
-      return;
-    }
-    _source = next;
+    await widget.session.write(next);
   }
 
   OptionInputs _inputs() => OptionInputs(
@@ -754,14 +691,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ],
     baselinePrefixes: _baseline,
   );
-
-  String _message(PlatformException error) {
-    final String? message = error.message;
-    if (message == null || message.isEmpty) {
-      return 'Could not use that file.';
-    }
-    return message;
-  }
 }
 
 String _bookingLabel(BookingMethod method) => switch (method) {

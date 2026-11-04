@@ -21,6 +21,8 @@ dependencies:
     path: ../guar_book
   guar_domain:
     path: ../guar_domain
+  guar_plugins:
+    path: ../guar_plugins
 
 dev_dependencies:
   flutter_test:

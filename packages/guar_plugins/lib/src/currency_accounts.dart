@@ -6,8 +6,10 @@ import 'package:guar_plugins/src/helpers.dart';
 import 'package:guar_plugins/src/plugin.dart';
 
 const String _metaProcessed = 'currency_accounts_processed';
-const String _defaultBaseAccount = 'Equity:CurrencyAccounts';
+const String currencyAccountsDefaultBase = 'Equity:CurrencyAccounts';
 final RegExp _accountRe = RegExp(r'^[A-Z][A-Za-z0-9\-]*(?::[A-Z0-9][A-Za-z0-9\-]*)+$');
+
+bool isCurrencyAccountsBase(String name) => _accountRe.hasMatch(name);
 
 BookPluginResult insertCurrencyTradingPostings(
   List<Directive> directives,
@@ -17,7 +19,7 @@ BookPluginResult insertCurrencyTradingPostings(
 ) {
   String baseAccount = (config ?? '').trim();
   if (!_accountRe.hasMatch(baseAccount)) {
-    baseAccount = _defaultBaseAccount;
+    baseAccount = currencyAccountsDefaultBase;
   }
 
   final Set<String> newAccounts = <String>{};

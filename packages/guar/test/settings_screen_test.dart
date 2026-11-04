@@ -7,13 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:guar/main.dart';
 import 'package:guar/src/ledger_documents.dart';
-import 'package:guar/src/settings_screen.dart';
+import 'package:guar/src/ledger_session.dart';
 
 void main() {
   testWidgets('opens on settings with the file picker first', (WidgetTester tester) async {
     await _pumpApp(tester, _FakeLedgerDocuments());
 
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
     expect(find.text('Open a ledger'), findsOneWidget);
     expect(find.text('Create a new ledger'), findsOneWidget);
     expect(find.text('No ledger is selected.'), findsOneWidget);
@@ -224,6 +225,11 @@ void main() {
         '${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')}';
     expect(documents.files[document.uri], '$today custom "guar_option" "advanced_ui" "TRUE"\n');
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx,
+      lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Settings')).dx),
+    );
   });
 
   testWidgets('turns advanced UI off by removing the guar option', (WidgetTester tester) async {
@@ -245,6 +251,7 @@ void main() {
 
     expect(documents.files[document.uri], '');
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isFalse);
+    expect(find.byType(NavigationBar), findsNothing);
   });
 
   testWidgets('writes default option lines when the switch is turned on', (WidgetTester tester) async {
