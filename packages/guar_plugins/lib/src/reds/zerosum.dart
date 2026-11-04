@@ -8,7 +8,10 @@ import 'package:guar_domain/guar_domain.dart';
 import 'package:guar_plugins/src/plugin.dart';
 import 'package:guar_plugins/src/reds/common.dart';
 
-final Decimal _defaultTolerance = Decimal.parse('0.0099');
+const String zerosumDefaultTolerance = '0.0099';
+const String zerosumDefaultMetadataName = 'match_id';
+const String zerosumDefaultLinkPrefix = 'ZeroSum.';
+final Decimal _defaultTolerance = Decimal.parse(zerosumDefaultTolerance);
 
 BookPluginResult zerosumPlugin(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) {
   final ({
@@ -69,9 +72,9 @@ _parse(String? config) {
     replaceTo: replaceTo,
     tolerance: toleranceValue == null ? _defaultTolerance : toDecimal(toleranceValue),
     matchMetadata: map.remove('match_metadata') == true,
-    matchMetadataName: map.remove('match_metadata_name')?.toString() ?? 'match_id',
+    matchMetadataName: map.remove('match_metadata_name')?.toString() ?? zerosumDefaultMetadataName,
     linkTransactions: map.remove('link_transactions') == true,
-    linkPrefix: map.remove('link_prefix')?.toString() ?? 'ZeroSum.',
+    linkPrefix: map.remove('link_prefix')?.toString() ?? zerosumDefaultLinkPrefix,
     flagUnmatched: map.remove('flag_unmatched') == true,
   );
 }

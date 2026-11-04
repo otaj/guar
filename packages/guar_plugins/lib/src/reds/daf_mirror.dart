@@ -6,8 +6,8 @@ import 'package:guar_plugins/src/plugin.dart';
 import 'package:guar_plugins/src/reds/common.dart';
 
 const String _metaGenerated = 'daf_mirror_generated';
-const String _defaultPrefix = 'Assets:DAF';
-const String _defaultPayeePrefix = 'Mirror ';
+const String dafDefaultPrefix = 'Assets:DAF';
+const String dafDefaultPayeePrefix = 'Mirror ';
 
 BookPluginResult dafMirror(List<Directive> directives, LedgerOptions options, ProcessingInfo info, String? config) {
   final ({String payeePrefix, String prefix}) parsed = _parseConfig(config);
@@ -22,22 +22,22 @@ BookPluginResult dafMirror(List<Directive> directives, LedgerOptions options, Pr
 
 ({String prefix, String payeePrefix}) _parseConfig(String? config) {
   if (config == null || config.trim().isEmpty) {
-    return (prefix: _defaultPrefix, payeePrefix: _defaultPayeePrefix);
+    return (prefix: dafDefaultPrefix, payeePrefix: dafDefaultPayeePrefix);
   }
   final ConfigLiteral parsed = parseConfigLiteral(config);
   final Object? value = parsed.value;
   if (parsed.error != null || value == null) {
-    return (prefix: config.trim().isEmpty ? _defaultPrefix : config.trim(), payeePrefix: _defaultPayeePrefix);
+    return (prefix: config.trim().isEmpty ? dafDefaultPrefix : config.trim(), payeePrefix: dafDefaultPayeePrefix);
   }
   if (value is Map<Object?, Object?>) {
     final String? prefix = value['account_prefix']?.toString().trim();
     return (
-      prefix: (prefix == null || prefix.isEmpty) ? _defaultPrefix : prefix,
-      payeePrefix: value['payee_prefix']?.toString() ?? _defaultPayeePrefix,
+      prefix: (prefix == null || prefix.isEmpty) ? dafDefaultPrefix : prefix,
+      payeePrefix: value['payee_prefix']?.toString() ?? dafDefaultPayeePrefix,
     );
   }
   final String prefix = value.toString().trim();
-  return (prefix: prefix.isEmpty ? _defaultPrefix : prefix, payeePrefix: _defaultPayeePrefix);
+  return (prefix: prefix.isEmpty ? dafDefaultPrefix : prefix, payeePrefix: dafDefaultPayeePrefix);
 }
 
 Directive? _mirror(Directive directive, String prefix, String payeePrefix, LedgerOptions options) {
