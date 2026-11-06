@@ -95,7 +95,8 @@ jobs:
       - name: Check outdated packages
         run: python3 scripts/check_pub_outdated.py
 
-  # Parallel with analyze. A new workspace package fails Analyze until it is listed here.
+  # These job names are required status checks on main.
+  # Add a package here and in branch protection together.
   test:
     name: Test ${{ matrix.name }}
     runs-on: ubuntu-latest
@@ -128,6 +129,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: latest-known
+
       - name: Set up Java
         if: matrix.kind == 'android'
         uses: actions/setup-java@v5
@@ -152,23 +158,6 @@ jobs:
 
       - name: Test
         run: ./scripts/test.sh "${{ matrix.package }}" "${{ matrix.kind }}"
-
-  # Branch protection requires this name. It passes only when analyze and every test job do.
-  analyze-and-test:
-    name: Analyze & test
-    needs: [analyze, test]
-    if: always() && !cancelled()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require analyze and every package test
-        run: |
-          set -euo pipefail
-          analyze="${{ needs.analyze.result }}"
-          tests="${{ needs.test.result }}"
-          if [[ "${analyze}" != "success" || "${tests}" != "success" ]]; then
-            echo "analyze=${analyze} tests=${tests}" >&2
-            exit 1
-          fi
 
   debug-apk:
     name: Debug APKs
