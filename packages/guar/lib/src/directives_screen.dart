@@ -16,10 +16,6 @@ class DirectivesScreen extends StatefulWidget {
 }
 
 class _DirectivesScreenState extends State<DirectivesScreen> {
-  BookedLedger? _booked;
-  String? _bookedSource;
-  String? _bookedName;
-
   @override
   void initState() {
     super.initState();
@@ -41,7 +37,11 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
     final ColorScheme colors = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
     final LedgerSession session = widget.session;
-    if (!session.settled) return const SizedBox.shrink();
+    final BookedLedger? booked = session.snapshot?.booked;
+    if (!session.settled || booked == null) {
+      if (session.loading) return const Center(child: CircularProgressIndicator());
+      return const SizedBox.shrink();
+    }
     final String? sessionError = session.error;
     if (session.document == null) {
       return Padding(
@@ -53,7 +53,6 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       );
     }
 
-    final BookedLedger booked = _bookedFor(session);
     final Ledger ledger = booked.ledger;
     final List<Directive> directives = switch (ledger) {
       LedgerDirectives(:final List<Directive> directives) => directives,
@@ -94,7 +93,10 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
                   const SizedBox(height: 12),
                   Text(error.message, style: text.bodyMedium?.copyWith(color: colors.error)),
                 ],
-                if (session.busy) ...<Widget>[const SizedBox(height: 12), const LinearProgressIndicator()],
+                if (session.busy || session.loading) ...<Widget>[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
               ],
             ),
           ),
@@ -112,18 +114,6 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
         ),
       ],
     );
-  }
-
-  BookedLedger _bookedFor(LedgerSession session) {
-    final String source = session.source;
-    final String name = session.document?.displayName ?? '';
-    final BookedLedger? cached = _booked;
-    if (cached != null && _bookedSource == source && _bookedName == name) return cached;
-    _bookedSource = source;
-    _bookedName = name;
-    final BookedLedger booked = bookLedger(source, filename: name);
-    _booked = booked;
-    return booked;
   }
 }
 

@@ -45,7 +45,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   LedgerDocument? get _document => widget.session.document;
 
-  bool get _busy => widget.session.busy;
+  bool get _pickerBusy => widget.session.busy;
+
+  bool get _busy => _pickerBusy || widget.session.loading;
 
   bool get _settled => widget.session.settled;
 
@@ -109,7 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             FilledButton(
-              onPressed: _busy ? null : () => unawaited(_choose(widget.session.documents.openExisting)),
+              onPressed: _pickerBusy ? null : () => unawaited(_choose(widget.session.documents.openExisting)),
               child: Text(document?.displayName ?? 'Open a ledger'),
             ),
             const SizedBox(height: 8),
@@ -119,7 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 16),
             FilledButton.tonal(
-              onPressed: _busy ? null : () => unawaited(_choose(widget.session.documents.createNew)),
+              onPressed: _pickerBusy ? null : () => unawaited(_choose(widget.session.documents.createNew)),
               child: const Text('Create a new ledger'),
             ),
             if (error != null) ...<Widget>[
@@ -391,7 +393,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _fieldError = null;
       return;
     }
-    final LoadedLedgerOptions loaded = readLedgerOptions(widget.session.source);
+    final LoadedLedgerOptions? loaded = widget.session.snapshot?.options;
+    if (loaded == null) {
+      _parseErrors = <String>[];
+      _fieldError = null;
+      return;
+    }
     _bind(loaded);
     _parseErrors = loaded.errors;
     _fieldError = null;
@@ -670,15 +677,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted && _fieldError != null) {
       setState(() => _fieldError = null);
     }
-    final String next = writeLedgerOptions(
-      widget.session.source,
+    await widget.session.saveOptions(
       options,
-      guar: GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions, hidden: _hidden),
+      GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions, hidden: _hidden),
     );
-    if (next == widget.session.source) {
-      return;
-    }
-    await widget.session.write(next);
   }
 
   OptionInputs _inputs() => OptionInputs(

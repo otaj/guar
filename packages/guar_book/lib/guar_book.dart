@@ -13,5 +13,6 @@ export 'src/options_source.dart'
         explicitOptionLines,
         parsedHideToken,
         readLedgerOptions,
+        readLedgerOptionsFrom,
         writeLedgerOptions;
-export 'src/plugins_source.dart' show LedgerPlugin, readLedgerPlugins, writeLedgerPlugins;
+export 'src/plugins_source.dart' show LedgerPlugin, readLedgerPlugins, readLedgerPluginsFrom, writeLedgerPlugins;

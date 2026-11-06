@@ -11,4 +11,9 @@ class MainActivity : FlutterFragmentActivity() {
         super.configureFlutterEngine(flutterEngine)
         ledgerDocuments.attach(flutterEngine)
     }
+
+    override fun onDestroy() {
+        ledgerDocuments.close()
+        super.onDestroy()
+    }
 }

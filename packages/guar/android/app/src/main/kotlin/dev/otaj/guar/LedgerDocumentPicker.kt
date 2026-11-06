@@ -6,6 +6,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.HandlerThread
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContract
@@ -29,7 +31,13 @@ private const val WRITE_PERMISSION = Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 class LedgerDocumentPicker(
     private val activity: ComponentActivity,
 ) {
+    private val ioThread = HandlerThread("ledger-io").apply { start() }
+    private val io = Handler(ioThread.looper)
     private var pending: MethodChannel.Result? = null
+
+    fun close() {
+        ioThread.quitSafely()
+    }
 
     private val openLauncher =
         activity.registerForActivityResult(OpenLedgerContract()) { picked ->
@@ -148,16 +156,21 @@ class LedgerDocumentPicker(
             result.error("unavailable", "Guar could not read that ledger.", null)
             return
         }
-        try {
-            result.success(read(Uri.parse(uri)))
-        } catch (caught: SecurityException) {
-            result.error(
-                "permission_denied",
-                "Guar was not allowed to keep access to that file.",
-                caught.message,
-            )
-        } catch (caught: IOException) {
-            result.error("read_failed", "Guar could not read that ledger.", caught.message)
+        io.post {
+            try {
+                val text = read(Uri.parse(uri))
+                deliver { result.success(text) }
+            } catch (caught: SecurityException) {
+                deliver {
+                    result.error(
+                        "permission_denied",
+                        "Guar was not allowed to keep access to that file.",
+                        caught.message,
+                    )
+                }
+            } catch (caught: IOException) {
+                deliver { result.error("read_failed", "Guar could not read that ledger.", caught.message) }
+            }
         }
     }
 
@@ -171,17 +184,30 @@ class LedgerDocumentPicker(
             result.error("unavailable", "Guar could not write that ledger.", null)
             return
         }
-        try {
-            write(Uri.parse(uri), text)
-            result.success(null)
-        } catch (caught: SecurityException) {
-            result.error(
-                "permission_denied",
-                "Guar was not allowed to keep access to that file.",
-                caught.message,
-            )
-        } catch (caught: IOException) {
-            result.error("write_failed", "Guar could not write that ledger.", caught.message)
+        io.post {
+            try {
+                write(Uri.parse(uri), text)
+                deliver { result.success(null) }
+            } catch (caught: SecurityException) {
+                deliver {
+                    result.error(
+                        "permission_denied",
+                        "Guar was not allowed to keep access to that file.",
+                        caught.message,
+                    )
+                }
+            } catch (caught: IOException) {
+                deliver { result.error("write_failed", "Guar could not write that ledger.", caught.message) }
+            }
+        }
+    }
+
+    private fun deliver(block: () -> Unit) {
+        activity.runOnUiThread {
+            if (activity.isDestroyed) {
+                return@runOnUiThread
+            }
+            block()
         }
     }
 

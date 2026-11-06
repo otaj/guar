@@ -8,7 +8,6 @@ import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar/src/plugins_screen.dart';
 import 'package:guar/src/settings_screen.dart';
-import 'package:guar_book/guar_book.dart';
 
 enum _Tab {
   ledger('Ledger', Icons.list_alt_outlined, Icons.list_alt),
@@ -57,7 +56,7 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  bool get _advanced => readLedgerOptions(_session.source).guar.advancedUi;
+  bool get _advanced => _session.snapshot?.options.guar.advancedUi ?? false;
 
   void _onSession() {
     if (!mounted) return;
@@ -78,6 +77,9 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_session.loading && _session.snapshot == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final bool loaded = _session.settled && _session.document != null;
     final bool advanced = loaded && _advanced;
     final _Tab visible = !loaded || (!advanced && _tab == _Tab.plugins) ? _Tab.settings : _tab;

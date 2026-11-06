@@ -6,6 +6,22 @@ import 'package:guar_parser/guar_parser.dart' as parser;
 
 typedef _SourceDirective = ({String filename, int line, String kind});
 
+class LedgerSnapshot {
+  const LedgerSnapshot({
+    required this.source,
+    required this.filename,
+    required this.booked,
+    required this.options,
+    required this.plugins,
+  });
+
+  final String source;
+  final String filename;
+  final BookedLedger booked;
+  final LoadedLedgerOptions options;
+  final List<LedgerPlugin> plugins;
+}
+
 class BookedLedger {
   const BookedLedger._({
     required this.ledger,
@@ -30,23 +46,25 @@ class BookedLedger {
   };
 }
 
-BookedLedger bookLedger(String source, {String filename = ''}) {
+LedgerSnapshot prepareLedger(String source, {String filename = '', parser.ParsedLedger? parsed}) {
   // Included paths are not files the app has opened. Keep a directive when a later check fails.
-  final parser.ParsedLedger parsed = const parser.BeancountParser().parse(
-    source,
+  final parser.ParsedLedger ledger =
+      parsed ?? const parser.BeancountParser().parse(source, filename: filename, recover: true, followIncludes: false);
+  final LoadedLedgerOptions loaded = readLedgerOptionsFrom(source, ledger);
+  return LedgerSnapshot(
+    source: source,
     filename: filename,
-    recover: true,
-    followIncludes: false,
-  );
-  final LoadedLedgerOptions loaded = readLedgerOptions(source);
-  return BookedLedger._(
-    ledger: Book().process(parsed, recover: true),
-    guar: loaded.guar,
-    optionWarnings: <String>[
-      for (final String message in loaded.errors)
-        if (message.startsWith('hide_')) message,
-    ],
-    sourceDirectives: _parsedSources(parsed),
+    booked: BookedLedger._(
+      ledger: Book().process(ledger, recover: true),
+      guar: loaded.guar,
+      optionWarnings: <String>[
+        for (final String message in loaded.errors)
+          if (message.startsWith('hide_')) message,
+      ],
+      sourceDirectives: _parsedSources(ledger),
+    ),
+    options: loaded,
+    plugins: readLedgerPluginsFrom(ledger),
   );
 }
 

@@ -90,7 +90,10 @@ class _PluginsScreenState extends State<PluginsScreen> {
                   const SizedBox(height: 12),
                   Text(error, style: text.bodyMedium?.copyWith(color: colors.error)),
                 ],
-                if (session.busy) ...<Widget>[const SizedBox(height: 12), const LinearProgressIndicator()],
+                if (session.busy || session.loading) ...<Widget>[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
               ],
             ),
           ),
@@ -167,8 +170,9 @@ class _PluginsScreenState extends State<PluginsScreen> {
 
   void _loadRows() {
     _rows.clear();
-    if (widget.session.document == null) return;
-    for (final LedgerPlugin plugin in readLedgerPlugins(widget.session.source)) {
+    final List<LedgerPlugin>? plugins = widget.session.snapshot?.plugins;
+    if (plugins == null) return;
+    for (final LedgerPlugin plugin in plugins) {
       _rows.add(_Row(id: _nextId++, name: plugin.name, config: plugin.config));
     }
   }
@@ -237,17 +241,12 @@ class _PluginsScreenState extends State<PluginsScreen> {
 
   Future<void> _saveOnce() async {
     if (widget.session.document == null) return;
-    final String next;
     try {
-      next = writeLedgerPlugins(
-        widget.session.source,
-        <LedgerPlugin>[for (final _Row row in _rows) LedgerPlugin(name: row.name, config: row.config)],
-      );
+      await widget.session.savePlugins(<LedgerPlugin>[
+        for (final _Row row in _rows) LedgerPlugin(name: row.name, config: row.config),
+      ]);
     } on FormatException catch (error) {
       if (mounted) setState(() => _error = error.message);
-      return;
     }
-    if (next == widget.session.source) return;
-    await widget.session.write(next);
   }
 }
