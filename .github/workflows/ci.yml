@@ -46,12 +46,15 @@ jobs:
       - name: Ruff format
         run: uvx ruff==0.16.4 format --check
 
-  analyze-and-test:
-    name: Analyze & test
+  analyze:
+    name: Analyze
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Check test matrix
+        run: ./scripts/test.sh --check-matrix
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.0.1
@@ -92,8 +95,80 @@ jobs:
       - name: Check outdated packages
         run: python3 scripts/check_pub_outdated.py
 
+  # Parallel with analyze. A new workspace package fails Analyze until it is listed here.
+  test:
+    name: Test ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: guar
+            package: guar
+            kind: flutter
+          - name: guar (Android)
+            package: guar
+            kind: android
+          - name: guar_parser
+            package: guar_parser
+            kind: dart
+          - name: guar_domain
+            package: guar_domain
+            kind: dart
+          - name: guar_plugins
+            package: guar_plugins
+            kind: dart
+          - name: guar_book
+            package: guar_book
+            kind: dart
+          - name: guar_query
+            package: guar_query
+            kind: dart
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        if: matrix.kind == 'android'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Generate Freezed
+        uses: ./.github/actions/codegen
+        with:
+          save: "false"
+
       - name: Test
-        run: ./scripts/test.sh
+        run: ./scripts/test.sh "${{ matrix.package }}" "${{ matrix.kind }}"
+
+  # Branch protection requires this name. It passes only when analyze and every test job do.
+  analyze-and-test:
+    name: Analyze & test
+    needs: [analyze, test]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require analyze and every package test
+        run: |
+          set -euo pipefail
+          analyze="${{ needs.analyze.result }}"
+          tests="${{ needs.test.result }}"
+          if [[ "${analyze}" != "success" || "${tests}" != "success" ]]; then
+            echo "analyze=${analyze} tests=${tests}" >&2
+            exit 1
+          fi
 
   debug-apk:
     name: Debug APKs
