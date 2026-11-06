@@ -93,10 +93,18 @@ class LedgerSession extends ChangeNotifier {
     }
   }
 
-  Future<void> saveOptions(LedgerOptions options, GuarOptions guar) {
+  Future<void> saveOptions(
+    LedgerOptions options,
+    GuarOptions guar, {
+    Set<String> preserveKeys = const <String>{},
+  }) {
     final LedgerDocument? current = document;
     if (current == null) return Future<void>.value();
-    (_editFor(current.uri) ?? _startEdit(current)).options = (options: options, guar: guar);
+    (_editFor(current.uri) ?? _startEdit(current)).options = (
+      options: options,
+      guar: guar,
+      preserveKeys: preserveKeys,
+    );
     return _later(_drain);
   }
 
@@ -196,7 +204,7 @@ class LedgerSession extends ChangeNotifier {
     try {
       while (_pending.isNotEmpty) {
         final _PendingEdit edit = _pending.first;
-        final ({LedgerOptions options, GuarOptions guar})? options = edit.options;
+        final ({LedgerOptions options, GuarOptions guar, Set<String> preserveKeys})? options = edit.options;
         final List<LedgerPlugin>? plugins = edit.plugins;
         edit
           ..options = null
@@ -232,13 +240,17 @@ class LedgerSession extends ChangeNotifier {
     }
   }
 
-  Future<String?> _rewriteOptions(_PendingEdit edit, ({LedgerOptions options, GuarOptions guar}) job) async {
+  Future<String?> _rewriteOptions(
+    _PendingEdit edit,
+    ({LedgerOptions options, GuarOptions guar, Set<String> preserveKeys}) job,
+  ) async {
     final String next = await _engine.rewriteOptions(
       edit.source,
       edit.document.displayName,
       job.options,
       job.guar,
       DateTime.now(),
+      preserveKeys: job.preserveKeys,
     );
     if (next == edit.source) return null;
     return next;
@@ -294,6 +306,6 @@ class _PendingEdit {
 
   final LedgerDocument document;
   String source;
-  ({LedgerOptions options, GuarOptions guar})? options;
+  ({LedgerOptions options, GuarOptions guar, Set<String> preserveKeys})? options;
   List<LedgerPlugin>? plugins;
 }

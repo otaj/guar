@@ -40,13 +40,16 @@ class LedgerEngine {
     String filename,
     LedgerOptions options,
     GuarOptions guar,
-    DateTime today,
-  ) {
+    DateTime today, {
+    Set<String> preserveKeys = const <String>{},
+  }) {
     final _Memory? memory = _memory;
     if (memory != null) {
-      return _afterRewriteGate(() => memory.rewriteOptions(source, filename, options, guar, today));
+      return _afterRewriteGate(
+        () => memory.rewriteOptions(source, filename, options, guar, today, preserveKeys: preserveKeys),
+      );
     }
-    return _remote!.rewriteOptions(source, filename, options, guar, today);
+    return _remote!.rewriteOptions(source, filename, options, guar, today, preserveKeys: preserveKeys);
   }
 
   Future<String> rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) {
@@ -81,9 +84,16 @@ class _Memory {
     return _snapshot!;
   }
 
-  String rewriteOptions(String source, String filename, LedgerOptions options, GuarOptions guar, DateTime today) {
+  String rewriteOptions(
+    String source,
+    String filename,
+    LedgerOptions options,
+    GuarOptions guar,
+    DateTime today, {
+    Set<String> preserveKeys = const <String>{},
+  }) {
     final parser.ParsedLedger parsed = _parsedFor(source, filename);
-    return writeLedgerOptions(source, options, guar: guar, today: today, parsed: parsed);
+    return writeLedgerOptions(source, options, guar: guar, today: today, parsed: parsed, preserveKeys: preserveKeys);
   }
 
   String rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) {
@@ -117,13 +127,14 @@ class _PrepareRequest {
 }
 
 class _OptionsRequest {
-  const _OptionsRequest(this.source, this.filename, this.options, this.guar, this.today);
+  const _OptionsRequest(this.source, this.filename, this.options, this.guar, this.today, this.preserveKeys);
 
   final String source;
   final String filename;
   final LedgerOptions options;
   final GuarOptions guar;
   final DateTime today;
+  final List<String> preserveKeys;
 }
 
 class _PluginsRequest {
@@ -154,8 +165,11 @@ class _RemoteMemory {
     String filename,
     LedgerOptions options,
     GuarOptions guar,
-    DateTime today,
-  ) => _call<String>(_OptionsRequest(source, filename, options, guar, today));
+    DateTime today, {
+    Set<String> preserveKeys = const <String>{},
+  }) => _call<String>(
+    _OptionsRequest(source, filename, options, guar, today, preserveKeys.toList(growable: false)),
+  );
 
   Future<String> rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) =>
       _call<String>(_PluginsRequest(source, filename, plugins));
@@ -225,8 +239,16 @@ Object _answer(_Memory memory, Object? request) {
       :final LedgerOptions options,
       :final GuarOptions guar,
       :final DateTime today,
+      :final List<String> preserveKeys,
     ):
-      return memory.rewriteOptions(source, filename, options, guar, today);
+      return memory.rewriteOptions(
+        source,
+        filename,
+        options,
+        guar,
+        today,
+        preserveKeys: preserveKeys.toSet(),
+      );
     case _PluginsRequest(:final String source, :final String filename, :final List<LedgerPlugin> plugins):
       return memory.rewritePlugins(source, filename, plugins);
     default:

@@ -447,6 +447,71 @@ void main() {
     expect(find.text('2020-01-01 · Open'), findsOneWidget);
     expect(find.text('Household'), findsOneWidget);
   });
+
+  testWidgets('groups settings and keeps advanced options hidden', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    await _pumpApp(tester, _FakeLedgerDocuments(currentDocument: document));
+    await _showSettings(tester);
+
+    expect(find.text('Account names'), findsOneWidget);
+    expect(find.text('Advanced settings'), findsOneWidget);
+    expect(find.text('Insert Python path'), findsNothing);
+    expect(find.textContaining('No effect in Guar'), findsNothing);
+    expect(tester.getTopLeft(find.text('Account names')).dy, greaterThan(tester.getTopLeft(find.text('Title')).dy));
+
+    await tester.ensureVisible(find.byKey(const Key('help-title')));
+    await tester.tap(find.byKey(const Key('help-title')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Guar shows it on the ledger screen'), findsOneWidget);
+  });
+
+  testWidgets('leaves a hidden option line unchanged when another setting is saved', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    const String python = 'option "insert_pythonpath" "TRUE" ; keep';
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{'content://ledger/1': '$python\n'},
+    );
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    await tester.enterText(find.byKey(const Key('title')), 'Household');
+    await tester.pump(ledgerOptionSaveDelay);
+    await tester.pump();
+
+    expect(
+      documents.files[document.uri],
+      'option "title" "Household"\n'
+      '$python\n',
+    );
+  });
+
+  testWidgets('shows an unused warning and allows the edit once advanced settings are on', (
+    WidgetTester tester,
+  ) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{'content://ledger/1': 'option "insert_pythonpath" "TRUE"\n'},
+    );
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('showAdvanced')));
+    await tester.tap(find.byKey(const Key('showAdvanced')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Insert Python path'), findsOneWidget);
+    expect(find.text('No effect in Guar. Python plugins are not run.'), findsOneWidget);
+    expect(find.text('Compatibility'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('pythonpath')));
+    await tester.tap(find.byKey(const Key('pythonpath')));
+    await tester.pumpAndSettle();
+
+    expect(documents.files[document.uri], '');
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {

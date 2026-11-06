@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_option_draft.dart';
 import 'package:guar/src/ledger_session.dart';
+import 'package:guar/src/settings_copy.dart';
+import 'package:guar/src/settings_field.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
 
@@ -35,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final List<FocusNode> _toleranceValueFocus = <FocusNode>[];
 
   AccountPrefixes _baseline = const AccountPrefixes();
+  LedgerOptions? _loadedOptions;
   bool _mute = false;
   bool _closed = false;
   bool _pumping = false;
@@ -55,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<String> _parseErrors = <String>[];
   Timer? _timer;
 
+  bool _showAdvanced = false;
   bool _advancedUi = false;
   bool _writeDefaultOptions = false;
   Set<String> _hidden = <String>{};
@@ -148,111 +152,165 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Text(fieldError, style: text.bodyMedium?.copyWith(color: colors.error)),
                 ),
               _switch(
+                'showAdvanced',
+                'Advanced settings',
+                showAdvancedCopy,
+                _showAdvanced,
+                _setShowAdvanced,
+              ),
+              _section('App', 'How Guar presents this ledger, and which options it writes.'),
+              _switch(
+                'advancedUi',
                 'Advanced UI',
+                advancedUiCopy,
                 _advancedUi,
                 (bool value) => _toggle(() => _advancedUi = value),
-                key: const Key('advancedUi'),
               ),
               _switch(
+                'writeDefaultOptions',
                 'Write default options',
+                writeDefaultsCopy,
                 _writeDefaultOptions,
                 (bool value) => _toggle(() => _writeDefaultOptions = value),
-                key: const Key('writeDefaultOptions'),
               ),
-              Text('Hide on the ledger screen', style: text.titleMedium),
-              Text(
-                'Generated entries come from plugins or balance padding.',
-                style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              _section(
+                'Ledger screen',
+                'Choose types to leave off the ledger screen. The entries stay in the file.',
               ),
               for (final GuarHide item in GuarHide.values)
                 _switch(
+                  'hide-${item.token}',
                   item.label,
+                  hideCopy(item),
                   _hidden.contains(item.token),
                   (bool value) => _setHidden(item.token, hidden: value),
-                  key: Key('hide-${item.token}'),
                 ),
-              _textField('title', 'Title'),
-              _stringList('Documents', _documents, _documentFocus, _addDocument, _removeDocument),
-              _stringList('Operating currencies', _currencies, _currencyFocus, _addCurrency, _removeCurrency),
-              _textField('conversion', 'Conversion currency', key: const Key('conversion')),
-              _switch('Render commas', _renderCommas, (bool value) => _toggle(() => _renderCommas = value)),
-              _textField('maxlines', 'Long string max lines'),
-              _menu<PluginProcessingMode>(
-                'Plugin processing mode',
-                _pluginMode,
-                PluginProcessingMode.values,
-                _pluginLabel,
-                (PluginProcessingMode value) => _toggle(() => _pluginMode = value),
+              _section('Ledger', 'The name of the books, the currencies, and how lots are booked.'),
+              _textField('title', 'Title', titleCopy),
+              _stringList(
+                'currencies',
+                'Operating currencies',
+                operatingCopy,
+                _currencies,
+                _currencyFocus,
+                _addCurrency,
+                _removeCurrency,
               ),
-              _switch(
-                'Insert pythonpath',
-                _insertPythonpath,
-                (bool value) => _toggle(() => _insertPythonpath = value),
-              ),
-              _switch(
-                'Allow pipe separator',
-                _allowPipeSeparator,
-                (bool value) => _toggle(() => _allowPipeSeparator = value),
-              ),
-              _switch(
-                'Allow deprecated none for tags and links',
-                _allowDeprecatedNone,
-                (bool value) => _toggle(() => _allowDeprecatedNone = value),
-              ),
-              _textField('assets', 'Assets'),
-              _textField('liabilities', 'Liabilities'),
-              _textField('equity', 'Equity'),
-              _textField('income', 'Income'),
-              _textField('expenses', 'Expenses'),
-              _textField('previousBalances', 'Previous balances'),
-              _textField('previousEarnings', 'Previous earnings'),
-              _textField('previousConversions', 'Previous conversions'),
-              _textField('currentEarnings', 'Current earnings'),
-              _textField('currentConversions', 'Current conversions'),
-              _textField('unrealizedGains', 'Unrealized gains'),
-              _textField('rounding', 'Rounding account'),
+              _textField('conversion', 'Conversion currency', conversionCopy),
               _menu<BookingMethod>(
+                'booking',
                 'Booking method',
+                bookingCopy,
                 _booking,
                 BookingMethod.values,
                 _bookingLabel,
                 (BookingMethod value) => _toggle(() => _booking = value),
-                key: const Key('booking'),
               ),
-              _switch(
-                'Precise interpolation',
-                _usePreciseInterpolation,
-                (bool value) => _toggle(() => _usePreciseInterpolation = value),
-              ),
-              _switch(
-                'Infer tolerance from cost',
-                _inferToleranceFromCost,
-                (bool value) => _toggle(() => _inferToleranceFromCost = value),
-              ),
-              _textField('tolerance', 'Tolerance multiplier'),
-              _textField('inferredMultiplier', 'Inferred tolerance multiplier'),
-              _pairList(
-                'Inferred tolerance defaults',
-                _toleranceKeys,
-                _toleranceValues,
-                _toleranceKeyFocus,
-                _toleranceValueFocus,
-                'Key',
-                'Number',
-                _addTolerance,
-                _removeTolerance,
-              ),
-              _pairList(
-                'Display precision',
-                _precisionKeys,
-                _precisionValues,
-                _precisionKeyFocus,
-                _precisionValueFocus,
-                'Key',
-                'Number',
-                _addPrecision,
-                _removePrecision,
-              ),
+              _section('Account names', 'Every account starts with one of these five roots.'),
+              _textField('assets', 'Assets', assetsCopy),
+              _textField('liabilities', 'Liabilities', liabilitiesCopy),
+              _textField('equity', 'Equity', equityCopy),
+              _textField('income', 'Income', incomeCopy),
+              _textField('expenses', 'Expenses', expensesCopy),
+              if (_showAdvanced) ...<Widget>[
+                _section('Documents', 'Where document directives look for files.'),
+                _stringList(
+                  'documents',
+                  'Documents',
+                  documentsCopy,
+                  _documents,
+                  _documentFocus,
+                  _addDocument,
+                  _removeDocument,
+                ),
+                _section('Booking details', 'Tolerances, interpolation, and where leftover cents go.'),
+                _switch(
+                  'precise',
+                  'Precise interpolation',
+                  preciseCopy,
+                  _usePreciseInterpolation,
+                  (bool value) => _toggle(() => _usePreciseInterpolation = value),
+                ),
+                _switch(
+                  'inferCost',
+                  'Infer tolerance from cost',
+                  inferCostCopy,
+                  _inferToleranceFromCost,
+                  (bool value) => _toggle(() => _inferToleranceFromCost = value),
+                ),
+                _textField('tolerance', 'Tolerance multiplier', toleranceCopy),
+                _textField('inferredMultiplier', 'Inferred tolerance multiplier', inferredMultiplierCopy),
+                _pairList(
+                  'tolerances',
+                  'Inferred tolerance defaults',
+                  inferredDefaultsCopy,
+                  _toleranceKeys,
+                  _toleranceValues,
+                  _toleranceKeyFocus,
+                  _toleranceValueFocus,
+                  _addTolerance,
+                  _removeTolerance,
+                ),
+                _textField('rounding', 'Rounding account', roundingCopy),
+                _section('System accounts', 'Accounts used when queries open, close, or clear the books.'),
+                _textField('previousBalances', 'Previous balances', previousBalancesCopy),
+                _textField('previousEarnings', 'Previous earnings', previousEarningsCopy),
+                _textField('previousConversions', 'Previous conversions', previousConversionsCopy),
+                _textField('currentEarnings', 'Current earnings', currentEarningsCopy),
+                _textField('currentConversions', 'Current conversions', currentConversionsCopy),
+                _textField('unrealizedGains', 'Unrealized gains', unrealizedCopy),
+                _section('Plugins', 'When plugins run relative to the other checks.'),
+                _menu<PluginProcessingMode>(
+                  'pluginMode',
+                  'Plugin processing mode',
+                  pluginModeCopy,
+                  _pluginMode,
+                  PluginProcessingMode.values,
+                  _pluginLabel,
+                  (PluginProcessingMode value) => _toggle(() => _pluginMode = value),
+                ),
+                _section('Compatibility', 'Older syntax, and options kept for other Beancount tools.'),
+                _switch(
+                  'pipe',
+                  'Allow pipe separator',
+                  pipeCopy,
+                  _allowPipeSeparator,
+                  (bool value) => _toggle(() => _allowPipeSeparator = value),
+                ),
+                _switch(
+                  'deprecatedNone',
+                  'Allow deprecated none for tags and links',
+                  deprecatedNoneCopy,
+                  _allowDeprecatedNone,
+                  (bool value) => _toggle(() => _allowDeprecatedNone = value),
+                ),
+                _switch(
+                  'pythonpath',
+                  'Insert Python path',
+                  pythonPathCopy,
+                  _insertPythonpath,
+                  (bool value) => _toggle(() => _insertPythonpath = value),
+                ),
+                _switch(
+                  'commas',
+                  'Render commas',
+                  renderCommasCopy,
+                  _renderCommas,
+                  (bool value) => _toggle(() => _renderCommas = value),
+                ),
+                _textField('maxlines', 'Long string max lines', maxLinesCopy),
+                _pairList(
+                  'precision',
+                  'Display precision',
+                  precisionCopy,
+                  _precisionKeys,
+                  _precisionValues,
+                  _precisionKeyFocus,
+                  _precisionValueFocus,
+                  _addPrecision,
+                  _removePrecision,
+                ),
+              ],
             ],
           ],
         ),
@@ -260,37 +318,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _textField(String id, String label, {Key? key}) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
+  Widget _section(String title, String summary) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    final TextTheme text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(title, style: text.titleMedium),
+          const SizedBox(height: 4),
+          Text(summary, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+
+  Widget _textField(String id, String label, SettingCopy copy) => SettingBlock(
+    helpKey: Key('help-$id'),
+    label: label,
+    copy: copy,
     child: TextFormField(
-      key: key ?? Key(id),
+      key: Key(id),
       controller: _field(id),
       focusNode: _node(id),
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      decoration: const InputDecoration(border: OutlineInputBorder()),
     ),
   );
 
-  Widget _switch(String label, bool value, ValueChanged<bool> onChanged, {Key? key}) => SwitchListTile(
-    key: key,
-    contentPadding: EdgeInsets.zero,
-    title: Text(label),
+  Widget _switch(String id, String label, SettingCopy copy, bool value, ValueChanged<bool> onChanged) => SettingSwitch(
+    switchKey: Key(id),
+    helpKey: Key('help-$id'),
+    label: label,
+    copy: copy,
     value: value,
     onChanged: onChanged,
   );
 
   Widget _menu<T>(
+    String id,
     String label,
+    SettingCopy copy,
     T value,
     List<T> values,
     String Function(T value) itemLabel,
-    ValueChanged<T> onChanged, {
-    Key? key,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
+    ValueChanged<T> onChanged,
+  ) => SettingBlock(
+    helpKey: Key('help-$id'),
+    label: label,
+    copy: copy,
     child: DropdownButtonFormField<T>(
-      key: key ?? Key(label),
+      key: Key(id),
       initialValue: value,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      decoration: const InputDecoration(border: OutlineInputBorder()),
       items: <DropdownMenuItem<T>>[
         for (final T item in values) DropdownMenuItem<T>(value: item, child: Text(itemLabel(item))),
       ],
@@ -303,75 +383,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
   );
 
   Widget _stringList(
+    String id,
     String label,
+    SettingCopy copy,
     List<TextEditingController> controllers,
     List<FocusNode> nodes,
     VoidCallback onAdd,
     void Function(int index) onRemove,
-  ) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: <Widget>[
-      Text(label, style: Theme.of(context).textTheme.titleMedium),
-      for (int index = 0; index < controllers.length; index++)
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: TextFormField(
-                controller: controllers[index],
-                focusNode: nodes[index],
-                decoration: const InputDecoration(border: OutlineInputBorder()),
+  ) => SettingBlock(
+    helpKey: Key('help-$id'),
+    label: label,
+    copy: copy,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (int index = 0; index < controllers.length; index++)
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: TextFormField(
+                  controller: controllers[index],
+                  focusNode: nodes[index],
+                  decoration: const InputDecoration(border: OutlineInputBorder()),
+                ),
               ),
-            ),
-            IconButton(onPressed: () => onRemove(index), icon: const Icon(Icons.close)),
-          ],
+              IconButton(onPressed: () => onRemove(index), icon: const Icon(Icons.close)),
+            ],
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(onPressed: onAdd, child: Text('Add $label')),
         ),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton(onPressed: onAdd, child: Text('Add $label')),
-      ),
-    ],
+      ],
+    ),
   );
 
   Widget _pairList(
+    String id,
     String label,
+    SettingCopy copy,
     List<TextEditingController> keys,
     List<TextEditingController> values,
     List<FocusNode> keyNodes,
     List<FocusNode> valueNodes,
-    String keyLabel,
-    String valueLabel,
     VoidCallback onAdd,
     void Function(int index) onRemove,
-  ) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: <Widget>[
-      Text(label, style: Theme.of(context).textTheme.titleMedium),
-      for (int index = 0; index < keys.length; index++)
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: TextFormField(
-                controller: keys[index],
-                focusNode: keyNodes[index],
-                decoration: InputDecoration(labelText: keyLabel, border: const OutlineInputBorder()),
+  ) => SettingBlock(
+    helpKey: Key('help-$id'),
+    label: label,
+    copy: copy,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (int index = 0; index < keys.length; index++)
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: TextFormField(
+                  controller: keys[index],
+                  focusNode: keyNodes[index],
+                  decoration: const InputDecoration(labelText: 'Key', border: OutlineInputBorder()),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextFormField(
-                controller: values[index],
-                focusNode: valueNodes[index],
-                decoration: InputDecoration(labelText: valueLabel, border: const OutlineInputBorder()),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  controller: values[index],
+                  focusNode: valueNodes[index],
+                  decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()),
+                ),
               ),
-            ),
-            IconButton(onPressed: () => onRemove(index), icon: const Icon(Icons.close)),
-          ],
+              IconButton(onPressed: () => onRemove(index), icon: const Icon(Icons.close)),
+            ],
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(onPressed: onAdd, child: Text('Add $label')),
         ),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton(onPressed: onAdd, child: Text('Add $label')),
-      ),
-    ],
+      ],
+    ),
   );
 
   Future<void> _choose(Future<LedgerDocument?> Function() pick) => widget.session.choose(pick);
@@ -391,12 +481,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_document == null) {
       _parseErrors = <String>[];
       _fieldError = null;
+      _loadedOptions = null;
       return;
     }
     final LoadedLedgerOptions? loaded = widget.session.snapshot?.options;
     if (loaded == null) {
       _parseErrors = <String>[];
       _fieldError = null;
+      _loadedOptions = null;
       return;
     }
     _bind(loaded);
@@ -406,6 +498,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _bind(LoadedLedgerOptions loaded) {
     final LedgerOptions options = loaded.options;
+    _loadedOptions = options;
     _mute = true;
     _advancedUi = loaded.guar.advancedUi;
     _writeDefaultOptions = loaded.guar.writeDefaultOptions;
@@ -464,6 +557,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _toggle(VoidCallback assign) {
     setState(assign);
     _flush();
+  }
+
+  void _setShowAdvanced(bool value) {
+    if (_showAdvanced && !value) {
+      _flush();
+    }
+    setState(() => _showAdvanced = value);
   }
 
   void _setHidden(String token, {required bool hidden}) {
@@ -656,7 +756,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (document == null) {
       return;
     }
-    final DraftedOptions drafted = draftLedgerOptions(_inputs());
+    final bool showAdvanced = _showAdvanced;
+    final DraftedOptions drafted = draftLedgerOptions(_inputs(showAdvanced: showAdvanced));
     final String? error = drafted.error;
     final LedgerOptions? options = drafted.options;
     if (error != null || options == null) {
@@ -680,47 +781,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await widget.session.saveOptions(
       options,
       GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions, hidden: _hidden),
+      preserveKeys: showAdvanced ? const <String>{} : advancedOptionKeys,
     );
   }
 
-  OptionInputs _inputs() => OptionInputs(
-    title: _field('title').text,
-    documents: <String>[for (final TextEditingController controller in _documents) controller.text],
-    operatingCurrencies: <String>[for (final TextEditingController controller in _currencies) controller.text],
-    conversionCurrency: _field('conversion').text,
-    renderCommas: _renderCommas,
-    longStringMaxlines: _field('maxlines').text,
-    pluginProcessingMode: _pluginMode,
-    insertPythonpath: _insertPythonpath,
-    allowPipeSeparator: _allowPipeSeparator,
-    allowDeprecatedNoneForTagsAndLinks: _allowDeprecatedNone,
-    assets: _field('assets').text,
-    liabilities: _field('liabilities').text,
-    equity: _field('equity').text,
-    income: _field('income').text,
-    expenses: _field('expenses').text,
-    previousBalances: _field('previousBalances').text,
-    previousEarnings: _field('previousEarnings').text,
-    previousConversions: _field('previousConversions').text,
-    currentEarnings: _field('currentEarnings').text,
-    currentConversions: _field('currentConversions').text,
-    unrealizedGains: _field('unrealizedGains').text,
-    rounding: _field('rounding').text,
-    bookingMethod: _booking,
-    usePreciseInterpolation: _usePreciseInterpolation,
-    inferToleranceFromCost: _inferToleranceFromCost,
-    toleranceMultiplier: _field('tolerance').text,
-    inferredToleranceMultiplier: _field('inferredMultiplier').text,
-    inferredTolerances: <({String key, String value})>[
-      for (int index = 0; index < _toleranceKeys.length; index++)
-        (key: _toleranceKeys[index].text, value: _toleranceValues[index].text),
-    ],
-    displayPrecisions: <({String key, String value})>[
-      for (int index = 0; index < _precisionKeys.length; index++)
-        (key: _precisionKeys[index].text, value: _precisionValues[index].text),
-    ],
-    baselinePrefixes: _baseline,
-  );
+  OptionInputs _inputs({required bool showAdvanced}) {
+    final LedgerOptions? frozen = showAdvanced ? null : _loadedOptions;
+    return OptionInputs(
+      title: _field('title').text,
+      documents: frozen != null ? List<String>.of(frozen.documents) : _texts(_documents),
+      operatingCurrencies: _texts(_currencies),
+      conversionCurrency: _field('conversion').text,
+      renderCommas: frozen?.renderCommas ?? _renderCommas,
+      longStringMaxlines: frozen != null ? '${frozen.longStringMaxlines}' : _field('maxlines').text,
+      pluginProcessingMode: frozen?.pluginProcessingMode ?? _pluginMode,
+      insertPythonpath: frozen?.insertPythonpath ?? _insertPythonpath,
+      allowPipeSeparator: frozen?.allowPipeSeparator ?? _allowPipeSeparator,
+      allowDeprecatedNoneForTagsAndLinks: frozen?.allowDeprecatedNoneForTagsAndLinks ?? _allowDeprecatedNone,
+      assets: _field('assets').text,
+      liabilities: _field('liabilities').text,
+      equity: _field('equity').text,
+      income: _field('income').text,
+      expenses: _field('expenses').text,
+      previousBalances: frozen?.accountPreviousBalances.name ?? _field('previousBalances').text,
+      previousEarnings: frozen?.accountPreviousEarnings.name ?? _field('previousEarnings').text,
+      previousConversions: frozen?.accountPreviousConversions.name ?? _field('previousConversions').text,
+      currentEarnings: frozen?.accountCurrentEarnings.name ?? _field('currentEarnings').text,
+      currentConversions: frozen?.accountCurrentConversions.name ?? _field('currentConversions').text,
+      unrealizedGains: frozen?.accountUnrealizedGains.name ?? _field('unrealizedGains').text,
+      rounding: frozen != null ? (frozen.accountRounding?.name ?? '') : _field('rounding').text,
+      bookingMethod: _booking,
+      usePreciseInterpolation: frozen?.usePreciseInterpolation ?? _usePreciseInterpolation,
+      inferToleranceFromCost: frozen?.inferToleranceFromCost ?? _inferToleranceFromCost,
+      toleranceMultiplier: frozen?.toleranceMultiplier.verbatim ?? _field('tolerance').text,
+      inferredToleranceMultiplier: frozen?.inferredToleranceMultiplier.verbatim ?? _field('inferredMultiplier').text,
+      inferredTolerances: frozen != null ? _toleranceRows(frozen) : _pairs(_toleranceKeys, _toleranceValues),
+      displayPrecisions: frozen != null ? _precisionRows(frozen) : _pairs(_precisionKeys, _precisionValues),
+      baselinePrefixes: _baseline,
+    );
+  }
+
+  List<String> _texts(List<TextEditingController> controllers) => <String>[
+    for (final TextEditingController controller in controllers) controller.text,
+  ];
+
+  List<({String key, String value})> _pairs(List<TextEditingController> keys, List<TextEditingController> values) =>
+      <({String key, String value})>[
+        for (int index = 0; index < keys.length; index++) (key: keys[index].text, value: values[index].text),
+      ];
+
+  List<({String key, String value})> _toleranceRows(LedgerOptions options) => <({String key, String value})>[
+    for (final InferredTolerance tolerance in options.inferredToleranceDefault)
+      (key: _currencyKeyText(tolerance.key), value: tolerance.value.toString()),
+  ];
+
+  List<({String key, String value})> _precisionRows(LedgerOptions options) => <({String key, String value})>[
+    for (final DisplayPrecision precision in options.displayPrecision)
+      (key: _precisionKeyText(precision.key), value: precision.value.toString()),
+  ];
 }
 
 String _bookingLabel(BookingMethod method) => switch (method) {
