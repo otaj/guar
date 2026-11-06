@@ -173,6 +173,7 @@ void main() {
     await _pumpApp(tester, documents);
     await _showSettings(tester);
 
+    await tester.ensureVisible(find.byKey(const Key('title')));
     await tester.tap(find.byKey(const Key('title')));
     await tester.enterText(find.byKey(const Key('title')), 'Household');
     await tester.pump(const Duration(milliseconds: 400));
@@ -317,6 +318,54 @@ void main() {
 
     expect(documents.files[document.uri], '');
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('writeDefaultOptions'))).value, isFalse);
+  });
+
+  testWidgets('writes hide_directives and the ledger screen drops that type', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{
+        'content://ledger/1':
+            'option "title" "Household"\n'
+            '2020-01-01 open Assets:Bank\n'
+            '2020-01-05 price EUR 1.10 USD\n',
+      },
+    );
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-price'))).value, isFalse);
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-generated'))).value, isFalse);
+
+    await tester.ensureVisible(find.byKey(const Key('hide-generated')));
+    await tester.tap(find.byKey(const Key('hide-generated')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('hide-price')));
+    await tester.tap(find.byKey(const Key('hide-price')));
+    await tester.pumpAndSettle();
+
+    final DateTime now = DateTime.now();
+    final String today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(
+      documents.files[document.uri],
+      'option "title" "Household"\n'
+      '$today custom "guar_option" "hide_generated" "TRUE"\n'
+      '$today custom "guar_option" "hide_price" "TRUE"\n'
+      '2020-01-01 open Assets:Bank\n'
+      '2020-01-05 price EUR 1.10 USD\n',
+    );
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-price'))).value, isTrue);
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-generated'))).value, isTrue);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Ledger'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2020-01-05 · Price'), findsNothing);
+    expect(find.text('2020-01-01 · Open'), findsOneWidget);
+    expect(find.text('Household'), findsOneWidget);
   });
 }
 

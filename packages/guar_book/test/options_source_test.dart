@@ -16,6 +16,7 @@ void main() {
     expect(loaded.options.accountPreviousBalances.name, 'Equity:Opening-Balances');
     expect(loaded.guar.advancedUi, isFalse);
     expect(loaded.guar.writeDefaultOptions, isFalse);
+    expect(loaded.guar.hidden, isEmpty);
   });
 
   test('keeps options that follow a broken line', () {
@@ -377,5 +378,118 @@ void main() {
     expect(advancedOff.contains('advanced_ui'), isFalse);
     expect(advancedOff.contains('write_default_options'), isTrue);
     expect(advancedOff.contains('option "title" "Beancount"'), isTrue);
+  });
+
+  test('honors one quoted TRUE toggle per directive', () {
+    const String source =
+        '2020-05-01 custom "guar_option" "hide_price" "TRUE"\n'
+        '  note: "keep"\n'
+        '2020-05-02 custom "guar_option" "hide_generated" "TRUE"\n';
+    final LoadedLedgerOptions loaded = readLedgerOptions(source);
+    expect(loaded.errors, isEmpty);
+    expect(loaded.guar.hidden, <String>{'price', 'generated'});
+    expect(writeLedgerOptions(source, LedgerOptions(), guar: loaded.guar, today: DateTime(1999)), source);
+  });
+
+  test('does not honor a hide line that is not the toggle format', () {
+    const String quoted = '2020-01-01 custom "guar_option" "hide_price" "true"\n';
+    final LoadedLedgerOptions lower = readLedgerOptions(quoted);
+    expect(lower.guar.hidden, isEmpty);
+    expect(lower.errors, <String>['hide_price: found "true" expected "TRUE"']);
+    expect(writeLedgerOptions(quoted, LedgerOptions(), guar: const GuarOptions()), quoted);
+
+    const String bare = '2020-01-01 custom "guar_option" "hide_price" TRUE\n';
+    final LoadedLedgerOptions unquoted = readLedgerOptions(bare);
+    expect(unquoted.guar.hidden, isEmpty);
+    expect(unquoted.errors, <String>['hide_price: found TRUE expected "TRUE"']);
+    expect(writeLedgerOptions(bare, LedgerOptions(), guar: const GuarOptions()), bare);
+
+    const String list =
+        '2020-03-01 custom "guar_option" "theme" "dark"\n'
+        '2020-02-01 custom "guar_option" "hide_directives" "price" "note"\n'
+        '  note: "keep"\n'
+        '2020-04-01 open Assets:Cash\n';
+    final LoadedLedgerOptions freeform = readLedgerOptions(list);
+    expect(freeform.guar.hidden, isEmpty);
+    expect(freeform.errors, <String>['hide_directives is not a ledger hide toggle']);
+    expect(writeLedgerOptions(list, LedgerOptions(), guar: const GuarOptions()), list);
+    expect(
+      writeLedgerOptions(list, LedgerOptions(bookingMethod: BookingMethod.fifo)),
+      'option "booking_method" "FIFO"\n$list',
+    );
+  });
+
+  test('does not honor repeated hide toggles', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "hide_open" "TRUE"\n'
+        '2020-06-01 custom "guar_option" "hide_open" "TRUE"\n';
+    final LoadedLedgerOptions loaded = readLedgerOptions(source);
+    expect(loaded.guar.hidden, isEmpty);
+    expect(loaded.errors, <String>['hide_open expects a single "TRUE"']);
+    expect(writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions()), source);
+  });
+
+  test('writes a hide toggle after other guar options', () {
+    final String written = writeLedgerOptions(
+      '2020-01-02 custom "guar_option" "advanced_ui" "TRUE"\n',
+      LedgerOptions(),
+      guar: const GuarOptions(advancedUi: true, hidden: <String>{'note', 'generated'}),
+      today: DateTime(1999),
+    );
+    expect(
+      written,
+      '2020-01-02 custom "guar_option" "advanced_ui" "TRUE"\n'
+      '1999-01-01 custom "guar_option" "hide_generated" "TRUE"\n'
+      '1999-01-01 custom "guar_option" "hide_note" "TRUE"\n',
+    );
+    final LoadedLedgerOptions loaded = readLedgerOptions(written);
+    expect(loaded.errors, isEmpty);
+    expect(loaded.guar.hidden, <String>{'generated', 'note'});
+    expect(writeLedgerOptions(written, loaded.options, guar: loaded.guar, today: DateTime(2024)), written);
+  });
+
+  test('replaces an inexact hide toggle when that switch is turned on', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "hide_price" "true"\n'
+        '  note: "keep"\n'
+        '2020-02-01 open Assets:Cash\n';
+    expect(
+      writeLedgerOptions(
+        source,
+        LedgerOptions(),
+        guar: const GuarOptions(hidden: <String>{'price'}),
+        today: DateTime(1999),
+      ),
+      '2020-01-01 custom "guar_option" "hide_price" "TRUE"\n'
+      '2020-02-01 open Assets:Cash\n',
+    );
+  });
+
+  test('removes an exact hide toggle when that switch is turned off', () {
+    const String source =
+        '2020-05-01 custom "guar_option" "hide_price" "TRUE"\n'
+        '  note: "keep"\n'
+        '2020-02-01 open Assets:Cash\n';
+    expect(
+      writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions()),
+      '2020-02-01 open Assets:Cash\n',
+    );
+  });
+
+  test('advanced_ui, write_default_options, and hide toggles are written together', () {
+    final String written = writeLedgerOptions(
+      '',
+      LedgerOptions(),
+      guar: const GuarOptions(advancedUi: true, writeDefaultOptions: true, hidden: <String>{'balance'}),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(
+      written.endsWith(
+        '2020-01-02 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '2020-01-02 custom "guar_option" "write_default_options" "TRUE"\n'
+        '2020-01-02 custom "guar_option" "hide_balance" "TRUE"\n',
+      ),
+      isTrue,
+    );
   });
 }
