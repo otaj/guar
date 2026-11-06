@@ -10,6 +10,24 @@ import 'package:guar/src/plugins_screen.dart';
 import 'package:guar/src/settings_screen.dart';
 import 'package:guar_book/guar_book.dart';
 
+enum _Tab {
+  ledger('Ledger', Icons.list_alt_outlined, Icons.list_alt),
+  plugins('Plugins', Icons.extension_outlined, Icons.extension),
+  settings('Settings', Icons.tune_outlined, Icons.tune);
+
+  const _Tab(this.label, this.icon, this.selectedIcon);
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+
+  NavigationDestination get destination => NavigationDestination(
+    icon: Icon(icon),
+    selectedIcon: Icon(selectedIcon),
+    label: label,
+  );
+}
+
 class AppShell extends StatefulWidget {
   const AppShell({required this.documents, super.key});
 
@@ -20,12 +38,8 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const int _directivesTab = 0;
-  static const int _pluginsTab = 1;
-  static const int _settingsTab = 2;
-
   late final LedgerSession _session;
-  int _index = _settingsTab;
+  _Tab _tab = _Tab.settings;
   String? _openUri;
 
   @override
@@ -49,13 +63,13 @@ class _AppShellState extends State<AppShell> {
     if (!mounted) return;
     if (_session.settled) {
       final String? uri = _session.document?.uri;
-      // A newly opened ledger starts on its directives. Later edits keep the current tab.
+      // A newly opened ledger starts on the ledger tab. Later edits keep the current tab.
       if (uri == null) {
-        _index = _settingsTab;
+        _tab = _Tab.settings;
       } else if (uri != _openUri) {
-        _index = _directivesTab;
-      } else if (!_advanced && _index == _pluginsTab) {
-        _index = _settingsTab;
+        _tab = _Tab.ledger;
+      } else if (!_advanced && _tab == _Tab.plugins) {
+        _tab = _Tab.settings;
       }
       _openUri = uri;
     }
@@ -66,65 +80,39 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final bool loaded = _session.settled && _session.document != null;
     final bool advanced = loaded && _advanced;
-    final int visible = !loaded || (!advanced && _index == _pluginsTab) ? _settingsTab : _index;
+    final _Tab visible = !loaded || (!advanced && _tab == _Tab.plugins) ? _Tab.settings : _tab;
+    final List<_Tab> tabs = <_Tab>[
+      if (loaded) _Tab.ledger,
+      if (loaded && advanced) _Tab.plugins,
+      _Tab.settings,
+    ];
     return Scaffold(
-      appBar: AppBar(title: Text(_title(visible))),
+      appBar: AppBar(title: Text(visible.label)),
       body: IndexedStack(
-        index: visible,
+        index: visible.index,
         children: <Widget>[
-          DirectivesScreen(key: const Key('directives'), session: _session),
-          PluginsScreen(key: const Key('plugins'), session: _session),
-          SettingsScreen(key: const Key('settings'), session: _session),
+          for (final _Tab tab in _Tab.values)
+            switch (tab) {
+              _Tab.ledger => DirectivesScreen(key: const Key('directives'), session: _session),
+              _Tab.plugins => PluginsScreen(key: const Key('plugins'), session: _session),
+              _Tab.settings => SettingsScreen(key: const Key('settings'), session: _session),
+            },
         ],
       ),
       bottomNavigationBar: loaded
           ? NavigationBar(
-              selectedIndex: _barIndex(visible, advanced: advanced),
-              destinations: <NavigationDestination>[
-                const NavigationDestination(
-                  icon: Icon(Icons.list_alt_outlined),
-                  selectedIcon: Icon(Icons.list_alt),
-                  label: 'Ledger',
-                ),
-                if (advanced)
-                  const NavigationDestination(
-                    icon: Icon(Icons.extension_outlined),
-                    selectedIcon: Icon(Icons.extension),
-                    label: 'Plugins',
-                  ),
-                const NavigationDestination(
-                  icon: Icon(Icons.tune_outlined),
-                  selectedIcon: Icon(Icons.tune),
-                  label: 'Settings',
-                ),
-              ],
-              onDestinationSelected: (int next) => unawaited(_select(_tabFor(next, advanced: advanced))),
+              selectedIndex: tabs.indexOf(visible),
+              destinations: <NavigationDestination>[for (final _Tab tab in tabs) tab.destination],
+              onDestinationSelected: (int next) => unawaited(_select(tabs[next])),
             )
           : null,
     );
   }
 
-  String _title(int visible) => switch (visible) {
-    _directivesTab => 'Ledger',
-    _pluginsTab => 'Plugins',
-    _ => 'Settings',
-  };
-
-  int _barIndex(int visible, {required bool advanced}) => switch (visible) {
-    _directivesTab => 0,
-    _pluginsTab => 1,
-    _ => advanced ? 2 : 1,
-  };
-
-  int _tabFor(int barIndex, {required bool advanced}) {
-    if (!advanced && barIndex == 1) return _settingsTab;
-    return barIndex;
-  }
-
-  Future<void> _select(int index) async {
-    if (index == _index) return;
+  Future<void> _select(_Tab tab) async {
+    if (tab == _tab) return;
     await _session.flush();
     if (!mounted) return;
-    setState(() => _index = index);
+    setState(() => _tab = tab);
   }
 }
