@@ -78,6 +78,40 @@ void main() {
     expect(loaded.options.inferredToleranceDefault.single.value, Decimal.parse('0.01'));
   });
 
+  test('keeps a preserved option line verbatim', () {
+    const String source =
+        'option "insert_pythonpath" "TRUE" ; keep\n'
+        'option "title" "Old"\n'
+        '2020-01-01 open Assets:Cash\n';
+    final String written = writeLedgerOptions(
+      source,
+      LedgerOptions(title: 'New', insertPythonpath: true),
+      preserveKeys: const <String>{'insert_pythonpath'},
+    );
+    expect(
+      written,
+      'option "insert_pythonpath" "TRUE" ; keep\n'
+      'option "title" "New"\n'
+      '2020-01-01 open Assets:Cash\n',
+    );
+  });
+
+  test('does not emit preserved keys when writing defaults', () {
+    const String source = 'option "render_commas" "TRUE" ; keep\n';
+    final String written = writeLedgerOptions(
+      source,
+      LedgerOptions(renderCommas: true),
+      guar: const GuarOptions(writeDefaultOptions: true),
+      preserveKeys: const <String>{'render_commas', 'long_string_maxlines', 'plugin_processing_mode'},
+      today: DateTime(2020, 1, 2),
+    );
+    expect(written, contains('option "render_commas" "TRUE" ; keep'));
+    expect(RegExp('render_commas').allMatches(written), hasLength(1));
+    expect(written.contains('long_string_maxlines'), isFalse);
+    expect(written.contains('plugin_processing_mode'), isFalse);
+    expect(written.contains('option "title" "Beancount"'), isTrue);
+  });
+
   test('drops an option line that matches the default', () {
     const String source = 'option "title" "Beancount"\n2020-01-01 open Assets:Cash\n';
     final LoadedLedgerOptions loaded = readLedgerOptions(source);

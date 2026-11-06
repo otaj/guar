@@ -106,13 +106,23 @@ String writeLedgerOptions(
   GuarOptions? guar,
   DateTime? today,
   p.ParsedLedger? parsed,
+  Set<String> preserveKeys = const <String>{},
 }) {
   final p.ParsedLedger ledger = parsed ?? _parse(source);
-  final List<String> rendered = explicitOptionLines(options, writeDefaults: guar?.writeDefaultOptions ?? false);
+  // Hidden settings stay as written: do not emit them, and do not rewrite lines already in the file.
+  final List<String> rendered = explicitOptionLines(
+    options,
+    writeDefaults: guar?.writeDefaultOptions ?? false,
+    skipKeys: preserveKeys,
+  );
   final _Text text = _split(source);
   final _Rewrite rewrite = _Rewrite(List<String>.of(text.lines), _optionInsertAt(ledger, text));
   if (guar != null) rewrite.collectGuar(ledger, text);
-  final bool rewroteOptions = rewrite.applyOptions(rendered, _optionSpans(ledger, text));
+  final bool rewroteOptions = rewrite.applyOptions(
+    rendered,
+    _optionSpans(ledger, text),
+    keepStarts: _preservedStarts(ledger, text, preserveKeys),
+  );
   if (guar != null) {
     final DateTime date = today ?? DateTime.now();
     for (final GuarHide hide in GuarHide.values) {
@@ -149,12 +159,29 @@ List<({int end, int start})> _optionSpans(p.ParsedLedger parsed, _Text text) {
   return spans;
 }
 
-List<String> explicitOptionLines(d.LedgerOptions options, {bool writeDefaults = false}) {
+Set<int> _preservedStarts(p.ParsedLedger parsed, _Text text, Set<String> preserveKeys) {
+  final Set<int> starts = <int>{};
+  if (preserveKeys.isEmpty) return starts;
+  for (final p.OptionSetting setting in parsed.info.optionSettings) {
+    if (!preserveKeys.contains(setting.key)) continue;
+    final int start = setting.location.linenoBegin - 1;
+    if (start < 0 || start >= text.lines.length) continue;
+    starts.add(start);
+  }
+  return starts;
+}
+
+List<String> explicitOptionLines(
+  d.LedgerOptions options, {
+  bool writeDefaults = false,
+  Set<String> skipKeys = const <String>{},
+}) {
   final d.LedgerOptions stock = d.LedgerOptions();
   final d.LedgerOptions derived = d.LedgerOptions(accountPrefixes: options.accountPrefixes);
   final List<String> lines = <String>[];
 
   void add(String key, String value) {
+    if (skipKeys.contains(key)) return;
     lines.add('option ${_quote(key)} ${_quote(value)}');
   }
 
@@ -437,10 +464,18 @@ class _Rewrite {
     }
   }
 
-  bool applyOptions(List<String> rendered, List<({int end, int start})> optionSpans) {
-    if (rendered.isEmpty && optionSpans.isEmpty) return false;
-    final int insertAt = optionSpans.isEmpty ? 0 : optionSpans.first.start;
-    for (final ({int end, int start}) span in optionSpans.reversed) {
+  bool applyOptions(
+    List<String> rendered,
+    List<({int end, int start})> optionSpans, {
+    Set<int> keepStarts = const <int>{},
+  }) {
+    final List<({int end, int start})> drop = <({int end, int start})>[
+      for (final ({int end, int start}) span in optionSpans)
+        if (!keepStarts.contains(span.start)) span,
+    ];
+    if (rendered.isEmpty && drop.isEmpty) return false;
+    final int insertAt = drop.isEmpty ? (optionSpans.isEmpty ? 0 : optionSpans.first.start) : drop.first.start;
+    for (final ({int end, int start}) span in drop.reversed) {
       if (span.start < 0 || span.start >= lines.length) continue;
       final int end = span.end >= lines.length ? lines.length - 1 : span.end;
       if (end < span.start) continue;
