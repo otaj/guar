@@ -55,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _advancedUi = false;
   bool _writeDefaultOptions = false;
+  Set<String> _hidden = <String>{};
   bool _renderCommas = false;
   bool _insertPythonpath = false;
   bool _allowPipeSeparator = false;
@@ -156,6 +157,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 (bool value) => _toggle(() => _writeDefaultOptions = value),
                 key: const Key('writeDefaultOptions'),
               ),
+              Text('Hide on the ledger screen', style: text.titleMedium),
+              Text(
+                'Generated entries come from plugins or balance padding.',
+                style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              for (final GuarHide item in GuarHide.values)
+                _switch(
+                  item.label,
+                  _hidden.contains(item.token),
+                  (bool value) => _setHidden(item.token, hidden: value),
+                  key: Key('hide-${item.token}'),
+                ),
               _textField('title', 'Title'),
               _stringList('Documents', _documents, _documentFocus, _addDocument, _removeDocument),
               _stringList('Operating currencies', _currencies, _currencyFocus, _addCurrency, _removeCurrency),
@@ -389,6 +402,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _mute = true;
     _advancedUi = loaded.guar.advancedUi;
     _writeDefaultOptions = loaded.guar.writeDefaultOptions;
+    _hidden = Set<String>.of(loaded.guar.hidden);
     _booking = options.bookingMethod;
     _pluginMode = options.pluginProcessingMode;
     _renderCommas = options.renderCommas;
@@ -443,6 +457,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _toggle(VoidCallback assign) {
     setState(assign);
     _flush();
+  }
+
+  void _setHidden(String token, {required bool hidden}) {
+    _toggle(() {
+      final Set<String> next = <String>{..._hidden};
+      if (hidden) {
+        next.add(token);
+      } else {
+        next.remove(token);
+      }
+      _hidden = next;
+    });
   }
 
   void _addDocument() => setState(() => _documents.add(_controller(_documentFocus)));
@@ -647,7 +673,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final String next = writeLedgerOptions(
       widget.session.source,
       options,
-      guar: GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions),
+      guar: GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions, hidden: _hidden),
     );
     if (next == widget.session.source) {
       return;

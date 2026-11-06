@@ -4,11 +4,70 @@ import 'package:guar_book/src/options_defaults.dart';
 import 'package:guar_domain/guar_domain.dart' as d;
 import 'package:guar_parser/guar_parser.dart' as p;
 
+enum GuarHide {
+  generated('generated', 'Generated'),
+  transaction('transaction', 'Transaction'),
+  price('price', 'Price'),
+  balance('balance', 'Balance'),
+  open('open', 'Open'),
+  close('close', 'Close'),
+  commodity('commodity', 'Commodity'),
+  pad('pad', 'Pad'),
+  document('document', 'Document'),
+  note('note', 'Note'),
+  event('event', 'Event'),
+  query('query', 'Query'),
+  custom('custom', 'Custom'),
+  budget('budget', 'Budget'),
+  budgetOff('budget_off', 'Budget off');
+
+  const GuarHide(this.token, this.label);
+
+  final String token;
+  final String label;
+
+  String get optionKey => 'hide_$token';
+}
+
+String directiveHideToken(d.DirectiveBody body) => switch (body) {
+  d.TransactionBody() => GuarHide.transaction.token,
+  d.PriceBody() => GuarHide.price.token,
+  d.BalanceBody() => GuarHide.balance.token,
+  d.OpenBody() => GuarHide.open.token,
+  d.CloseBody() => GuarHide.close.token,
+  d.CommodityBody() => GuarHide.commodity.token,
+  d.PadBody() => GuarHide.pad.token,
+  d.DocumentBody() => GuarHide.document.token,
+  d.NoteBody() => GuarHide.note.token,
+  d.EventBody() => GuarHide.event.token,
+  d.QueryBody() => GuarHide.query.token,
+  d.CustomBody() => GuarHide.custom.token,
+  d.BudgetBody() => GuarHide.budget.token,
+  d.BudgetOffBody() => GuarHide.budgetOff.token,
+};
+
+String parsedHideToken(p.DirectiveBody body) => switch (body) {
+  p.TransactionBody() => GuarHide.transaction.token,
+  p.PriceBody() => GuarHide.price.token,
+  p.BalanceBody() => GuarHide.balance.token,
+  p.OpenBody() => GuarHide.open.token,
+  p.CloseBody() => GuarHide.close.token,
+  p.CommodityBody() => GuarHide.commodity.token,
+  p.PadBody() => GuarHide.pad.token,
+  p.DocumentBody() => GuarHide.document.token,
+  p.NoteBody() => GuarHide.note.token,
+  p.EventBody() => GuarHide.event.token,
+  p.QueryBody() => GuarHide.query.token,
+  p.CustomBody() => GuarHide.custom.token,
+};
+
 class GuarOptions {
-  const GuarOptions({this.advancedUi = false, this.writeDefaultOptions = false});
+  const GuarOptions({this.advancedUi = false, this.writeDefaultOptions = false, this.hidden = const <String>{}});
 
   final bool advancedUi;
   final bool writeDefaultOptions;
+
+  final Set<String> hidden;
 }
 
 class LoadedLedgerOptions {
@@ -23,14 +82,20 @@ LoadedLedgerOptions readLedgerOptions(String source) {
   final p.ParsedLedger parsed = _parse(source);
   final _GuarBoolScan advancedUi = _scanGuarBool(source, parsed, 'advanced_ui');
   final _GuarBoolScan writeDefaults = _scanGuarBool(source, parsed, 'write_default_options');
+  final ({Set<String> values, List<String> errors}) hidden = _readHide(source, parsed);
   return LoadedLedgerOptions(
     options: defaultOptions(parsed.options),
     errors: <String>[
       for (final p.ParseError error in parsed.errors) error.message,
       ...advancedUi.errors,
       ...writeDefaults.errors,
+      ...hidden.errors,
     ],
-    guar: GuarOptions(advancedUi: advancedUi.value, writeDefaultOptions: writeDefaults.value),
+    guar: GuarOptions(
+      advancedUi: advancedUi.value,
+      writeDefaultOptions: writeDefaults.value,
+      hidden: hidden.values,
+    ),
   );
 }
 
@@ -40,9 +105,13 @@ String writeLedgerOptions(String source, d.LedgerOptions options, {GuarOptions? 
     return written;
   }
   final DateTime date = today ?? DateTime.now();
-  // Insert advanced_ui second so a newly added pair stays in switch order.
+  // New lines insert at the front of the guar block, so later calls stay first.
+  String withHide = written;
+  for (final GuarHide hide in GuarHide.values) {
+    withHide = _writeGuarHideToggle(withHide, hide: hide, enabled: guar.hidden.contains(hide.token), today: date);
+  }
   final String withDefaults = _writeGuarBool(
-    written,
+    withHide,
     key: 'write_default_options',
     enabled: guar.writeDefaultOptions,
     today: date,
@@ -504,6 +573,163 @@ bool? _guarTextBool(String value) => switch (value.toLowerCase()) {
   'false' || '0' => false,
   _ => null,
 };
+
+class _HideLook {
+  const _HideLook({required this.hide, required this.key, required this.exact, required this.body, required this.hit});
+
+  final GuarHide? hide;
+  final String key;
+  final bool exact;
+  final p.CustomBody body;
+  final _GuarHit hit;
+}
+
+class _HideCollected {
+  const _HideCollected({required this.looks, required this.insertAt});
+
+  final List<_HideLook> looks;
+  final int insertAt;
+}
+
+({Set<String> values, List<String> errors}) _readHide(String source, p.ParsedLedger parsed) {
+  final _HideCollected collected = _collectHide(source, parsed);
+  final Set<String> values = <String>{};
+  final List<String> errors = <String>[];
+  for (final _HideLook look in collected.looks) {
+    if (look.hide == null) {
+      errors.add('${look.key} is not a ledger hide toggle');
+    }
+  }
+  for (final GuarHide hide in GuarHide.values) {
+    final List<_HideLook> mine = <_HideLook>[
+      for (final _HideLook look in collected.looks)
+        if (look.hide == hide) look,
+    ];
+    if (mine.isEmpty) {
+      continue;
+    }
+    if (mine.length == 1 && mine.single.exact) {
+      values.add(hide.token);
+    } else if (mine.length == 1) {
+      errors.add(_hideMismatch(hide.optionKey, mine.single.body));
+    } else {
+      errors.add('${hide.optionKey} expects a single "TRUE"');
+    }
+  }
+  return (values: values, errors: errors);
+}
+
+String _writeGuarHideToggle(String source, {required GuarHide hide, required bool enabled, required DateTime today}) {
+  final _HideCollected collected = _collectHide(source, _parse(source));
+  final List<_HideLook> mine = <_HideLook>[
+    for (final _HideLook look in collected.looks)
+      if (look.hide == hide) look,
+  ];
+  // An inexact line is left alone until this toggle is turned on.
+  if ((mine.length == 1 && mine.single.exact) == enabled) {
+    return source;
+  }
+  final _Text text = _split(source);
+  final List<String> lines = List<String>.of(text.lines);
+  if (!enabled) {
+    _removeHits(lines, <_GuarHit>[for (final _HideLook look in mine) look.hit]);
+  } else if (mine.isEmpty) {
+    final int at = collected.insertAt > lines.length ? lines.length : collected.insertAt;
+    lines.insert(at, _guarBoolLine(_isoDate(today), hide.optionKey));
+  } else {
+    final _GuarHit keep = mine.last.hit;
+    final List<_HideLook> ordered = <_HideLook>[...mine]
+      ..sort((_HideLook a, _HideLook b) => a.hit.start.compareTo(b.hit.start));
+    for (final _HideLook look in ordered.reversed) {
+      if (look.hit.start == keep.start) {
+        _replaceSpan(lines, look.hit.start, look.hit.end, _guarBoolLine(look.hit.date, hide.optionKey));
+      } else {
+        _removeSpan(lines, look.hit.start, look.hit.end);
+      }
+    }
+  }
+  final bool trailing = source.isEmpty ? lines.isNotEmpty : text.trailing;
+  return _join(lines, text.separator, trailing);
+}
+
+_HideCollected _collectHide(String source, p.ParsedLedger parsed) {
+  final List<p.ParsedDirective> directives = switch (parsed) {
+    p.ParsedLedgerDirectives(:final List<p.ParsedDirective> directives) => directives,
+    p.ParsedLedgerErrors() => const <p.ParsedDirective>[],
+  };
+  final _Text text = _split(source);
+  final List<_HideLook> looks = <_HideLook>[];
+  int insertAt = 0;
+  for (final p.OptionSetting setting in parsed.info.optionSettings) {
+    final int start = setting.location.linenoBegin - 1;
+    if (start < 0 || start >= text.lines.length) {
+      continue;
+    }
+    final int end = _spanEnd(text.lines, start);
+    if (end + 1 > insertAt) {
+      insertAt = end + 1;
+    }
+  }
+  for (final p.ParsedDirective directive in directives) {
+    final p.DirectiveBody body = directive.body;
+    if (body is! p.CustomBody || body.type != 'guar_option') {
+      continue;
+    }
+    final int start = directive.location.linenoBegin - 1;
+    final int quotedEnd = start >= 0 && start < text.lines.length ? _spanEnd(text.lines, start) : start;
+    final int metaEnd = directive.location.linenoEnd - 1;
+    final int end = metaEnd > quotedEnd ? metaEnd : quotedEnd;
+    if (start >= 0 && start < text.lines.length && end + 1 > insertAt) {
+      insertAt = end + 1;
+    }
+    if (body.values.isEmpty || body.values.first is! p.CustomText) {
+      continue;
+    }
+    final String key = (body.values.first as p.CustomText).value;
+    final GuarHide? hide = _hideForKey(key);
+    if (hide == null && key != 'hide_directives' && !key.startsWith('hide_')) {
+      continue;
+    }
+    looks.add(
+      _HideLook(
+        hide: hide,
+        key: key,
+        exact: hide != null && _exactHideTrue(body),
+        body: body,
+        hit: _GuarHit(start: start, end: end, date: directive.date.toString()),
+      ),
+    );
+  }
+  return _HideCollected(looks: looks, insertAt: insertAt);
+}
+
+GuarHide? _hideForKey(String key) {
+  for (final GuarHide hide in GuarHide.values) {
+    if (hide.optionKey == key) {
+      return hide;
+    }
+  }
+  return null;
+}
+
+bool _exactHideTrue(p.CustomBody body) =>
+    body.values.length == 2 && body.values[1] is p.CustomText && (body.values[1] as p.CustomText).value == 'TRUE';
+
+String _hideMismatch(String key, p.CustomBody body) {
+  if (body.values.length != 2) {
+    return '$key expects "TRUE"';
+  }
+  final String found = switch (body.values[1]) {
+    p.CustomText(:final String value) => '"$value"',
+    p.CustomBoolean(:final bool value) => value ? 'TRUE' : 'FALSE',
+    p.CustomAccount(:final p.Account value) => value.name,
+    p.CustomCurrency(:final p.Currency value) => value.name,
+    p.CustomDate() => 'a date',
+    p.CustomNumber() => 'a number',
+    p.CustomAmount() => 'an amount',
+  };
+  return '$key: found $found expected "TRUE"';
+}
 
 String _guarBoolLine(String date, String key) => '$date custom "guar_option" "$key" "TRUE"';
 

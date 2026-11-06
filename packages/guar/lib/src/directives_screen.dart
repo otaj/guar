@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/ledger_session.dart';
+import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
 
 class DirectivesScreen extends StatefulWidget {
@@ -15,7 +16,7 @@ class DirectivesScreen extends StatefulWidget {
 }
 
 class _DirectivesScreenState extends State<DirectivesScreen> {
-  Ledger? _booked;
+  BookedLedger? _booked;
   String? _bookedSource;
   String? _bookedName;
 
@@ -52,15 +53,26 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       );
     }
 
-    final Ledger ledger = _ledgerFor(session);
+    final BookedLedger booked = _bookedFor(session);
+    final Ledger ledger = booked.ledger;
     final List<Directive> directives = switch (ledger) {
       LedgerDirectives(:final List<Directive> directives) => directives,
       LedgerErrors() => const <Directive>[],
     };
+    final List<Directive> visible = <Directive>[
+      for (final Directive directive in directives)
+        if (!_hidden(directive, booked)) directive,
+    ];
     final List<ProcessingError> errors = switch (ledger) {
       LedgerDirectives(:final List<ProcessingError> errors) => errors,
       LedgerErrors(:final List<ProcessingError> errors) => errors,
     };
+    final String? emptyMessage = _emptyMessage(
+      visible: visible,
+      directives: directives,
+      errors: errors,
+      sessionError: sessionError,
+    );
     return CustomScrollView(
       slivers: <Widget>[
         SliverToBoxAdapter(
@@ -74,6 +86,10 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
                   const SizedBox(height: 12),
                   Text(sessionError, style: text.bodyMedium?.copyWith(color: colors.error)),
                 ],
+                for (final String warning in booked.optionWarnings) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(warning, style: text.bodyMedium?.copyWith(color: colors.error)),
+                ],
                 for (final ProcessingError error in errors) ...<Widget>[
                   const SizedBox(height: 12),
                   Text(error.message, style: text.bodyMedium?.copyWith(color: colors.error)),
@@ -83,32 +99,48 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
             ),
           ),
         ),
-        if (directives.isEmpty && errors.isEmpty && sessionError == null)
+        if (emptyMessage != null)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 12, 28, 12),
-              child: Text('This ledger has no directives.', style: text.bodyLarge),
+              child: Text(emptyMessage, style: text.bodyLarge),
             ),
           ),
         SliverList.builder(
-          itemCount: directives.length,
-          itemBuilder: (BuildContext context, int index) => _DirectiveChip(directive: directives[index]),
+          itemCount: visible.length,
+          itemBuilder: (BuildContext context, int index) => _DirectiveChip(directive: visible[index]),
         ),
       ],
     );
   }
 
-  Ledger _ledgerFor(LedgerSession session) {
+  BookedLedger _bookedFor(LedgerSession session) {
     final String source = session.source;
     final String name = session.document?.displayName ?? '';
-    final Ledger? cached = _booked;
+    final BookedLedger? cached = _booked;
     if (cached != null && _bookedSource == source && _bookedName == name) return cached;
     _bookedSource = source;
     _bookedName = name;
-    final Ledger booked = bookLedger(source, filename: name);
+    final BookedLedger booked = bookLedger(source, filename: name);
     _booked = booked;
     return booked;
   }
+}
+
+bool _hidden(Directive directive, BookedLedger booked) =>
+    booked.guar.hidden.contains(directiveHideToken(directive.body)) ||
+    (booked.guar.hidden.contains(GuarHide.generated.token) && booked.isGenerated(directive));
+
+String? _emptyMessage({
+  required List<Directive> visible,
+  required List<Directive> directives,
+  required List<ProcessingError> errors,
+  required String? sessionError,
+}) {
+  if (visible.isNotEmpty) return null;
+  if (directives.isNotEmpty) return 'Every directive is hidden.';
+  if (errors.isEmpty && sessionError == null) return 'This ledger has no directives.';
+  return null;
 }
 
 class _DirectiveChip extends StatelessWidget {

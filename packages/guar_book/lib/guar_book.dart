@@ -5,5 +5,13 @@ export 'src/book.dart';
 export 'src/inventory_from.dart';
 export 'src/options_defaults.dart' show accountTypeFor, defaultOptions, domainAccount, mapInfo, mapLocation;
 export 'src/options_source.dart'
-    show GuarOptions, LoadedLedgerOptions, explicitOptionLines, readLedgerOptions, writeLedgerOptions;
+    show
+        GuarHide,
+        GuarOptions,
+        LoadedLedgerOptions,
+        directiveHideToken,
+        explicitOptionLines,
+        parsedHideToken,
+        readLedgerOptions,
+        writeLedgerOptions;
 export 'src/plugins_source.dart' show LedgerPlugin, readLedgerPlugins, writeLedgerPlugins;
