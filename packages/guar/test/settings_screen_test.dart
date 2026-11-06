@@ -38,6 +38,7 @@ void main() {
         currentDocument: const LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount'),
       ),
     );
+    await _showSettings(tester);
 
     expect(find.widgetWithText(FilledButton, 'taxes.beancount'), findsOneWidget);
     expect(find.text('Beancount'), findsWidgets);
@@ -53,6 +54,7 @@ void main() {
 
     await tester.tap(find.text('Open a ledger'));
     await tester.pumpAndSettle();
+    await _showSettings(tester);
 
     expect(documents.openCount, 1);
     expect(documents.writeCount, 0);
@@ -70,6 +72,7 @@ void main() {
 
     await tester.tap(find.text('Create a new ledger'));
     await tester.pumpAndSettle();
+    await _showSettings(tester);
 
     expect(documents.createCount, 1);
     expect(documents.writeCount, 0);
@@ -81,6 +84,7 @@ void main() {
       currentDocument: const LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount'),
     );
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     await tester.tap(find.text('taxes.beancount'));
     await tester.pumpAndSettle();
@@ -133,6 +137,7 @@ void main() {
     await tester.pumpAndSettle();
     lateSaved.complete(const LedgerDocument(uri: 'content://ledger/1', displayName: 'old.beancount'));
     await tester.pumpAndSettle();
+    await _showSettings(tester);
 
     expect(find.widgetWithText(FilledButton, 'new.beancount'), findsOneWidget);
     expect(find.text('old.beancount'), findsNothing);
@@ -143,6 +148,7 @@ void main() {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     await tester.ensureVisible(find.text('STRICT'));
     await tester.tap(find.text('STRICT'));
@@ -165,6 +171,7 @@ void main() {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     await tester.tap(find.byKey(const Key('title')));
     await tester.enterText(find.byKey(const Key('title')), 'Household');
@@ -184,6 +191,7 @@ void main() {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     await tester.enterText(find.byKey(const Key('title')), 'Household');
     await tester.pump(const Duration(milliseconds: 100));
@@ -199,6 +207,7 @@ void main() {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     await tester.enterText(find.byKey(const Key('conversion')), 'usd');
     await tester.pump(ledgerOptionSaveDelay);
@@ -212,6 +221,7 @@ void main() {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isFalse);
 
@@ -227,6 +237,10 @@ void main() {
     expect(documents.files[document.uri], '$today custom "guar_option" "advanced_ui" "TRUE"\n');
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(
+      tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Ledger')).dx,
+      lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx),
+    );
+    expect(
       tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx,
       lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Settings')).dx),
     );
@@ -241,6 +255,7 @@ void main() {
       },
     );
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isTrue);
     expect(documents.writeCount, 0);
@@ -251,13 +266,16 @@ void main() {
 
     expect(documents.files[document.uri], '');
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('advancedUi'))).value, isFalse);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.widgetWithText(NavigationDestination, 'Ledger'), findsOneWidget);
+    expect(find.widgetWithText(NavigationDestination, 'Plugins'), findsNothing);
   });
 
   testWidgets('writes default option lines when the switch is turned on', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('writeDefaultOptions'))).value, isFalse);
 
@@ -288,6 +306,7 @@ void main() {
       },
     );
     await _pumpApp(tester, documents);
+    await _showSettings(tester);
 
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('writeDefaultOptions'))).value, isTrue);
     expect(documents.writeCount, 0);
@@ -303,6 +322,13 @@ void main() {
 
 Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {
   await tester.pumpWidget(MainApp(documents: documents));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _showSettings(WidgetTester tester) async {
+  final Finder settings = find.widgetWithText(NavigationDestination, 'Settings');
+  if (settings.evaluate().isEmpty) return;
+  await tester.tap(settings);
   await tester.pumpAndSettle();
 }
 
