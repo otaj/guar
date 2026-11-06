@@ -9,21 +9,20 @@ class LedgerPlugin {
   final String? config;
 }
 
-List<LedgerPlugin> readLedgerPlugins(String source) {
-  final p.ParsedLedger parsed = _parse(source);
-  return <LedgerPlugin>[
-    for (final p.Plugin plugin in parsed.info.plugin) LedgerPlugin(name: plugin.name, config: plugin.config),
-  ];
-}
+List<LedgerPlugin> readLedgerPlugins(String source) => readLedgerPluginsFrom(_parse(source));
 
-String writeLedgerPlugins(String source, List<LedgerPlugin> plugins) {
+List<LedgerPlugin> readLedgerPluginsFrom(p.ParsedLedger parsed) => <LedgerPlugin>[
+  for (final p.Plugin plugin in parsed.info.plugin) LedgerPlugin(name: plugin.name, config: plugin.config),
+];
+
+String writeLedgerPlugins(String source, List<LedgerPlugin> plugins, {p.ParsedLedger? parsed}) {
   final List<String> rendered = <String>[
     for (final LedgerPlugin plugin in plugins) ..._pluginLines(plugin),
   ];
-  final p.ParsedLedger parsed = _parse(source);
+  final p.ParsedLedger ledger = parsed ?? _parse(source);
   final _Text text = _split(source);
   final List<({int end, int start})> spans = <({int end, int start})>[];
-  for (final p.Plugin plugin in parsed.info.plugin) {
+  for (final p.Plugin plugin in ledger.info.plugin) {
     final int start = plugin.location.linenoBegin - 1;
     if (start < 0 || start >= text.lines.length) continue;
     spans.add((start: start, end: _spanEnd(text.lines, start)));
@@ -31,7 +30,7 @@ String writeLedgerPlugins(String source, List<LedgerPlugin> plugins) {
   spans.sort((({int end, int start}) a, ({int end, int start}) b) => a.start.compareTo(b.start));
   if (rendered.isEmpty && spans.isEmpty) return source;
   final List<String> lines = List<String>.of(text.lines);
-  final int insertAt = spans.isEmpty ? _afterOptions(parsed, text) : spans.first.start;
+  final int insertAt = spans.isEmpty ? _afterOptions(ledger, text) : spans.first.start;
   for (final ({int end, int start}) span in spans.reversed) {
     if (span.start >= lines.length) continue;
     final int end = span.end >= lines.length ? lines.length - 1 : span.end;

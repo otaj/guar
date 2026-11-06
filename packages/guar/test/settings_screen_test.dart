@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:guar/main.dart';
+import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/ledger_documents.dart';
+import 'package:guar/src/ledger_engine.dart';
 import 'package:guar/src/ledger_session.dart';
 
 void main() {
@@ -144,11 +146,32 @@ void main() {
     expect(documents.openCount, 1);
   });
 
+  testWidgets('shows a spinner while a ledger file is read', (WidgetTester tester) async {
+    final Completer<String> gate = Completer<String>();
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: const LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount'),
+      readGate: gate,
+    );
+    await tester.pumpWidget(MainApp(documents: documents));
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Open a ledger'), findsNothing);
+    expect(documents.readCount, 1);
+
+    gate.complete('option "title" "Taxes"\n');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Taxes'), findsOneWidget);
+    expect(documents.readCount, 1);
+  });
+
   testWidgets('writes a booking change immediately and removes the default', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
     await _pumpApp(tester, documents);
     await _showSettings(tester);
+    final int parses = debugLedgerParses;
 
     await tester.ensureVisible(find.text('STRICT'));
     await tester.tap(find.text('STRICT'));
@@ -157,6 +180,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(documents.files[document.uri], 'option "booking_method" "FIFO"\n');
+    expect(documents.readCount, 1);
+    expect(debugLedgerParses, parses + 1);
 
     await tester.ensureVisible(find.text('FIFO'));
     await tester.tap(find.text('FIFO'));
@@ -165,6 +190,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(documents.files[document.uri], '');
+    expect(documents.readCount, 1);
+    expect(debugLedgerParses, parses + 2);
+  });
+
+  testWidgets('prepares a ledger off the ui isolate', (WidgetTester tester) async {
+    debugForceLedgerIsolate = true;
+    addTearDown(() => debugForceLedgerIsolate = false);
+    final LedgerEngine engine = LedgerEngine();
+    addTearDown(engine.close);
+    final LedgerSnapshot? snapshot = await tester.runAsync(
+      () => engine.prepare('option "title" "Taxes"\n', 'taxes.beancount'),
+    );
+    expect(snapshot?.options.options.title, 'Taxes');
   });
 
   testWidgets('waits to save a title so the field keeps focus', (WidgetTester tester) async {
@@ -186,6 +224,48 @@ void main() {
 
     expect(documents.files[document.uri], 'option "title" "Household"\n');
     expect(tester.widget<EditableText>(find.byType(EditableText).first).focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets('finishes saving the previous file when another file is opened', (WidgetTester tester) async {
+    final Completer<void> gate = Completer<void>();
+    debugLedgerRewriteGate = gate;
+    addTearDown(() {
+      debugLedgerRewriteGate = null;
+      if (!gate.isCompleted) gate.complete();
+    });
+    const LedgerDocument previous = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    const LedgerDocument opened = LedgerDocument(uri: 'content://ledger/2', displayName: 'new.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: previous,
+      opened: opened,
+      files: const <String, String>{'content://ledger/2': 'option "title" "New"\n'},
+    );
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    await tester.enterText(find.byKey(const Key('title')), 'Household');
+    await tester.pump(const Duration(milliseconds: 100));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+
+    expect(documents.writeCount, 0);
+    expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'taxes.beancount'));
+    await tester.tap(find.widgetWithText(FilledButton, 'taxes.beancount'));
+    await tester.pump();
+
+    expect(find.text('New'), findsOneWidget);
+    expect(documents.writeCount, 0);
+    expect(documents.files[opened.uri], 'option "title" "New"\n');
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(documents.writeCount, 1);
+    expect(documents.files[previous.uri], 'option "title" "Household"\n');
+    expect(documents.files[opened.uri], 'option "title" "New"\n');
+    expect(find.text('New'), findsOneWidget);
+    expect(find.text('Household'), findsNothing);
   });
 
   testWidgets('saves a title when the field loses focus', (WidgetTester tester) async {
@@ -389,6 +469,7 @@ class _FakeLedgerDocuments implements LedgerDocuments {
     this.openError,
     this.openGate,
     this.currentGate,
+    this.readGate,
     Map<String, String>? files,
   }) : files = Map<String, String>.of(files ?? const <String, String>{});
 
@@ -398,10 +479,12 @@ class _FakeLedgerDocuments implements LedgerDocuments {
   final PlatformException? openError;
   final Completer<LedgerDocument?>? openGate;
   final Completer<LedgerDocument?>? currentGate;
+  final Completer<String>? readGate;
   final Map<String, String> files;
   int openCount = 0;
   int createCount = 0;
   int writeCount = 0;
+  int readCount = 0;
 
   @override
   Future<LedgerDocument?> current() {
@@ -433,7 +516,12 @@ class _FakeLedgerDocuments implements LedgerDocuments {
   }
 
   @override
-  Future<String> read(LedgerDocument document) async => files[document.uri] ?? '';
+  Future<String> read(LedgerDocument document) {
+    readCount += 1;
+    final Completer<String>? gate = readGate;
+    if (gate != null) return gate.future;
+    return Future<String>.value(files[document.uri] ?? '');
+  }
 
   @override
   Future<void> write(LedgerDocument document, String text) async {

@@ -1,0 +1,235 @@
+// Parses a ledger once, off the UI isolate, and reuses that parse for a later rewrite.
+
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+
+import 'package:guar/src/book_ledger.dart';
+import 'package:guar_book/guar_book.dart';
+import 'package:guar_domain/guar_domain.dart';
+import 'package:guar_parser/guar_parser.dart' as parser;
+
+bool debugForceLedgerIsolate = false;
+
+int debugLedgerParses = 0;
+
+// Holds a rewrite so a test can open another file before that save lands.
+Completer<void>? debugLedgerRewriteGate;
+
+class LedgerEngine {
+  LedgerEngine() {
+    if (debugForceLedgerIsolate || !Platform.environment.containsKey('FLUTTER_TEST')) {
+      _remote = _RemoteMemory();
+    } else {
+      // Microtasks, so a widget test's pump() finishes the work before the next frame.
+      _memory = _Memory();
+    }
+  }
+
+  _Memory? _memory;
+  _RemoteMemory? _remote;
+
+  Future<LedgerSnapshot> prepare(String source, String filename) {
+    final _Memory? memory = _memory;
+    if (memory != null) return Future<LedgerSnapshot>.microtask(() => memory.prepare(source, filename));
+    return _remote!.prepare(source, filename);
+  }
+
+  Future<String> rewriteOptions(
+    String source,
+    String filename,
+    LedgerOptions options,
+    GuarOptions guar,
+    DateTime today,
+  ) {
+    final _Memory? memory = _memory;
+    if (memory != null) {
+      return _afterRewriteGate(() => memory.rewriteOptions(source, filename, options, guar, today));
+    }
+    return _remote!.rewriteOptions(source, filename, options, guar, today);
+  }
+
+  Future<String> rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) {
+    final _Memory? memory = _memory;
+    if (memory != null) return _afterRewriteGate(() => memory.rewritePlugins(source, filename, plugins));
+    return _remote!.rewritePlugins(source, filename, plugins);
+  }
+
+  Future<T> _afterRewriteGate<T>(T Function() work) {
+    final Completer<void>? gate = debugLedgerRewriteGate;
+    if (gate == null) return Future<T>.microtask(work);
+    return gate.future.then((_) => work());
+  }
+
+  Future<void> close() {
+    final _RemoteMemory? remote = _remote;
+    if (remote == null) return Future<void>.value();
+    return remote.close();
+  }
+}
+
+class _Memory {
+  String? _source;
+  String? _filename;
+  parser.ParsedLedger? _parsed;
+  LedgerSnapshot? _snapshot;
+
+  LedgerSnapshot prepare(String source, String filename) {
+    if (_snapshot != null && _source == source && _filename == filename) return _snapshot!;
+    final parser.ParsedLedger parsed = _parsedFor(source, filename);
+    _snapshot = prepareLedger(source, filename: filename, parsed: parsed);
+    return _snapshot!;
+  }
+
+  String rewriteOptions(String source, String filename, LedgerOptions options, GuarOptions guar, DateTime today) {
+    final parser.ParsedLedger parsed = _parsedFor(source, filename);
+    return writeLedgerOptions(source, options, guar: guar, today: today, parsed: parsed);
+  }
+
+  String rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) {
+    final parser.ParsedLedger parsed = _parsedFor(source, filename);
+    return writeLedgerPlugins(source, plugins, parsed: parsed);
+  }
+
+  parser.ParsedLedger _parsedFor(String source, String filename) {
+    final parser.ParsedLedger? parsed = _parsed;
+    if (parsed != null && _source == source && _filename == filename) return parsed;
+    debugLedgerParses += 1;
+    final parser.ParsedLedger ledger = const parser.BeancountParser().parse(
+      source,
+      filename: filename,
+      recover: true,
+      followIncludes: false,
+    );
+    _parsed = ledger;
+    _source = source;
+    _filename = filename;
+    _snapshot = null;
+    return ledger;
+  }
+}
+
+class _PrepareRequest {
+  const _PrepareRequest(this.source, this.filename);
+
+  final String source;
+  final String filename;
+}
+
+class _OptionsRequest {
+  const _OptionsRequest(this.source, this.filename, this.options, this.guar, this.today);
+
+  final String source;
+  final String filename;
+  final LedgerOptions options;
+  final GuarOptions guar;
+  final DateTime today;
+}
+
+class _PluginsRequest {
+  const _PluginsRequest(this.source, this.filename, this.plugins);
+
+  final String source;
+  final String filename;
+  final List<LedgerPlugin> plugins;
+}
+
+class _Failure {
+  const _Failure(this.kind, this.message);
+
+  final String kind;
+  final String message;
+}
+
+class _RemoteMemory {
+  SendPort? _send;
+  Future<SendPort>? _opening;
+  Isolate? _isolate;
+
+  Future<LedgerSnapshot> prepare(String source, String filename) =>
+      _call<LedgerSnapshot>(_PrepareRequest(source, filename));
+
+  Future<String> rewriteOptions(
+    String source,
+    String filename,
+    LedgerOptions options,
+    GuarOptions guar,
+    DateTime today,
+  ) => _call<String>(_OptionsRequest(source, filename, options, guar, today));
+
+  Future<String> rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) =>
+      _call<String>(_PluginsRequest(source, filename, plugins));
+
+  Future<void> close() async {
+    _isolate?.kill(priority: Isolate.immediate);
+    _isolate = null;
+    _send = null;
+    _opening = null;
+  }
+
+  Future<SendPort> _port() {
+    final SendPort? send = _send;
+    if (send != null) return Future<SendPort>.value(send);
+    return _opening ??= _open();
+  }
+
+  Future<SendPort> _open() async {
+    final ReceivePort receive = ReceivePort();
+    _isolate = await Isolate.spawn(_ledgerIsolate, receive.sendPort);
+    final SendPort send = await receive.first as SendPort;
+    receive.close();
+    _send = send;
+    return send;
+  }
+
+  Future<T> _call<T>(Object request) async {
+    final SendPort send = await _port();
+    final ReceivePort reply = ReceivePort();
+    send.send(<Object?>[request, reply.sendPort]);
+    final Object? value = await reply.first;
+    reply.close();
+    if (value is _Failure) {
+      switch (value.kind) {
+        case 'format':
+          throw FormatException(value.message);
+        default:
+          throw FormatException(value.message);
+      }
+    }
+    return value as T;
+  }
+}
+
+void _ledgerIsolate(SendPort send) {
+  final ReceivePort receive = ReceivePort();
+  final _Memory memory = _Memory();
+  send.send(receive.sendPort);
+  receive.listen((Object? message) {
+    final List<Object?> pair = message! as List<Object?>;
+    final SendPort reply = pair[1]! as SendPort;
+    try {
+      reply.send(_answer(memory, pair[0]));
+    } on FormatException catch (error) {
+      reply.send(_Failure('format', error.message));
+    }
+  });
+}
+
+Object _answer(_Memory memory, Object? request) {
+  switch (request) {
+    case _PrepareRequest(:final String source, :final String filename):
+      return memory.prepare(source, filename);
+    case _OptionsRequest(
+      :final String source,
+      :final String filename,
+      :final LedgerOptions options,
+      :final GuarOptions guar,
+      :final DateTime today,
+    ):
+      return memory.rewriteOptions(source, filename, options, guar, today);
+    case _PluginsRequest(:final String source, :final String filename, :final List<LedgerPlugin> plugins):
+      return memory.rewritePlugins(source, filename, plugins);
+    default:
+      throw ArgumentError('Unexpected ledger work');
+  }
+}

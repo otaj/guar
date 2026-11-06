@@ -78,8 +78,9 @@ class LoadedLedgerOptions {
   final GuarOptions guar;
 }
 
-LoadedLedgerOptions readLedgerOptions(String source) {
-  final p.ParsedLedger parsed = _parse(source);
+LoadedLedgerOptions readLedgerOptions(String source) => readLedgerOptionsFrom(source, _parse(source));
+
+LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) {
   final _GuarBoolScan advancedUi = _scanGuarBool(source, parsed, 'advanced_ui');
   final _GuarBoolScan writeDefaults = _scanGuarBool(source, parsed, 'write_default_options');
   final ({Set<String> values, List<String> errors}) hidden = _readHide(source, parsed);
@@ -99,58 +100,53 @@ LoadedLedgerOptions readLedgerOptions(String source) {
   );
 }
 
-String writeLedgerOptions(String source, d.LedgerOptions options, {GuarOptions? guar, DateTime? today}) {
-  final String written = _writeOptionLines(source, options, writeDefaults: guar?.writeDefaultOptions ?? false);
-  if (guar == null) {
-    return written;
-  }
-  final DateTime date = today ?? DateTime.now();
-  // New lines insert at the front of the guar block, so later calls stay first.
-  String withHide = written;
-  for (final GuarHide hide in GuarHide.values) {
-    withHide = _writeGuarHideToggle(withHide, hide: hide, enabled: guar.hidden.contains(hide.token), today: date);
-  }
-  final String withDefaults = _writeGuarBool(
-    withHide,
-    key: 'write_default_options',
-    enabled: guar.writeDefaultOptions,
-    today: date,
-  );
-  return _writeGuarBool(withDefaults, key: 'advanced_ui', enabled: guar.advancedUi, today: date);
-}
-
-String _writeOptionLines(String source, d.LedgerOptions options, {required bool writeDefaults}) {
-  final List<String> rendered = explicitOptionLines(options, writeDefaults: writeDefaults);
-  final p.ParsedLedger parsed = _parse(source);
-  final p.ProcessingInfo info = switch (parsed) {
-    p.ParsedLedgerDirectives(:final p.ProcessingInfo info) => info,
-    p.ParsedLedgerErrors(:final p.ProcessingInfo info) => info,
-  };
+String writeLedgerOptions(
+  String source,
+  d.LedgerOptions options, {
+  GuarOptions? guar,
+  DateTime? today,
+  p.ParsedLedger? parsed,
+}) {
+  final p.ParsedLedger ledger = parsed ?? _parse(source);
+  final List<String> rendered = explicitOptionLines(options, writeDefaults: guar?.writeDefaultOptions ?? false);
   final _Text text = _split(source);
-  final List<({int start, int end})> spans = <({int start, int end})>[];
-  for (final p.OptionSetting setting in info.optionSettings) {
-    final int start = setting.location.linenoBegin - 1;
-    if (start < 0 || start >= text.lines.length) {
-      continue;
+  final _Rewrite rewrite = _Rewrite(List<String>.of(text.lines), _optionInsertAt(ledger, text));
+  if (guar != null) rewrite.collectGuar(ledger, text);
+  final bool rewroteOptions = rewrite.applyOptions(rendered, _optionSpans(ledger, text));
+  if (guar != null) {
+    final DateTime date = today ?? DateTime.now();
+    for (final GuarHide hide in GuarHide.values) {
+      rewrite.applyHide(hide, enabled: guar.hidden.contains(hide.token), today: date);
     }
-    spans.add((start: start, end: _spanEnd(text.lines, start)));
+    // New lines insert at the front of the guar block, so later calls stay first.
+    rewrite
+      ..applyBool(key: 'write_default_options', enabled: guar.writeDefaultOptions, today: date)
+      ..applyBool(key: 'advanced_ui', enabled: guar.advancedUi, today: date);
   }
-  spans.sort((({int start, int end}) a, ({int start, int end}) b) => a.start.compareTo(b.start));
-  if (rendered.isEmpty && spans.isEmpty) {
+  if (!rewroteOptions && !rewrite.changed) {
     return source;
   }
-  final List<String> lines = List<String>.of(text.lines);
-  final int insertAt = spans.isEmpty ? 0 : spans.first.start;
-  for (final ({int start, int end}) span in spans.reversed) {
-    if (span.start >= lines.length) {
-      continue;
-    }
-    final int end = span.end >= lines.length ? lines.length - 1 : span.end;
-    lines.removeRange(span.start, end + 1);
+  final bool trailing = source.isEmpty ? rewrite.lines.isNotEmpty : text.trailing;
+  return _join(rewrite.lines, text.separator, trailing);
+}
+
+int _optionInsertAt(p.ParsedLedger parsed, _Text text) {
+  int at = 0;
+  for (final ({int end, int start}) span in _optionSpans(parsed, text)) {
+    if (span.end + 1 > at) at = span.end + 1;
   }
-  lines.insertAll(insertAt > lines.length ? lines.length : insertAt, rendered);
-  final bool trailing = source.isEmpty ? rendered.isNotEmpty : text.trailing;
-  return _join(lines, text.separator, trailing);
+  return at;
+}
+
+List<({int end, int start})> _optionSpans(p.ParsedLedger parsed, _Text text) {
+  final List<({int end, int start})> spans = <({int end, int start})>[];
+  for (final p.OptionSetting setting in parsed.info.optionSettings) {
+    final int start = setting.location.linenoBegin - 1;
+    if (start < 0 || start >= text.lines.length) continue;
+    spans.add((start: start, end: _spanEnd(text.lines, start)));
+  }
+  spans.sort((({int end, int start}) a, ({int end, int start}) b) => a.start.compareTo(b.start));
+  return spans;
 }
 
 List<String> explicitOptionLines(d.LedgerOptions options, {bool writeDefaults = false}) {
@@ -373,6 +369,216 @@ String _quote(String value) {
 
 p.ParsedLedger _parse(String source) => const p.BeancountParser().parse(source, followIncludes: false, recover: true);
 
+class _MutableSpan {
+  _MutableSpan(this.start, this.end, this.date);
+
+  int start;
+  int end;
+  final String date;
+  bool live = true;
+}
+
+class _BoolAcc {
+  bool value = false;
+  final List<_MutableSpan> hits = <_MutableSpan>[];
+}
+
+class _HideAcc {
+  _HideAcc(this.hide, this.span, {required this.exact});
+
+  final GuarHide? hide;
+  final _MutableSpan span;
+  final bool exact;
+}
+
+class _Rewrite {
+  _Rewrite(this.lines, this.optionEnd);
+
+  final List<String> lines;
+  int optionEnd;
+  final List<_MutableSpan> spans = <_MutableSpan>[];
+  final Map<String, _BoolAcc> bools = <String, _BoolAcc>{
+    'advanced_ui': _BoolAcc(),
+    'write_default_options': _BoolAcc(),
+  };
+  final List<_HideAcc> hides = <_HideAcc>[];
+  bool changed = false;
+
+  void collectGuar(p.ParsedLedger parsed, _Text text) {
+    final List<p.ParsedDirective> directives = switch (parsed) {
+      p.ParsedLedgerDirectives(:final List<p.ParsedDirective> directives) => directives,
+      p.ParsedLedgerErrors() => const <p.ParsedDirective>[],
+    };
+    for (final p.ParsedDirective directive in directives) {
+      final p.DirectiveBody body = directive.body;
+      if (body is! p.CustomBody || body.type != 'guar_option') continue;
+      final int start = directive.location.linenoBegin - 1;
+      final int quotedEnd = start >= 0 && start < text.lines.length ? _spanEnd(text.lines, start) : start;
+      final int metaEnd = directive.location.linenoEnd - 1;
+      final _MutableSpan span = _MutableSpan(
+        start,
+        metaEnd > quotedEnd ? metaEnd : quotedEnd,
+        directive.date.toString(),
+      );
+      spans.add(span);
+      if (body.values.isEmpty || body.values.first is! p.CustomText) continue;
+      final String key = (body.values.first as p.CustomText).value;
+      final _BoolAcc? acc = bools[key];
+      if (acc != null) {
+        acc.hits.add(span);
+        if (body.values.length >= 2) {
+          final bool? parsedValue = _guarBool(body.values[1]);
+          if (parsedValue != null) acc.value = parsedValue;
+        }
+      }
+      final GuarHide? hide = _hideForKey(key);
+      if (hide == null && key != 'hide_directives' && !key.startsWith('hide_')) continue;
+      hides.add(_HideAcc(hide, span, exact: hide != null && _exactHideTrue(body)));
+    }
+  }
+
+  bool applyOptions(List<String> rendered, List<({int end, int start})> optionSpans) {
+    if (rendered.isEmpty && optionSpans.isEmpty) return false;
+    final int insertAt = optionSpans.isEmpty ? 0 : optionSpans.first.start;
+    for (final ({int end, int start}) span in optionSpans.reversed) {
+      if (span.start < 0 || span.start >= lines.length) continue;
+      final int end = span.end >= lines.length ? lines.length - 1 : span.end;
+      if (end < span.start) continue;
+      for (final _MutableSpan guar in spans) {
+        if (guar.live && guar.start >= span.start && guar.start <= end) guar.live = false;
+      }
+      lines.removeRange(span.start, end + 1);
+      _shift(span.start, end - span.start + 1, 0, shiftOptionEnd: false);
+    }
+    final int at = insertAt > lines.length ? lines.length : insertAt;
+    lines.insertAll(at, rendered);
+    _shift(at, 0, rendered.length, shiftOptionEnd: false);
+    optionEnd = at + rendered.length;
+    return true;
+  }
+
+  void applyHide(GuarHide hide, {required bool enabled, required DateTime today}) {
+    final List<_HideAcc> mine = <_HideAcc>[
+      for (final _HideAcc look in hides)
+        if (look.hide == hide && look.span.live) look,
+    ];
+    // An inexact line is left alone until this toggle is turned on.
+    if ((mine.length == 1 && mine.single.exact) == enabled) return;
+    if (!enabled) {
+      final List<_HideAcc> ordered = <_HideAcc>[...mine]
+        ..sort((_HideAcc a, _HideAcc b) => b.span.start.compareTo(a.span.start));
+      for (final _HideAcc look in ordered) {
+        _remove(look.span);
+      }
+      return;
+    }
+    if (mine.isEmpty) {
+      _insert(_hideInsertAt(), _guarBoolLine(_isoDate(today), hide.optionKey));
+      return;
+    }
+    final _HideAcc keep = mine.last;
+    final List<_HideAcc> others = <_HideAcc>[
+      for (final _HideAcc look in mine)
+        if (!identical(look, keep)) look,
+    ]..sort((_HideAcc a, _HideAcc b) => b.span.start.compareTo(a.span.start));
+    for (final _HideAcc look in others) {
+      _remove(look.span);
+    }
+    _replace(keep.span, _guarBoolLine(keep.span.date, hide.optionKey));
+  }
+
+  void applyBool({required String key, required bool enabled, required DateTime today}) {
+    final _BoolAcc acc = bools[key]!;
+    if (acc.value == enabled) return;
+    final List<_MutableSpan> hits = <_MutableSpan>[
+      for (final _MutableSpan hit in acc.hits)
+        if (hit.live) hit,
+    ];
+    if (!enabled) {
+      hits
+        ..sort((_MutableSpan a, _MutableSpan b) => b.start.compareTo(a.start))
+        ..forEach(_remove);
+      return;
+    }
+    if (hits.isEmpty) {
+      _insert(optionEnd, _guarBoolLine(_isoDate(today), key));
+      return;
+    }
+    final _MutableSpan keep = hits.last;
+    <_MutableSpan>[
+        for (final _MutableSpan hit in hits)
+          if (!identical(hit, keep)) hit,
+      ]
+      ..sort((_MutableSpan a, _MutableSpan b) => b.start.compareTo(a.start))
+      ..forEach(_remove);
+    _replace(keep, _guarBoolLine(keep.date, key));
+  }
+
+  int _hideInsertAt() {
+    int at = optionEnd;
+    for (final _MutableSpan span in spans) {
+      if (span.live && span.end + 1 > at) at = span.end + 1;
+    }
+    return at > lines.length ? lines.length : at;
+  }
+
+  void _insert(int at, String line) {
+    final int index = at > lines.length ? lines.length : at;
+    lines.insert(index, line);
+    _shift(index, 0, 1);
+    spans.add(_MutableSpan(index, index, line));
+    changed = true;
+  }
+
+  void _remove(_MutableSpan span) {
+    if (!span.live || span.start < 0 || span.start >= lines.length) {
+      span.live = false;
+      return;
+    }
+    final int end = span.end >= lines.length ? lines.length - 1 : span.end;
+    if (end < span.start) {
+      span.live = false;
+      return;
+    }
+    lines.removeRange(span.start, end + 1);
+    span.live = false;
+    _shift(span.start, end - span.start + 1, 0);
+    changed = true;
+  }
+
+  void _replace(_MutableSpan span, String line) {
+    if (!span.live || span.start < 0 || span.start >= lines.length) return;
+    final int end = span.end >= lines.length ? lines.length - 1 : span.end;
+    if (end < span.start) return;
+    final int start = span.start;
+    lines.replaceRange(start, end + 1, <String>[line]);
+    span
+      ..start = start
+      ..end = start;
+    _shift(start, end - start + 1, 1);
+    changed = true;
+  }
+
+  void _shift(int at, int removed, int inserted, {bool shiftOptionEnd = true}) {
+    final int delta = inserted - removed;
+    for (final _MutableSpan span in spans) {
+      if (!span.live || span.end < at) continue;
+      if (span.start >= at + removed) {
+        span
+          ..start += delta
+          ..end += delta;
+      }
+    }
+    if (shiftOptionEnd && optionEnd > at) {
+      if (optionEnd >= at + removed) {
+        optionEnd += delta;
+      } else {
+        optionEnd = at + inserted;
+      }
+    }
+  }
+}
+
 // A quoted option value may continue on the following lines, matching the parser.
 int _spanEnd(List<String> lines, int start) {
   final StringBuffer code = StringBuffer(_stripTrailingComment(lines[start]).trimRight());
@@ -471,46 +677,11 @@ class _GuarHit {
 }
 
 class _GuarBoolScan {
-  const _GuarBoolScan({required this.value, required this.errors, required this.hits, required this.insertAt});
+  const _GuarBoolScan({required this.value, required this.errors, required this.hits});
 
   final bool value;
   final List<String> errors;
   final List<_GuarHit> hits;
-  final int insertAt;
-}
-
-String _writeGuarBool(String source, {required String key, required bool enabled, required DateTime today}) {
-  final _GuarBoolScan scan = _scanGuarBool(source, _parse(source), key);
-  if (scan.value == enabled) {
-    return source;
-  }
-  final _Text text = _split(source);
-  final List<String> lines = List<String>.of(text.lines);
-  if (!enabled) {
-    _removeHits(lines, scan.hits);
-  } else if (scan.hits.isEmpty) {
-    final int at = scan.insertAt > lines.length ? lines.length : scan.insertAt;
-    lines.insert(at, _guarBoolLine(_isoDate(today), key));
-  } else {
-    final _GuarHit keep = scan.hits.last;
-    final List<_GuarHit> hits = <_GuarHit>[...scan.hits]..sort((_GuarHit a, _GuarHit b) => a.start.compareTo(b.start));
-    for (final _GuarHit hit in hits.reversed) {
-      if (hit.start == keep.start) {
-        _replaceSpan(lines, hit.start, hit.end, _guarBoolLine(hit.date, key));
-      } else {
-        _removeSpan(lines, hit.start, hit.end);
-      }
-    }
-  }
-  final bool trailing = source.isEmpty ? lines.isNotEmpty : text.trailing;
-  return _join(lines, text.separator, trailing);
-}
-
-void _removeHits(List<String> lines, List<_GuarHit> hits) {
-  final List<_GuarHit> ordered = <_GuarHit>[...hits]..sort((_GuarHit a, _GuarHit b) => a.start.compareTo(b.start));
-  for (final _GuarHit hit in ordered.reversed) {
-    _removeSpan(lines, hit.start, hit.end);
-  }
 }
 
 _GuarBoolScan _scanGuarBool(String source, p.ParsedLedger parsed, String key) {
@@ -548,18 +719,7 @@ _GuarBoolScan _scanGuarBool(String source, p.ParsedLedger parsed, String key) {
     }
     value = parsedValue;
   }
-  int insertAt = 0;
-  for (final p.OptionSetting setting in parsed.info.optionSettings) {
-    final int start = setting.location.linenoBegin - 1;
-    if (start < 0 || start >= text.lines.length) {
-      continue;
-    }
-    final int end = _spanEnd(text.lines, start);
-    if (end + 1 > insertAt) {
-      insertAt = end + 1;
-    }
-  }
-  return _GuarBoolScan(value: value, errors: errors, hits: hits, insertAt: insertAt);
+  return _GuarBoolScan(value: value, errors: errors, hits: hits);
 }
 
 bool? _guarBool(p.CustomValue value) => switch (value) {
@@ -585,10 +745,9 @@ class _HideLook {
 }
 
 class _HideCollected {
-  const _HideCollected({required this.looks, required this.insertAt});
+  const _HideCollected({required this.looks});
 
   final List<_HideLook> looks;
-  final int insertAt;
 }
 
 ({Set<String> values, List<String> errors}) _readHide(String source, p.ParsedLedger parsed) {
@@ -619,39 +778,6 @@ class _HideCollected {
   return (values: values, errors: errors);
 }
 
-String _writeGuarHideToggle(String source, {required GuarHide hide, required bool enabled, required DateTime today}) {
-  final _HideCollected collected = _collectHide(source, _parse(source));
-  final List<_HideLook> mine = <_HideLook>[
-    for (final _HideLook look in collected.looks)
-      if (look.hide == hide) look,
-  ];
-  // An inexact line is left alone until this toggle is turned on.
-  if ((mine.length == 1 && mine.single.exact) == enabled) {
-    return source;
-  }
-  final _Text text = _split(source);
-  final List<String> lines = List<String>.of(text.lines);
-  if (!enabled) {
-    _removeHits(lines, <_GuarHit>[for (final _HideLook look in mine) look.hit]);
-  } else if (mine.isEmpty) {
-    final int at = collected.insertAt > lines.length ? lines.length : collected.insertAt;
-    lines.insert(at, _guarBoolLine(_isoDate(today), hide.optionKey));
-  } else {
-    final _GuarHit keep = mine.last.hit;
-    final List<_HideLook> ordered = <_HideLook>[...mine]
-      ..sort((_HideLook a, _HideLook b) => a.hit.start.compareTo(b.hit.start));
-    for (final _HideLook look in ordered.reversed) {
-      if (look.hit.start == keep.start) {
-        _replaceSpan(lines, look.hit.start, look.hit.end, _guarBoolLine(look.hit.date, hide.optionKey));
-      } else {
-        _removeSpan(lines, look.hit.start, look.hit.end);
-      }
-    }
-  }
-  final bool trailing = source.isEmpty ? lines.isNotEmpty : text.trailing;
-  return _join(lines, text.separator, trailing);
-}
-
 _HideCollected _collectHide(String source, p.ParsedLedger parsed) {
   final List<p.ParsedDirective> directives = switch (parsed) {
     p.ParsedLedgerDirectives(:final List<p.ParsedDirective> directives) => directives,
@@ -659,17 +785,6 @@ _HideCollected _collectHide(String source, p.ParsedLedger parsed) {
   };
   final _Text text = _split(source);
   final List<_HideLook> looks = <_HideLook>[];
-  int insertAt = 0;
-  for (final p.OptionSetting setting in parsed.info.optionSettings) {
-    final int start = setting.location.linenoBegin - 1;
-    if (start < 0 || start >= text.lines.length) {
-      continue;
-    }
-    final int end = _spanEnd(text.lines, start);
-    if (end + 1 > insertAt) {
-      insertAt = end + 1;
-    }
-  }
   for (final p.ParsedDirective directive in directives) {
     final p.DirectiveBody body = directive.body;
     if (body is! p.CustomBody || body.type != 'guar_option') {
@@ -679,9 +794,6 @@ _HideCollected _collectHide(String source, p.ParsedLedger parsed) {
     final int quotedEnd = start >= 0 && start < text.lines.length ? _spanEnd(text.lines, start) : start;
     final int metaEnd = directive.location.linenoEnd - 1;
     final int end = metaEnd > quotedEnd ? metaEnd : quotedEnd;
-    if (start >= 0 && start < text.lines.length && end + 1 > insertAt) {
-      insertAt = end + 1;
-    }
     if (body.values.isEmpty || body.values.first is! p.CustomText) {
       continue;
     }
@@ -700,7 +812,7 @@ _HideCollected _collectHide(String source, p.ParsedLedger parsed) {
       ),
     );
   }
-  return _HideCollected(looks: looks, insertAt: insertAt);
+  return _HideCollected(looks: looks);
 }
 
 GuarHide? _hideForKey(String key) {
@@ -737,25 +849,3 @@ String _isoDate(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
-
-void _removeSpan(List<String> lines, int start, int end) {
-  if (start < 0 || start >= lines.length) {
-    return;
-  }
-  final int last = end >= lines.length ? lines.length - 1 : end;
-  if (last < start) {
-    return;
-  }
-  lines.removeRange(start, last + 1);
-}
-
-void _replaceSpan(List<String> lines, int start, int end, String line) {
-  if (start < 0 || start >= lines.length) {
-    return;
-  }
-  final int last = end >= lines.length ? lines.length - 1 : end;
-  if (last < start) {
-    return;
-  }
-  lines.replaceRange(start, last + 1, <String>[line]);
-}
