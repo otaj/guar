@@ -592,8 +592,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> flushPending() {
-    if (_closed) return Future<void>.value();
-    _timer?.cancel();
+    final Timer? timer = _timer;
+    if (_closed || timer == null || !timer.isActive) return Future<void>.value();
+    timer.cancel();
+    _timer = null;
     return _pump();
   }
 

@@ -16,10 +16,17 @@ void main() {
 
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     await _pumpApp(tester, _FakeLedgerDocuments(currentDocument: document));
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.widgetWithText(AppBar, 'Ledger'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.widgetWithText(NavigationDestination, 'Plugins'), findsNothing);
 
     await _pumpApp(tester, _ledger(document));
+    expect(find.widgetWithText(AppBar, 'Ledger'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Ledger')).dx,
+      lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx),
+    );
     expect(
       tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx,
       lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Settings')).dx),
