@@ -2,6 +2,7 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:guar_book/guar_book.dart';
+import 'package:guar_domain/guar_domain.dart' as d;
 import 'package:guar_parser/guar_parser.dart' as p;
 import 'package:test/test.dart';
 
@@ -263,6 +264,72 @@ void main() {
         ),
       ),
       throwsFormatException,
+    );
+  });
+
+  test('writeTransactionDraft renders the same text as the parsed directive', () {
+    final d.BeanDate day = d.BeanDate(year: 2026, month: 11, day: 9);
+    final Decimal amount = Decimal.parse('12.30');
+    final String draft = writeTransactionDraft(
+      TransactionDraft(
+        date: day,
+        payee: 'Grocer',
+        narration: 'Lunch',
+        tags: <d.Tag>[d.Tag(name: 'trip')],
+        postings: <TransactionDraftPosting>[
+          TransactionDraftPosting(
+            account: d.Account(name: 'Expenses:Food', type: d.AccountType.expenses),
+            units: TransactionDraftAmount(
+              number: amount,
+              currency: d.Currency(name: 'USD'),
+            ),
+          ),
+          TransactionDraftPosting(
+            account: d.Account(name: 'Assets:Cash', type: d.AccountType.assets),
+            units: TransactionDraftAmount(
+              number: -amount,
+              currency: d.Currency(name: 'USD'),
+            ),
+          ),
+        ],
+      ),
+    );
+    expect(
+      draft,
+      '2026-11-09 * "Grocer" "Lunch" #trip\n'
+      '  Expenses:Food  12.3 USD\n'
+      '  Assets:Cash  -12.3 USD\n',
+    );
+    expect(_parseOne(draft).postings[0].units?.number?.verbatim, '12.3');
+  });
+
+  test('writeTransactionDraft keeps an elided leg and a total cost', () {
+    final d.BeanDate day = d.BeanDate(year: 2026, month: 11, day: 9);
+    final String draft = writeTransactionDraft(
+      TransactionDraft(
+        date: day,
+        narration: 'Buy',
+        postings: <TransactionDraftPosting>[
+          TransactionDraftPosting(
+            account: d.Account(name: 'Expenses:Food', type: d.AccountType.expenses),
+            units: TransactionDraftAmount(
+              number: Decimal.parse('2'),
+              currency: d.Currency(name: 'USD'),
+            ),
+            cost: TransactionDraftCost(
+              numberTotal: Decimal.parse('22'),
+              currency: d.Currency(name: 'EUR'),
+            ),
+          ),
+          TransactionDraftPosting(
+            account: d.Account(name: 'Assets:Cash', type: d.AccountType.assets),
+          ),
+        ],
+      ),
+    );
+    expect(
+      draft.split('\n').skip(1).take(2).join('\n'),
+      '  Expenses:Food  2 USD {{22 EUR}}\n  Assets:Cash',
     );
   });
 }
