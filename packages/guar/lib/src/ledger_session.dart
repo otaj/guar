@@ -1,10 +1,12 @@
 // The open ledger file shared by the app screens.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:guar/src/book_ledger.dart';
+import 'package:guar/src/included_files.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_engine.dart';
 import 'package:guar_book/guar_book.dart';
@@ -13,9 +15,10 @@ import 'package:guar_domain/guar_domain.dart';
 const Duration ledgerOptionSaveDelay = Duration(milliseconds: 500);
 
 class LedgerSession extends ChangeNotifier {
-  LedgerSession(this.documents);
+  LedgerSession(this.documents, {this.included = const IoIncludedFiles()});
 
   final LedgerDocuments documents;
+  final IncludedFiles included;
   final LedgerEngine _engine = LedgerEngine();
 
   LedgerDocument? document;
@@ -114,6 +117,26 @@ class LedgerSession extends ChangeNotifier {
     final _PendingEdit? existing = _editFor(current.uri);
     if ((existing == null || existing.options == null) && _samePlugins(plugins)) return Future<void>.value();
     (existing ?? _startEdit(current)).plugins = plugins;
+    return _later(_drain);
+  }
+
+  Future<List<String>> validateTransaction(String targetFilename, String snippet) {
+    final LedgerDocument? current = document;
+    if (current == null) return Future<List<String>>.value(const <String>['No ledger is open.']);
+    return _engine
+        .appendTransaction(source, current.displayName, targetFilename, snippet)
+        .then(
+          (AppendOutcome outcome) => switch (outcome) {
+            AppendOk() => const <String>[],
+            AppendFailed(:final List<String> errors) => errors,
+          },
+        );
+  }
+
+  Future<void> addTransaction(String targetFilename, String snippet) {
+    final LedgerDocument? current = document;
+    if (current == null) return Future<void>.value();
+    (_editFor(current.uri) ?? _startEdit(current)).transaction = (target: targetFilename, snippet: snippet);
     return _later(_drain);
   }
 
@@ -231,7 +254,32 @@ class LedgerSession extends ChangeNotifier {
           }
           if (next != null) await _commit(edit, next);
         }
-        if (edit.options == null && edit.plugins == null) _pending.removeAt(0);
+        final ({String target, String snippet})? txn = edit.transaction;
+        edit.transaction = null;
+        if (txn != null) {
+          final AppendOutcome outcome = await _engine.appendTransaction(
+            edit.source,
+            edit.document.displayName,
+            txn.target,
+            txn.snippet,
+          );
+          if (edit.transaction != null) continue;
+          switch (outcome) {
+            case AppendOk(:final String text):
+              if (txn.target == edit.document.displayName) {
+                await _commit(edit, text);
+              } else {
+                try {
+                  included.write(txn.target, text);
+                } on FileSystemException {
+                  _fail(edit, 'Could not write the included ledger file.');
+                }
+              }
+            case AppendFailed(:final List<String> errors):
+              _fail(edit, errors.isEmpty ? 'Could not save the transaction.' : errors.first);
+          }
+        }
+        if (edit.options == null && edit.plugins == null && edit.transaction == null) _pending.removeAt(0);
       }
       await _refresh();
     } finally {
@@ -276,6 +324,11 @@ class LedgerSession extends ChangeNotifier {
     error = null;
   }
 
+  void _fail(_PendingEdit edit, String message) {
+    if (_disposed || document?.uri != edit.document.uri) return;
+    error = message;
+  }
+
   Future<void> _refresh() async {
     final LedgerDocument? current = document;
     if (current == null) return;
@@ -308,4 +361,5 @@ class _PendingEdit {
   String source;
   ({LedgerOptions options, GuarOptions guar, Set<String> preserveKeys})? options;
   List<LedgerPlugin>? plugins;
+  ({String target, String snippet})? transaction;
 }

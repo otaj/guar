@@ -16,6 +16,24 @@ int debugLedgerParses = 0;
 // Holds a rewrite so a test can open another file before that save lands.
 Completer<void>? debugLedgerRewriteGate;
 
+sealed class AppendOutcome {
+  const AppendOutcome();
+}
+
+class AppendOk extends AppendOutcome {
+  const AppendOk(this.text);
+
+  final String text;
+}
+
+class AppendFailed extends AppendOutcome {
+  const AppendFailed(this.errors);
+
+  final List<String> errors;
+}
+
+typedef _IncludeRead = ({Map<String, String> read, parser.ParsedLedger parsed});
+
 class LedgerEngine {
   LedgerEngine() {
     if (debugForceLedgerIsolate || !Platform.environment.containsKey('FLUTTER_TEST')) {
@@ -58,7 +76,17 @@ class LedgerEngine {
     return _remote!.rewritePlugins(source, filename, plugins);
   }
 
-  Future<T> _afterRewriteGate<T>(T Function() work) {
+  Future<AppendOutcome> appendTransaction(String source, String filename, String targetFilename, String snippet) {
+    final _Memory? memory = _memory;
+    if (memory != null) {
+      return Future<AppendOutcome>.microtask(
+        () => memory.appendTransaction(source, filename, targetFilename, snippet),
+      );
+    }
+    return _afterRewriteGate(() => _remote!.appendTransaction(source, filename, targetFilename, snippet));
+  }
+
+  Future<T> _afterRewriteGate<T>(FutureOr<T> Function() work) {
     final Completer<void>? gate = debugLedgerRewriteGate;
     if (gate == null) return Future<T>.microtask(work);
     return gate.future.then((_) => work());
@@ -76,11 +104,27 @@ class _Memory {
   String? _filename;
   parser.ParsedLedger? _parsed;
   LedgerSnapshot? _snapshot;
+  Map<String, String> _includes = const <String, String>{};
 
   LedgerSnapshot prepare(String source, String filename) {
-    if (_snapshot != null && _source == source && _filename == filename) return _snapshot!;
-    final parser.ParsedLedger parsed = _parsedFor(source, filename);
-    _snapshot = prepareLedger(source, filename: filename, parsed: parsed);
+    if (_snapshot != null && _source == source && _filename == filename && _includesUnchanged()) return _snapshot!;
+    final _IncludeRead full = _parseWithIncludes(source, filename);
+    if (full.read.isEmpty) {
+      // Without includes one parse serves both booking and the later rewrites.
+      _parsed = full.parsed;
+      _source = source;
+      _filename = filename;
+      _snapshot = prepareLedger(source, filename: filename, parsed: full.parsed);
+      _includes = const <String, String>{};
+      return _snapshot!;
+    }
+    _snapshot = prepareLedger(
+      source,
+      filename: filename,
+      parsed: _parsedFor(source, filename),
+      parsedIncludes: full.parsed,
+    );
+    _includes = full.read;
     return _snapshot!;
   }
 
@@ -99,6 +143,70 @@ class _Memory {
   String rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) {
     final parser.ParsedLedger parsed = _parsedFor(source, filename);
     return writeLedgerPlugins(source, plugins, parsed: parsed);
+  }
+
+  AppendOutcome appendTransaction(String source, String filename, String targetFilename, String snippet) {
+    final bool root = targetFilename == filename;
+    final String? original = root ? source : _readFile(targetFilename);
+    if (original == null) return const AppendFailed(<String>['Could not read the target file.']);
+    final String base = original.isEmpty || original.endsWith('\n') ? original : '$original\n';
+    final String text = '$base$snippet';
+    final int firstLine = base.split('\n').length;
+    final int lastLine = firstLine + snippet.split('\n').length - 2;
+    final _IncludeRead full = root
+        ? _parseWithIncludes(text, filename)
+        : _parseWithIncludes(source, filename, targetPath: targetFilename, targetText: text);
+    final Ledger ledger = Book().process(full.parsed, recover: true);
+    final List<ProcessingError> errors = switch (ledger) {
+      LedgerDirectives(:final List<ProcessingError> errors) => errors,
+      LedgerErrors(:final List<ProcessingError> errors) => errors,
+    };
+    final List<String> snippetErrors = <String>[
+      for (final ProcessingError error in errors)
+        if (error.location.filename == targetFilename &&
+            error.location.linenoBegin >= firstLine &&
+            error.location.linenoBegin <= lastLine)
+          error.message,
+    ];
+    if (snippetErrors.isNotEmpty) return AppendFailed(snippetErrors);
+    _includes = full.read;
+    _snapshot = null;
+    return AppendOk(text);
+  }
+
+  _IncludeRead _parseWithIncludes(String source, String filename, {String? targetPath, String? targetText}) {
+    final Map<String, String> read = <String, String>{};
+    final parser.ParsedLedger parsed = const parser.BeancountParser().parse(
+      source,
+      filename: filename,
+      recover: true,
+      includes: parser.IncludeController(
+        readFile: (String path) {
+          final String? text = path == targetPath ? targetText : _readFile(path);
+          if (text != null) read[path] = text;
+          return text;
+        },
+      ),
+    );
+    debugLedgerParses += 1;
+    return (read: read, parsed: parsed);
+  }
+
+  bool _includesUnchanged() {
+    for (final MapEntry<String, String> entry in _includes.entries) {
+      if (_readFile(entry.key) != entry.value) return false;
+    }
+    return true;
+  }
+
+  String? _readFile(String path) {
+    try {
+      final File file = File(path);
+      if (!file.existsSync()) return null;
+      return file.readAsStringSync();
+    } on FileSystemException {
+      return null;
+    }
   }
 
   parser.ParsedLedger _parsedFor(String source, String filename) {
@@ -145,6 +253,15 @@ class _PluginsRequest {
   final List<LedgerPlugin> plugins;
 }
 
+class _AppendRequest {
+  const _AppendRequest(this.source, this.filename, this.targetFilename, this.snippet);
+
+  final String source;
+  final String filename;
+  final String targetFilename;
+  final String snippet;
+}
+
 class _Failure {
   const _Failure(this.kind, this.message);
 
@@ -173,6 +290,9 @@ class _RemoteMemory {
 
   Future<String> rewritePlugins(String source, String filename, List<LedgerPlugin> plugins) =>
       _call<String>(_PluginsRequest(source, filename, plugins));
+
+  Future<AppendOutcome> appendTransaction(String source, String filename, String targetFilename, String snippet) =>
+      _call<AppendOutcome>(_AppendRequest(source, filename, targetFilename, snippet));
 
   Future<void> close() async {
     _isolate?.kill(priority: Isolate.immediate);
@@ -251,6 +371,13 @@ Object _answer(_Memory memory, Object? request) {
       );
     case _PluginsRequest(:final String source, :final String filename, :final List<LedgerPlugin> plugins):
       return memory.rewritePlugins(source, filename, plugins);
+    case _AppendRequest(
+      :final String source,
+      :final String filename,
+      :final String targetFilename,
+      :final String snippet,
+    ):
+      return memory.appendTransaction(source, filename, targetFilename, snippet);
     default:
       throw ArgumentError('Unexpected ledger work');
   }

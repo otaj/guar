@@ -13,12 +13,17 @@ import 'package:guar_parser/src/parser/splice.dart';
 class BeancountParser {
   const BeancountParser();
 
-  ParsedLedger parse(String source, {String filename = '', bool recover = false, bool followIncludes = true}) =>
-      BeancountGrammar(
-        filename: filename,
-        includes: followIncludes ? IncludeController.io() : IncludeController.skip(),
-        recover: recover,
-      ).parse(source);
+  ParsedLedger parse(
+    String source, {
+    String filename = '',
+    bool recover = false,
+    bool followIncludes = true,
+    IncludeController? includes,
+  }) => BeancountGrammar(
+    filename: filename,
+    includes: includes ?? (followIncludes ? IncludeController.io() : IncludeController.skip()),
+    recover: recover,
+  ).parse(source);
 
   ParsedLedger splice(
     ParsedLedger ledger,
