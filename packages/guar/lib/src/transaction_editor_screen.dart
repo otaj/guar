@@ -155,6 +155,13 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     return trimmed.isEmpty ? null : Decimal.tryParse(trimmed);
   }
 
+  String _negateNumber(String text) {
+    final Decimal value = Decimal.tryParse(text)!;
+    if (value.compareTo(Decimal.zero) < 0) return text.substring(1);
+    if (value == Decimal.zero) return text;
+    return '-$text';
+  }
+
   TransactionDraft? _draft() {
     final d.BeanDate? date = _parseDate(_date.text);
     if (date == null) return null;
@@ -177,15 +184,15 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (meta == null) return null;
     final List<TransactionDraftPosting> postings = <TransactionDraftPosting>[];
     if (!_advanced) {
-      final Decimal? amount = _number(_legs[0].number);
+      final String amount = _legs[0].number.trim();
       final d.Currency? currency = _currency(_legs[0].currency);
       final d.Account? from = _legs[0].account;
       final d.Account? to = _legs[1].account;
-      if (amount == null || currency == null || from == null || to == null) return null;
+      if (_number(amount) == null || currency == null || from == null || to == null) return null;
       postings.addAll(<TransactionDraftPosting>[
         TransactionDraftPosting(
           account: from,
-          units: TransactionDraftAmount(number: -amount, currency: currency),
+          units: TransactionDraftAmount(number: _negateNumber(amount), currency: currency),
         ),
         TransactionDraftPosting(
           account: to,
@@ -202,14 +209,14 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         if (leg.currency.trim().isNotEmpty && unitsCurrency == null) return null;
         final TransactionDraftCost? cost = _costOf(leg);
         final TransactionDraftPrice? price = _priceOf(leg);
-        final Decimal? number = _number(leg.number);
-        if (number == null && leg.number.trim().isNotEmpty) return null;
+        final String number = leg.number.trim();
+        if (_number(number) == null && number.isNotEmpty) return null;
         postings.add(
           TransactionDraftPosting(
             account: account,
-            units: number == null && unitsCurrency == null
+            units: number.isEmpty && unitsCurrency == null
                 ? null
-                : TransactionDraftAmount(number: number, currency: unitsCurrency),
+                : TransactionDraftAmount(number: number.isEmpty ? null : number, currency: unitsCurrency),
             cost: cost,
             price: price,
             meta: legMeta,
@@ -237,8 +244,8 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (leg.costCurrency.trim().isNotEmpty && currency == null) return null;
     if (number == null && currency == null) return null;
     return TransactionDraftCost(
-      numberPer: leg.costTotal ? null : number,
-      numberTotal: leg.costTotal ? number : null,
+      numberPer: leg.costTotal || leg.costNumber.trim().isEmpty ? null : leg.costNumber.trim(),
+      numberTotal: leg.costTotal && leg.costNumber.trim().isNotEmpty ? leg.costNumber.trim() : null,
       currency: currency,
     );
   }
@@ -249,7 +256,11 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (leg.priceNumber.trim().isNotEmpty && number == null) return null;
     if (leg.priceCurrency.trim().isNotEmpty && currency == null) return null;
     if (number == null && currency == null) return null;
-    return TransactionDraftPrice(number: number, currency: currency, total: leg.priceTotal);
+    return TransactionDraftPrice(
+      number: leg.priceNumber.trim().isEmpty ? null : leg.priceNumber.trim(),
+      currency: currency,
+      total: leg.priceTotal,
+    );
   }
 
   d.Meta? _metaOf(List<_MetaDraft> rows) {

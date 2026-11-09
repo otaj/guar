@@ -267,9 +267,8 @@ void main() {
     );
   });
 
-  test('writeTransactionDraft renders the same text as the parsed directive', () {
+  test('writeTransactionDraft renders typed numbers verbatim, keeping their scale', () {
     final d.BeanDate day = d.BeanDate(year: 2026, month: 11, day: 9);
-    final Decimal amount = Decimal.parse('12.30');
     final String draft = writeTransactionDraft(
       TransactionDraft(
         date: day,
@@ -280,14 +279,14 @@ void main() {
           TransactionDraftPosting(
             account: d.Account(name: 'Expenses:Food', type: d.AccountType.expenses),
             units: TransactionDraftAmount(
-              number: amount,
+              number: '12.30',
               currency: d.Currency(name: 'USD'),
             ),
           ),
           TransactionDraftPosting(
             account: d.Account(name: 'Assets:Cash', type: d.AccountType.assets),
             units: TransactionDraftAmount(
-              number: -amount,
+              number: '-12.30',
               currency: d.Currency(name: 'USD'),
             ),
           ),
@@ -297,10 +296,34 @@ void main() {
     expect(
       draft,
       '2026-11-09 * "Grocer" "Lunch" #trip\n'
-      '  Expenses:Food  12.3 USD\n'
-      '  Assets:Cash  -12.3 USD\n',
+      '  Expenses:Food  12.30 USD\n'
+      '  Assets:Cash  -12.30 USD\n',
     );
-    expect(_parseOne(draft).postings[0].units?.number?.verbatim, '12.3');
+    expect(_parseOne(draft).postings[0].units?.number?.verbatim, '12.30');
+  });
+
+  test('writeTransactionDraft rejects an unparseable number', () {
+    expect(
+      () => writeTransactionDraft(
+        TransactionDraft(
+          date: d.BeanDate(year: 2026, month: 11, day: 9),
+          narration: 'Buy',
+          postings: <TransactionDraftPosting>[
+            TransactionDraftPosting(
+              account: d.Account(name: 'Expenses:Food', type: d.AccountType.expenses),
+              units: TransactionDraftAmount(
+                number: 'twelve',
+                currency: d.Currency(name: 'USD'),
+              ),
+            ),
+            TransactionDraftPosting(
+              account: d.Account(name: 'Assets:Cash', type: d.AccountType.assets),
+            ),
+          ],
+        ),
+      ),
+      throwsFormatException,
+    );
   });
 
   test('writeTransactionDraft keeps an elided leg and a total cost', () {
@@ -313,11 +336,11 @@ void main() {
           TransactionDraftPosting(
             account: d.Account(name: 'Expenses:Food', type: d.AccountType.expenses),
             units: TransactionDraftAmount(
-              number: Decimal.parse('2'),
+              number: '2',
               currency: d.Currency(name: 'USD'),
             ),
             cost: TransactionDraftCost(
-              numberTotal: Decimal.parse('22'),
+              numberTotal: '22',
               currency: d.Currency(name: 'EUR'),
             ),
           ),

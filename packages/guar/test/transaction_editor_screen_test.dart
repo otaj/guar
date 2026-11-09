@@ -80,7 +80,7 @@ void main() {
     expect(
       documents.files[path],
       '2026-01-01 open Assets:Cash\n2026-01-01 open Expenses:Food\n'
-      '$today * ""\n  Assets:Cash  -12.3 USD\n  Expenses:Food  12.3 USD\n',
+      '$today * ""\n  Assets:Cash  -12.30 USD\n  Expenses:Food  12.30 USD\n',
     );
   });
 
@@ -128,7 +128,7 @@ void main() {
     expect(find.text('New transaction'), findsNothing);
     expect(
       documents.files[path],
-      contains('$today * ""\n  Assets:Cash  12.3 USD\n  Expenses:Food\n'),
+      contains('$today * ""\n  Assets:Cash  12.30 USD\n  Expenses:Food\n'),
     );
   });
 

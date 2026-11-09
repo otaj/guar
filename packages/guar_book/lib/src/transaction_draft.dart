@@ -46,7 +46,8 @@ class TransactionDraftPosting {
 class TransactionDraftAmount {
   const TransactionDraftAmount({this.number, this.currency});
 
-  final Decimal? number;
+  /// The number as typed; rendered verbatim, so scale is preserved.
+  final String? number;
   final d.Currency? currency;
 }
 
@@ -60,8 +61,8 @@ class TransactionDraftCost {
     this.merge = false,
   });
 
-  final Decimal? numberPer;
-  final Decimal? numberTotal;
+  final String? numberPer;
+  final String? numberTotal;
   final d.Currency? currency;
   final d.BeanDate? date;
   final String? label;
@@ -71,7 +72,7 @@ class TransactionDraftCost {
 class TransactionDraftPrice {
   const TransactionDraftPrice({this.number, this.currency, this.total = false});
 
-  final Decimal? number;
+  final String? number;
   final d.Currency? currency;
   final bool total;
 }
@@ -107,7 +108,7 @@ p.ParsedPosting _posting(TransactionDraftPosting posting) => p.ParsedPosting(
 
 p.IncompleteAmount? _units(TransactionDraftAmount? units) {
   if (units == null) return null;
-  final Decimal? number = units.number;
+  final String? number = units.number;
   final d.Currency? currency = units.currency;
   if (number == null && currency == null) return null;
   return p.IncompleteAmount(
@@ -139,7 +140,11 @@ p.ParsedPrice? _price(TransactionDraftPrice? price) {
 
 p.BeanDate _date(d.BeanDate date) => p.BeanDate(year: date.year, month: date.month, day: date.day);
 
-p.BeanNumber _number(Decimal value) => p.BeanNumber(verbatim: value.toString(), resolved: value);
+p.BeanNumber _number(String text) {
+  final Decimal? resolved = Decimal.tryParse(text);
+  if (resolved == null) throw FormatException('invalid number "$text"');
+  return p.BeanNumber(verbatim: text, resolved: resolved);
+}
 
 p.Meta _meta(d.Meta meta) => p.Meta(
   entries: <p.MetaEntry>[
@@ -155,10 +160,12 @@ p.MetaValue? _metaValue(d.MetaValue? value) => switch (value) {
   d.MetaTag(:final d.Tag value) => p.MetaValue.tag(p.Tag(name: value.name)),
   d.MetaDate(:final d.BeanDate value) => p.MetaValue.date(_date(value)),
   d.MetaBoolean(:final bool value) => p.MetaValue.boolean(value),
-  d.MetaNumber(:final Decimal value) => p.MetaValue.number(_number(value)),
+  d.MetaNumber(:final Decimal value) => p.MetaValue.number(
+    p.BeanNumber(verbatim: value.toString(), resolved: value),
+  ),
   d.MetaAmount(:final d.Amount value) => p.MetaValue.amount(
     p.Amount(
-      number: _number(value.number),
+      number: p.BeanNumber(verbatim: value.number.toString(), resolved: value.number),
       currency: p.Currency(name: value.currency.name),
     ),
   ),
