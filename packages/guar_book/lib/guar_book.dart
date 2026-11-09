@@ -16,3 +16,4 @@ export 'src/options_source.dart'
         readLedgerOptionsFrom,
         writeLedgerOptions;
 export 'src/plugins_source.dart' show LedgerPlugin, readLedgerPlugins, readLedgerPluginsFrom, writeLedgerPlugins;
+export 'src/transaction_source.dart' show writeTransaction;
