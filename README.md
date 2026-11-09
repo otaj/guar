@@ -14,7 +14,7 @@ Guar is a bean. Its leaves are arrow-shaped, if you squint hard enough.
 
 The Android app lives in [`packages/guar`](packages/guar). Version codes, the per-ABI split, and how to build are in [its README](packages/guar/README.md).
 
-Parsing, booking, and queries are libraries the app calls. The screen itself is still an empty shell.
+Parsing, booking, and queries are libraries the app calls.
 
 ## Libraries
 
