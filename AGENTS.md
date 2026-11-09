@@ -70,17 +70,20 @@ guar_parser  ──►  ParsedLedger
 - `guar_book` — Booking/validation pipeline (parser + plugins → domain)
 - `guar_plugins` — Stock Beancount and reds plugins
 - `guar_query` — BQL query engine over booked ledgers
-- `guar` — Flutter Android app (currently an empty shell)
+- `guar` — Flutter Android app (open/edit screens over a `LedgerDocuments` abstraction)
 
 Dependency direction is strictly downward. `guar_domain` must not import `guar_parser` or `protobean`. `guar_book` and `guar_query` must not import `protobean` from `lib/`.
+
+`protobean` is an external pub package used only as interchange format. Outside `guar_parser/lib/src/proto/`, import it only via `package:guar_parser/proto.dart` — never from domain or parser code. See `.cursor/rules/domain.mdc`.
 
 ## Constraints
 
 - **No Google Play services.** `scripts/check_no_google_libs.sh` fails the build if GMS, Firebase, ML Kit, or Play libraries appear in the Gradle classpath or APK. Open-source Google Maven artifacts (Tink, Gson, annotations) are allowed.
-- **Version code formula.** `packages/guar/pubspec.yaml` version must be `X.Y.Z+N` where `N = 10000*major + 100*minor + patch`. The `+N` is the pre-ABI Android versionCode; `android/app/build.gradle.kts` packs the ABI as `10*N + abi`. Enforced by pre-commit.
+- **Version code formula.** `packages/guar/pubspec.yaml` version must be `X.Y.Z+N` where `N = 10000*major + 100*minor + patch`. The `+N` is the pre-ABI Android versionCode; `android/app/build.gradle.kts` packs the ABI as `10*N + abi` (1=armeabi-v7a, 2=arm64-v8a, 3=x86_64). Enforced by pre-commit. Details: `packages/guar/README.md`.
 - **Line length 120.** Dart format uses `--line-length 120`. The 80-char lint is disabled.
 - **Conventional Commits** with one concern per commit. Enforced by pre-commit.
 - **Minimal comments.** One short top-of-file comment stating why the file exists. No other comments, dartdocs, or TODOs unless logic is non-obvious. See `.cursor/rules/comments.mdc`.
+- **Pull requests** branch from the latest `origin/main` (`git fetch origin main` first). See `.cursor/rules/pull-requests.mdc`.
 
 ## TDD workflow (parser & query)
 
