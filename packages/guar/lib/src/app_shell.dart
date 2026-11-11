@@ -127,23 +127,27 @@ class _AppShellState extends State<AppShell> {
     if (!mounted) return;
     final String? choice = await showModalBottomSheet<String>(
       context: context,
+      showDragHandle: true,
       builder: (BuildContext context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              key: const Key('add-transaction-option'),
-              leading: const Icon(Icons.receipt_long),
-              title: const Text('New transaction'),
-              onTap: () => Navigator.pop(context, 'transaction'),
-            ),
-            ListTile(
-              key: const Key('add-account-option'),
-              leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: const Text('New account'),
-              onTap: () => Navigator.pop(context, 'account'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _AddOptionRow(
+                key: const Key('add-transaction-option'),
+                icon: Icons.receipt_long,
+                label: 'New transaction',
+                onTap: () => Navigator.pop(context, 'transaction'),
+              ),
+              _AddOptionRow(
+                key: const Key('add-account-option'),
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'New account',
+                onTap: () => Navigator.pop(context, 'account'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -173,5 +177,44 @@ class _AppShellState extends State<AppShell> {
     await _session.flush();
     if (!mounted) return;
     setState(() => _tab = tab);
+  }
+}
+
+class _AddOptionRow extends StatelessWidget {
+  const _AddOptionRow({required this.icon, required this.label, required this.onTap, super.key});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: colors.secondaryContainer),
+                  alignment: Alignment.center,
+                  child: Icon(icon, color: colors.onSecondaryContainer, size: 22),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Text(label, style: Theme.of(context).textTheme.titleMedium)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
