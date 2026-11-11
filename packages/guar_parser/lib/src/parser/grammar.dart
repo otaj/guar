@@ -114,7 +114,7 @@ class BeancountGrammar {
       if (code.trimLeft().startsWith(';')) {
         continue;
       }
-      if (_isOrgModeTitle(raw)) {
+      if (_isIgnoredLine(raw)) {
         continue;
       }
       if (code.startsWith(' ') || code.startsWith('\t')) {
@@ -661,7 +661,21 @@ class BeancountGrammar {
   }
 
   // Beancount ignores '*' at column 0 when more text follows (`* Heading`, `** Nested`).
-  bool _isOrgModeTitle(String line) => line.startsWith('*') && line.length > 1;
+  // Lines beancount's lexer ignores: starting with '*', ':' or '#', unless the
+  // '#' begins a tag token (flex longest-match keeps `#tag` a tag).
+  bool _isIgnoredLine(String line) {
+    if (line.length < 2) {
+      return false;
+    }
+    final String ch = line[0];
+    if (ch == '*' || ch == ':') {
+      return true;
+    }
+    if (ch != '#') {
+      return false;
+    }
+    return RegExp(r'^#[A-Za-z0-9\-_/.]+').firstMatch(line) == null;
+  }
 
   String _stripTrailingComment(String line) {
     const bool inString = false;
