@@ -61,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showAdvanced = false;
   bool _advancedUi = false;
   bool _writeDefaultOptions = false;
+  bool _allowUnopenedAccounts = false;
   Set<String> _hidden = <String>{};
   bool _renderCommas = false;
   bool _insertPythonpath = false;
@@ -172,6 +173,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 writeDefaultsCopy,
                 _writeDefaultOptions,
                 (bool value) => _toggle(() => _writeDefaultOptions = value),
+              ),
+              _switch(
+                'allowUnopenedAccounts',
+                'Allow unopened accounts',
+                allowUnopenedCopy,
+                _allowUnopenedAccounts,
+                (bool value) => _toggle(() => _allowUnopenedAccounts = value),
               ),
               _section(
                 'Ledger screen',
@@ -502,6 +510,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _mute = true;
     _advancedUi = loaded.guar.advancedUi;
     _writeDefaultOptions = loaded.guar.writeDefaultOptions;
+    _allowUnopenedAccounts = loaded.guar.allowUnopenedAccounts;
     _hidden = Set<String>.of(loaded.guar.hidden);
     _booking = options.bookingMethod;
     _pluginMode = options.pluginProcessingMode;
@@ -780,7 +789,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     await widget.session.saveOptions(
       options,
-      GuarOptions(advancedUi: _advancedUi, writeDefaultOptions: _writeDefaultOptions, hidden: _hidden),
+      GuarOptions(
+        advancedUi: _advancedUi,
+        writeDefaultOptions: _writeDefaultOptions,
+        allowUnopenedAccounts: _allowUnopenedAccounts,
+        hidden: _hidden,
+      ),
       preserveKeys: showAdvanced ? const <String>{} : advancedOptionKeys,
     );
   }

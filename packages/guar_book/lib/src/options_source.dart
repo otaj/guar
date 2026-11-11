@@ -62,10 +62,16 @@ String parsedHideToken(p.DirectiveBody body) => switch (body) {
 };
 
 class GuarOptions {
-  const GuarOptions({this.advancedUi = false, this.writeDefaultOptions = false, this.hidden = const <String>{}});
+  const GuarOptions({
+    this.advancedUi = false,
+    this.writeDefaultOptions = false,
+    this.allowUnopenedAccounts = false,
+    this.hidden = const <String>{},
+  });
 
   final bool advancedUi;
   final bool writeDefaultOptions;
+  final bool allowUnopenedAccounts;
 
   final Set<String> hidden;
 }
@@ -83,6 +89,7 @@ LoadedLedgerOptions readLedgerOptions(String source) => readLedgerOptionsFrom(so
 LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) {
   final _GuarBoolScan advancedUi = _scanGuarBool(source, parsed, 'advanced_ui');
   final _GuarBoolScan writeDefaults = _scanGuarBool(source, parsed, 'write_default_options');
+  final _GuarBoolScan allowUnopened = _scanGuarBool(source, parsed, 'allow_unopened_accounts');
   final ({Set<String> values, List<String> errors}) hidden = _readHide(source, parsed);
   return LoadedLedgerOptions(
     options: defaultOptions(parsed.options),
@@ -90,11 +97,13 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
       for (final p.ParseError error in parsed.errors) error.message,
       ...advancedUi.errors,
       ...writeDefaults.errors,
+      ...allowUnopened.errors,
       ...hidden.errors,
     ],
     guar: GuarOptions(
       advancedUi: advancedUi.value,
       writeDefaultOptions: writeDefaults.value,
+      allowUnopenedAccounts: allowUnopened.value,
       hidden: hidden.values,
     ),
   );
@@ -131,7 +140,8 @@ String writeLedgerOptions(
     // New lines insert at the front of the guar block, so later calls stay first.
     rewrite
       ..applyBool(key: 'write_default_options', enabled: guar.writeDefaultOptions, today: date)
-      ..applyBool(key: 'advanced_ui', enabled: guar.advancedUi, today: date);
+      ..applyBool(key: 'advanced_ui', enabled: guar.advancedUi, today: date)
+      ..applyBool(key: 'allow_unopened_accounts', enabled: guar.allowUnopenedAccounts, today: date);
   }
   if (!rewroteOptions && !rewrite.changed) {
     return source;
@@ -427,6 +437,7 @@ class _Rewrite {
   final Map<String, _BoolAcc> bools = <String, _BoolAcc>{
     'advanced_ui': _BoolAcc(),
     'write_default_options': _BoolAcc(),
+    'allow_unopened_accounts': _BoolAcc(),
   };
   final List<_HideAcc> hides = <_HideAcc>[];
   bool changed = false;
