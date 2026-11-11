@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:guar/src/directives_screen.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_session.dart';
+import 'package:guar/src/open_account_screen.dart';
 import 'package:guar/src/plugins_screen.dart';
 import 'package:guar/src/settings_screen.dart';
 import 'package:guar/src/transaction_editor_screen.dart';
@@ -124,12 +125,47 @@ class _AppShellState extends State<AppShell> {
   Future<void> _addTransaction() async {
     await _session.flush();
     if (!mounted) return;
+    final String? choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              key: const Key('add-transaction-option'),
+              leading: const Icon(Icons.receipt_long),
+              title: const Text('New transaction'),
+              onTap: () => Navigator.pop(context, 'transaction'),
+            ),
+            ListTile(
+              key: const Key('add-account-option'),
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('New account'),
+              onTap: () => Navigator.pop(context, 'account'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'account') {
+      await _openAccount();
+      return;
+    }
     final Object? result = await Navigator.of(context).push<Object?>(
       MaterialPageRoute<Object?>(builder: (BuildContext context) => TransactionEditorScreen(session: _session)),
     );
     if (result == 'plugins' && mounted) {
       setState(() => _tab = _Tab.plugins);
     }
+  }
+
+  Future<void> _openAccount() async {
+    await _session.flush();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (BuildContext context) => OpenAccountScreen(session: _session)),
+    );
   }
 
   Future<void> _select(_Tab tab) async {
