@@ -52,6 +52,12 @@ const SettingCopy writeDefaultsCopy = SettingCopy(
       "Normally the file only stores options that differ from Beancount's defaults. Turn this on to write the full set Guar is using. Options hidden by Advanced settings are left as they are.",
 );
 
+const SettingCopy allowUnopenedCopy = SettingCopy(
+  summary: 'Type any account in the transaction editor.',
+  detail:
+      'When this is on, the account pickers become plain text fields, so a posting can name an account no open directive shows, for example one a plugin such as autoopen opens. Accounts that nothing opens are still rejected when saving.',
+);
+
 const SettingCopy titleCopy = SettingCopy(
   summary: 'Name shown for this ledger.',
   detail: 'Beancount uses this as the report title. Guar shows it on the ledger screen. The default is Beancount.',

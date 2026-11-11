@@ -172,6 +172,58 @@ void main() {
     expect(find.text('Assets:Later'), findsNothing);
     expect(find.text('Expenses:Food'), findsNothing);
   });
+
+  testWidgets('allow_unopened_accounts turns the account pickers into free-form fields', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path:
+          '2020-01-01 custom "guar_option" "allow_unopened_accounts" "TRUE"\n'
+          '2026-01-01 open Assets:Cash\n',
+    });
+    await _openSession(tester, documents);
+
+    await tester.tap(find.byKey(const Key('add-transaction')));
+    await tester.pumpAndSettle();
+    _tallViewport(tester);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(find.byKey(const Key('leg-0-account'))), isA<TextFormField>());
+
+    await tester.enterText(find.byKey(const Key('leg-0-account')), 'Assets:Auto:Opened');
+    await tester.enterText(find.byKey(const Key('leg-1-account')), 'Assets:Cash');
+    await tester.enterText(find.byKey(const Key('leg-0-number')), '12.30');
+    await tester.enterText(find.byKey(const Key('leg-0-currency')), 'USD');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    // Nothing opens the account, so the posting is rejected with a suggestion popup.
+    expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNull);
+    expect(find.byKey(const Key('unopened-popup')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('open-account')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(
+      documents.files[path],
+      contains('$today open Assets:Auto:Opened\n'),
+    );
+    expect(find.byKey(const Key('unopened-popup')), findsNothing);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const Key('save')));
+    await tester.pumpAndSettle();
+    expect(find.text('New transaction'), findsNothing);
+    expect(
+      documents.files[path],
+      '2020-01-01 custom "guar_option" "allow_unopened_accounts" "TRUE"\n'
+      '2026-01-01 open Assets:Cash\n'
+      '$today open Assets:Auto:Opened\n'
+      '$today * ""\n'
+      '  Assets:Auto:Opened  -12.30 USD\n'
+      '  Assets:Cash  12.30 USD\n',
+    );
+  });
 }
 
 String _today() {

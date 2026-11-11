@@ -124,9 +124,12 @@ class _AppShellState extends State<AppShell> {
   Future<void> _addTransaction() async {
     await _session.flush();
     if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (BuildContext context) => TransactionEditorScreen(session: _session)),
+    final Object? result = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute<Object?>(builder: (BuildContext context) => TransactionEditorScreen(session: _session)),
     );
+    if (result == 'plugins' && mounted) {
+      setState(() => _tab = _Tab.plugins);
+    }
   }
 
   Future<void> _select(_Tab tab) async {

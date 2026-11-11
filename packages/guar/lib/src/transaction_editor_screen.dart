@@ -19,6 +19,7 @@ class TransactionEditorScreen extends StatefulWidget {
 
 class _LegDraft {
   d.Account? account;
+  String accountName = '';
   String number = '';
   String currency = '';
   String costNumber = '';
@@ -51,6 +52,8 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
 
   bool get _advanced => widget.session.snapshot?.options.guar.advancedUi ?? false;
 
+  bool get _freeAccounts => widget.session.snapshot?.options.guar.allowUnopenedAccounts ?? false;
+
   @override
   void initState() {
     super.initState();
@@ -72,21 +75,34 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   }
 
   void _onSession() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      // The ledger may have changed underneath the draft, so revalidate.
+      _queueCheck();
+    }
   }
 
   void _defaultAccounts() {
     final List<d.Account> accounts = _eligibleAccounts();
-    if (_legs[0].account == null) {
-      _legs[0].account = accounts
+    final bool typed = _freeAccounts;
+    if (_legs[0].account == null && !(typed && _legs[0].accountName.isNotEmpty)) {
+      final d.Account? from = accounts
           .where(
             (d.Account account) => account.type == d.AccountType.assets || account.type == d.AccountType.liabilities,
           )
           .firstOrNull;
+      if (from != null) _setAccount(_legs[0], from);
     }
-    if (_legs[1].account == null) {
-      _legs[1].account = accounts.where((d.Account account) => account.type == d.AccountType.expenses).firstOrNull;
+    if (_legs[1].account == null && !(typed && _legs[1].accountName.isNotEmpty)) {
+      final d.Account? to = accounts.where((d.Account account) => account.type == d.AccountType.expenses).firstOrNull;
+      if (to != null) _setAccount(_legs[1], to);
     }
+  }
+
+  void _setAccount(_LegDraft leg, d.Account account) {
+    leg
+      ..account = account
+      ..accountName = account.name;
   }
 
   List<d.Account> _eligibleAccounts() {
@@ -466,6 +482,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
+          if (_unknownAccounts().isNotEmpty) _unopenedPopup(_unknownAccounts().first),
           const SizedBox(height: 24),
           FilledButton(
             key: const Key('save'),
@@ -475,6 +492,84 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         ],
       ),
     );
+  }
+
+  Widget _accountField(int index, _LegDraft leg, List<d.Account> accounts) {
+    final String label = index == 0
+        ? 'From account'
+        : index == _legs.length - 1 && !_advanced
+        ? 'To account'
+        : 'Account';
+    if (_freeAccounts) {
+      return TextFormField(
+        key: Key('leg-$index-account'),
+        controller: TextEditingController(text: leg.accountName),
+        decoration: InputDecoration(labelText: label),
+        onChanged: (String value) {
+          leg
+            ..accountName = value
+            ..account = _domainAccount(value);
+          _queueCheck();
+        },
+      );
+    }
+    return DropdownButtonFormField<d.Account>(
+      key: Key('leg-$index-account'),
+      initialValue: leg.account,
+      decoration: InputDecoration(labelText: label),
+      items: <DropdownMenuItem<d.Account>>[
+        for (final d.Account account in accounts)
+          if (account == leg.account || !_legs.any((_LegDraft other) => other.account == account))
+            DropdownMenuItem<d.Account>(value: account, child: Text(account.name)),
+      ],
+      onChanged: (d.Account? account) {
+        setState(() => leg.account = account);
+        _queueCheck();
+      },
+    );
+  }
+
+  static final RegExp _unknownAccount = RegExp("Invalid reference to unknown account '(.+)'");
+
+  List<String> _unknownAccounts() => <String>[
+    for (final String error in _errors)
+      if (_unknownAccount.firstMatch(error) case final RegExpMatch match) match.group(1)!,
+  ];
+
+  Widget _unopenedPopup(String account) => Card(
+    key: const Key('unopened-popup'),
+    margin: const EdgeInsets.only(top: 12),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('$account is not opened.', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          const Text('Open the account, or turn a plugin on that opens it.'),
+          Row(
+            children: <Widget>[
+              TextButton(key: const Key('open-account'), onPressed: _openAccount, child: const Text('Open account')),
+              TextButton(
+                key: const Key('open-plugins'),
+                onPressed: () => Navigator.of(context).pop('plugins'),
+                child: const Text('Turn a plugin on'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _openAccount() async {
+    final String target = _target ?? widget.session.document?.displayName ?? '';
+    await widget.session.flush();
+    await widget.session.addTransaction(target, '${_today()} open ${_unknownAccounts().first}\n');
+    if (!mounted) return;
+    if (widget.session.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.session.error!)));
+    }
   }
 
   List<String> _ledgerCurrencies() => switch (widget.session.snapshot?.booked.ledger) {
@@ -496,28 +591,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Expanded(
-                  child: DropdownButtonFormField<d.Account>(
-                    key: Key('leg-$index-account'),
-                    initialValue: leg.account,
-                    decoration: InputDecoration(
-                      labelText: index == 0
-                          ? 'From account'
-                          : index == _legs.length - 1 && !_advanced
-                          ? 'To account'
-                          : 'Account',
-                    ),
-                    items: <DropdownMenuItem<d.Account>>[
-                      for (final d.Account account in accounts)
-                        if (account == leg.account || !_legs.any((_LegDraft other) => other.account == account))
-                          DropdownMenuItem<d.Account>(value: account, child: Text(account.name)),
-                    ],
-                    onChanged: (d.Account? account) {
-                      setState(() => leg.account = account);
-                      _queueCheck();
-                    },
-                  ),
-                ),
+                Expanded(child: _accountField(index, leg, accounts)),
                 if (_advanced && _legs.length > 2)
                   IconButton(
                     key: Key('leg-$index-remove'),
