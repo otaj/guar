@@ -46,25 +46,30 @@ class BookedLedger {
   };
 }
 
-LedgerSnapshot prepareLedger(String source, {String filename = '', parser.ParsedLedger? parsed}) {
+LedgerSnapshot prepareLedger(
+  String source, {
+  String filename = '',
+  parser.ParsedLedger? parsed,
+  parser.ParsedLedger? parsedIncludes,
+}) {
   // Included paths are not files the app has opened. Keep a directive when a later check fails.
-  final parser.ParsedLedger ledger =
+  final parser.ParsedLedger root =
       parsed ?? const parser.BeancountParser().parse(source, filename: filename, recover: true, followIncludes: false);
-  final LoadedLedgerOptions loaded = readLedgerOptionsFrom(source, ledger);
+  final LoadedLedgerOptions loaded = readLedgerOptionsFrom(source, root);
   return LedgerSnapshot(
     source: source,
     filename: filename,
     booked: BookedLedger._(
-      ledger: Book().process(ledger, recover: true),
+      ledger: Book().process(parsedIncludes ?? root, recover: true),
       guar: loaded.guar,
       optionWarnings: <String>[
         for (final String message in loaded.errors)
           if (message.startsWith('hide_')) message,
       ],
-      sourceDirectives: _parsedSources(ledger),
+      sourceDirectives: _parsedSources(root),
     ),
     options: loaded,
-    plugins: readLedgerPluginsFrom(ledger),
+    plugins: readLedgerPluginsFrom(root),
   );
 }
 

@@ -8,6 +8,7 @@ import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar/src/plugins_screen.dart';
 import 'package:guar/src/settings_screen.dart';
+import 'package:guar/src/transaction_editor_screen.dart';
 
 enum _Tab {
   ledger('Ledger', Icons.list_alt_outlined, Icons.list_alt),
@@ -108,6 +109,23 @@ class _AppShellState extends State<AppShell> {
               onDestinationSelected: (int next) => unawaited(_select(tabs[next])),
             )
           : null,
+      floatingActionButton: loaded
+          ? FloatingActionButton(
+              key: const Key('add-transaction'),
+              heroTag: 'add-transaction',
+              onPressed: _addTransaction,
+              child: const Icon(Icons.add),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+    );
+  }
+
+  Future<void> _addTransaction() async {
+    await _session.flush();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (BuildContext context) => TransactionEditorScreen(session: _session)),
     );
   }
 
