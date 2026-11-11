@@ -34,6 +34,13 @@ Future<void> _openSession(WidgetTester tester, _FakeDocuments documents) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _openEditor(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('add-transaction')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('add-transaction-option')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   final String today = _today();
 
@@ -63,8 +70,7 @@ void main() {
     });
     await _openSession(tester, documents);
 
-    await tester.tap(find.byKey(const Key('add-transaction')));
-    await tester.pumpAndSettle();
+    await _openEditor(tester);
     expect(find.text('New transaction'), findsOneWidget);
     expect(find.byKey(const Key('add-leg')), findsNothing);
 
@@ -93,8 +99,7 @@ void main() {
     });
     await _openSession(tester, documents);
 
-    await tester.tap(find.byKey(const Key('add-transaction')));
-    await tester.pumpAndSettle();
+    await _openEditor(tester);
     expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNull);
   });
 
@@ -110,8 +115,7 @@ void main() {
     });
     await _openSession(tester, documents);
 
-    await tester.tap(find.byKey(const Key('add-transaction')));
-    await tester.pumpAndSettle();
+    await _openEditor(tester);
     _tallViewport(tester);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('add-leg')), findsOneWidget);
@@ -144,8 +148,7 @@ void main() {
     });
     await _openSession(tester, documents);
 
-    await tester.tap(find.byKey(const Key('add-transaction')));
-    await tester.pumpAndSettle();
+    await _openEditor(tester);
     _tallViewport(tester);
     await tester.pumpAndSettle();
     expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNull);
@@ -164,8 +167,7 @@ void main() {
     });
     await _openSession(tester, documents);
 
-    await tester.tap(find.byKey(const Key('add-transaction')));
-    await tester.pumpAndSettle();
+    await _openEditor(tester);
     await tester.tap(find.byKey(const Key('leg-0-account')));
     await tester.pumpAndSettle();
     expect(find.text('Assets:Cash').last, findsOneWidget);
@@ -184,8 +186,7 @@ void main() {
     });
     await _openSession(tester, documents);
 
-    await tester.tap(find.byKey(const Key('add-transaction')));
-    await tester.pumpAndSettle();
+    await _openEditor(tester);
     _tallViewport(tester);
     await tester.pumpAndSettle();
     expect(tester.widget<TextFormField>(find.byKey(const Key('leg-0-account'))), isA<TextFormField>());

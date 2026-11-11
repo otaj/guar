@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:guar/src/directives_screen.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_session.dart';
+import 'package:guar/src/open_account_screen.dart';
 import 'package:guar/src/plugins_screen.dart';
 import 'package:guar/src/settings_screen.dart';
 import 'package:guar/src/transaction_editor_screen.dart';
@@ -124,6 +125,37 @@ class _AppShellState extends State<AppShell> {
   Future<void> _addTransaction() async {
     await _session.flush();
     if (!mounted) return;
+    final String? choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _AddOptionRow(
+                key: const Key('add-transaction-option'),
+                icon: Icons.receipt_long,
+                label: 'New transaction',
+                onTap: () => Navigator.pop(context, 'transaction'),
+              ),
+              _AddOptionRow(
+                key: const Key('add-account-option'),
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'New account',
+                onTap: () => Navigator.pop(context, 'account'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'account') {
+      await _openAccount();
+      return;
+    }
     final Object? result = await Navigator.of(context).push<Object?>(
       MaterialPageRoute<Object?>(builder: (BuildContext context) => TransactionEditorScreen(session: _session)),
     );
@@ -132,10 +164,57 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  Future<void> _openAccount() async {
+    await _session.flush();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (BuildContext context) => OpenAccountScreen(session: _session)),
+    );
+  }
+
   Future<void> _select(_Tab tab) async {
     if (tab == _tab) return;
     await _session.flush();
     if (!mounted) return;
     setState(() => _tab = tab);
+  }
+}
+
+class _AddOptionRow extends StatelessWidget {
+  const _AddOptionRow({required this.icon, required this.label, required this.onTap, super.key});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: colors.secondaryContainer),
+                  alignment: Alignment.center,
+                  child: Icon(icon, color: colors.onSecondaryContainer, size: 22),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Text(label, style: Theme.of(context).textTheme.titleMedium)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
