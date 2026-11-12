@@ -34,7 +34,8 @@ String _posting(p.ParsedPosting posting) {
   final String? cost = _cost(posting.cost);
   final String? price = _price(posting.price);
   final String amounts = <String>[?units, ?cost, ?price].join(' ');
-  final String line = amounts.isEmpty ? '$flag $account'.trimLeft() : '$flag$account  $amounts';
+  final String prefix = flag.isEmpty ? '' : '$flag ';
+  final String line = amounts.isEmpty ? '$prefix$account' : '$prefix$account  $amounts';
   final StringBuffer out = StringBuffer('  $line\n');
   for (final p.MetaEntry entry in posting.meta.entries) {
     out.write('  ${_metaEntry(entry)}\n');

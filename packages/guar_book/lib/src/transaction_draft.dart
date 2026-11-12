@@ -33,6 +33,7 @@ class TransactionDraftPosting {
     this.units,
     this.cost,
     this.price,
+    this.flag,
     this.meta = const d.Meta(),
   });
 
@@ -40,6 +41,7 @@ class TransactionDraftPosting {
   final TransactionDraftAmount? units;
   final TransactionDraftCost? cost;
   final TransactionDraftPrice? price;
+  final d.Flag? flag;
   final d.Meta meta;
 }
 
@@ -104,6 +106,7 @@ p.ParsedPosting _posting(TransactionDraftPosting posting) => p.ParsedPosting(
   units: _units(posting.units),
   cost: _cost(posting.cost),
   price: _price(posting.price),
+  flag: _flagOf(posting.flag),
 );
 
 p.IncompleteAmount? _units(TransactionDraftAmount? units) {
@@ -183,3 +186,5 @@ p.Flag _flag(d.Flag? flag) => switch (flag) {
   }),
   d.LetterFlag(:final String value) => p.Flag.letter(value),
 };
+
+p.Flag? _flagOf(d.Flag? flag) => flag == null ? null : _flag(flag);
