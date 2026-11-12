@@ -111,7 +111,11 @@ class _AppShellState extends State<AppShell> {
         children: <Widget>[
           for (final _Tab tab in _Tab.values)
             switch (tab) {
-              _Tab.ledger => DirectivesScreen(key: const Key('directives'), session: _session),
+              _Tab.ledger => DirectivesScreen(
+                key: const Key('directives'),
+                session: _session,
+                onPluginsRequested: () => setState(() => _tab = _Tab.plugins),
+              ),
               _Tab.balances => BalancesScreen(key: const Key('balances'), session: _session),
               _Tab.prices => PricesScreen(key: const Key('prices'), session: _session),
               _Tab.plugins => PluginsScreen(key: const Key('plugins'), session: _session),

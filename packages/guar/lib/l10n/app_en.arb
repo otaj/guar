@@ -255,6 +255,10 @@
   "enterWholeNumber": "Enter a whole number",
 
   "openAccount": "Open account",
+  "editTransaction": "Edit transaction",
+  "editTransactionButton": "Save transaction",
+  "editNeedsAdvanced": "This transaction uses advanced features. Turn on Advanced UI in Settings to edit it.",
+  "cannotEditGenerated": "Generated entries cannot be edited.",
   "labelDate": "Date",
   "labelAccount": "Account",
   "labelCurrenciesComma": "Currencies (comma separated)",

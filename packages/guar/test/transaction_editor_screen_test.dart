@@ -359,6 +359,74 @@ void main() {
     expect(find.text('New transaction'), findsNothing);
     expect(documents.files[path], contains('  Assets:Cash  12.30 USD @ 2.00 USD\n  Expenses:Food\n'));
   });
+
+  testWidgets('editing replaces the transaction in place', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path:
+          '2026-01-01 open Assets:Cash\n'
+          '2026-01-01 open Expenses:Food\n'
+          '2026-01-02 * "Grocer" "Lunch"\n'
+          '  Expenses:Food  12.30 USD\n'
+          '  Assets:Cash\n',
+    });
+    await _openSession(tester, documents);
+
+    await tester.tap(find.text('Lunch'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Edit transaction'), findsOneWidget);
+    expect(tester.widget<TextFormField>(find.byKey(const Key('narration'))).controller!.text, 'Lunch');
+    expect(tester.widget<TextFormField>(find.byKey(const Key('leg-0-number'))).controller!.text, '12.30');
+
+    await tester.enterText(find.byKey(const Key('narration')), 'Dinner');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit transaction'), findsNothing);
+    expect(
+      documents.files[path],
+      '2026-01-01 open Assets:Cash\n'
+      '2026-01-01 open Expenses:Food\n'
+      '2026-01-02 * "Grocer" "Dinner"\n'
+      '  Assets:Cash  -12.30 USD\n'
+      '  Expenses:Food  12.30 USD\n',
+    );
+  });
+
+  testWidgets('editing keeps the transaction when the save fails validation', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    const String original =
+        '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+        '2026-01-01 open Assets:Cash\n'
+        '2026-01-01 open Expenses:Food\n'
+        '2026-01-01 open Expenses:Coffee\n'
+        '2026-01-02 * "Grocer" "Lunch"\n'
+        '  Expenses:Food  8.00 USD\n'
+        '  Expenses:Coffee  4.30 USD\n'
+        '  Assets:Cash\n';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path: original,
+    });
+    await _openSession(tester, documents);
+
+    await tester.tap(find.text('Lunch'));
+    await tester.pumpAndSettle();
+    _tallViewport(tester);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Edit transaction'), findsOneWidget);
+
+    // Filling the elided leg breaks the balance.
+    await tester.enterText(find.byKey(const Key('leg-2-number')), '1.00');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNull);
+    expect(documents.files[path], original);
+  });
 }
 
 String _today() {

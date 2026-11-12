@@ -14,12 +14,34 @@ import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart' as d;
 
 class TransactionEditorScreen extends StatefulWidget {
-  const TransactionEditorScreen({required this.session, super.key});
+  const TransactionEditorScreen({required this.session, this.edit, super.key});
 
   final LedgerSession session;
 
+  // The booked transaction to replace; null adds a new one.
+  final d.Directive? edit;
+
   @override
   State<TransactionEditorScreen> createState() => _TransactionEditorScreenState();
+}
+
+// Whether the booked transaction carries anything the simple two-leg form cannot show.
+bool transactionNeedsAdvanced(d.Directive directive) {
+  final d.Transaction? transaction = switch (directive.body) {
+    d.TransactionBody(:final d.Transaction value) => value,
+    _ => null,
+  };
+  if (transaction == null) return false;
+  if (directive.meta.entries.isNotEmpty) return true;
+  if (transaction.flag != const d.Flag.special(d.SpecialFlag.asterisk)) return true;
+  if (transaction.tags.isNotEmpty || transaction.links.isNotEmpty) return true;
+  if (transaction.postings.length != 2) return true;
+  for (final d.Posting posting in transaction.postings) {
+    if (posting.flag != null || posting.cost != null || posting.price != null || posting.meta.entries.isNotEmpty) {
+      return true;
+    }
+  }
+  return false;
 }
 
 class _LegDraft {
@@ -34,6 +56,9 @@ class _LegDraft {
   String priceNumber = '';
   String priceCurrency = '';
   String flag = '';
+  // Cost details the form does not edit but must not lose when saving.
+  d.BeanDate? costDate;
+  String? costLabel;
   final List<_MetaDraft> meta = <_MetaDraft>[];
 }
 
@@ -64,6 +89,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   void initState() {
     super.initState();
     widget.session.addListener(_onSession);
+    _prefill();
     _defaultAccounts();
     _queueCheck();
   }
@@ -106,6 +132,110 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     leg
       ..account = account
       ..accountName = account.name;
+  }
+
+  // Fills the form from the booked transaction being edited.
+  void _prefill() {
+    final d.Directive? directive = widget.edit;
+    if (directive == null) return;
+    final d.Transaction? transaction = switch (directive.body) {
+      d.TransactionBody(:final d.Transaction value) => value,
+      _ => null,
+    };
+    if (transaction == null) return;
+    _date = directive.date;
+    _flag = transaction.flag;
+    _payee.text = transaction.payee ?? '';
+    _narration.text = transaction.narration;
+    _tags.addAll(<String>[for (final d.Tag tag in transaction.tags) tag.name]);
+    _links.addAll(<String>[for (final d.Link link in transaction.links) link.name]);
+    _meta.addAll(<_MetaDraft>[for (final d.MetaEntry entry in directive.meta.entries) _metaDraft(entry)]);
+    if (directive.origin case d.SourceOrigin(:final d.BeanLocation location)) {
+      _target = location.filename;
+    }
+    if (_advanced) {
+      _legs
+        ..clear()
+        ..addAll(<_LegDraft>[for (final d.Posting posting in transaction.postings) _legOf(posting, directive)]);
+      return;
+    }
+    final int negative = transaction.postings.indexWhere(
+      (d.Posting posting) => posting.units.number < Decimal.zero,
+    );
+    final int from = negative == -1 ? 0 : negative;
+    final int to = from == 0 ? 1 : 0;
+    // The basic form carries one amount for both legs; show both at the same digit scale.
+    final d.Posting fromPosting = transaction.postings[from];
+    final d.Posting toPosting = transaction.postings[to];
+    final int scale = fromPosting.units.scale > toPosting.units.scale ? fromPosting.units.scale : toPosting.units.scale;
+    _fillLeg(_legs[0], fromPosting);
+    _legs[0].number = _positiveScaled(fromPosting.units, scale);
+    _fillLeg(_legs[1], toPosting);
+    _legs[1].number = _scaledNumber(toPosting.units, scale);
+    _queueCheck();
+  }
+
+  void _fillLeg(_LegDraft leg, d.Posting posting) {
+    leg
+      ..account = posting.account
+      ..accountName = posting.account.name
+      ..number = _amountNumber(posting.units)
+      ..currency = posting.units.currency.name;
+  }
+
+  _LegDraft _legOf(d.Posting posting, d.Directive directive) {
+    final d.Cost? cost = posting.cost;
+    final d.Amount? price = posting.price;
+    return _LegDraft()
+      ..account = posting.account
+      ..accountName = posting.account.name
+      ..number = _amountNumber(posting.units)
+      ..currency = posting.units.currency.name
+      ..flag = posting.flag == null ? '' : _flagLabel(posting.flag!)
+      ..priceMode = price == null ? '' : 'unit'
+      ..priceNumber = price == null ? '' : _amountNumber(price)
+      ..priceCurrency = price?.currency.name ?? ''
+      ..costMode = cost == null ? '' : 'unit'
+      ..costNumber = cost == null ? '' : '${cost.number}'
+      ..costCurrency = cost?.currency.name ?? ''
+      // A cost date equal to the transaction date was omitted in the source; keep it omitted.
+      ..costDate = cost != null && cost.date != directive.date ? cost.date : null
+      ..costLabel = cost?.label
+      ..meta.addAll(<_MetaDraft>[for (final d.MetaEntry entry in posting.meta.entries) _metaDraft(entry)]);
+  }
+
+  _MetaDraft _metaDraft(d.MetaEntry entry) {
+    final (String type, String value) = switch (entry.value) {
+      null => ('text', ''),
+      d.MetaText(:final String value) => ('text', value),
+      d.MetaAccount(:final d.Account value) => ('account', value.name),
+      d.MetaCurrency(:final d.Currency value) => ('currency', value.name),
+      d.MetaTag(:final d.Tag value) => ('tag', value.name),
+      d.MetaDate(:final d.BeanDate value) => ('date', '$value'),
+      d.MetaBoolean(:final bool value) => ('boolean', value ? 'TRUE' : 'FALSE'),
+      d.MetaNumber(:final Decimal value) => ('number', '$value'),
+      d.MetaAmount(:final d.Amount value) => ('amount', '${value.number} ${value.currency.name}'),
+    };
+    return _MetaDraft()
+      ..key = entry.key
+      ..type = type
+      ..value = value;
+  }
+
+  // The number with the digits the ledger booked, e.g. 12.30 not Decimal's 12.3.
+  String _amountNumber(d.Amount amount) => _scaledNumber(amount, amount.scale);
+
+  String _scaledNumber(d.Amount amount, int scale) {
+    final String number = '${amount.number}';
+    final int digits = number.contains('.') ? number.length - number.indexOf('.') - 1 : 0;
+    if (scale <= digits) return number;
+    final String base = number.contains('.') ? number : '$number.';
+    return '$base${'0' * (scale - digits)}';
+  }
+
+  String _positiveScaled(d.Amount amount, int scale) {
+    final String text = _scaledNumber(amount, scale);
+    return text.startsWith('-') ? text.substring(1) : text;
   }
 
   List<d.Account> _eligibleAccounts() {
@@ -276,6 +406,8 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
       numberPer: total || leg.costNumber.trim().isEmpty ? null : leg.costNumber.trim(),
       numberTotal: total && leg.costNumber.trim().isNotEmpty ? leg.costNumber.trim() : null,
       currency: currency,
+      date: leg.costDate,
+      label: leg.costLabel,
     );
   }
 
@@ -327,12 +459,25 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               : d.MetaValue.currency(_currency(value)!),
         'tag' => value.isEmpty ? null : d.MetaValue.tag(d.Tag(name: value)),
         'boolean' => d.MetaValue.boolean(value.toUpperCase() == 'TRUE'),
+        'amount' => _amountMeta(value),
         _ => null,
       };
       if (value.isNotEmpty && row.type != 'boolean' && typed == null) return null;
       entries.add(d.MetaEntry(key: key, value: typed));
     }
     return d.Meta(entries: entries);
+  }
+
+  // Meta amounts keep their currency, typed as "10 USD".
+  d.MetaValue? _amountMeta(String value) {
+    final RegExpMatch? match = RegExp(r'^(-?[0-9]+(?:\.[0-9]+)?) ([A-Za-z][A-Za-z0-9._-]*)$').firstMatch(value.trim());
+    if (match == null) return null;
+    final Decimal? number = _number(match.group(1)!);
+    final d.Currency? currency = _currency(match.group(2)!);
+    if (number == null || currency == null) return null;
+    final String text = match.group(1)!;
+    final int scale = text.contains('.') ? text.length - text.indexOf('.') - 1 : 0;
+    return d.MetaValue.amount(d.Amount(number: number, currency: currency, scale: scale));
   }
 
   d.Account? _domainAccount(String name) {
@@ -370,7 +515,11 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
       return;
     }
     final String target = _target ?? widget.session.document?.displayName ?? '';
-    final List<String> errors = await widget.session.validateTransaction(target, writeTransactionDraft(draft));
+    final List<String> errors = await widget.session.validateTransaction(
+      target,
+      writeTransactionDraft(draft),
+      replace: widget.edit,
+    );
     if (mounted) setState(() => _errors = errors);
   }
 
@@ -381,7 +530,12 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (draft == null || !_canSave) return;
     final String target = _target ?? widget.session.document?.displayName ?? '';
     await widget.session.flush();
-    await widget.session.addTransaction(target, writeTransactionDraft(draft));
+    final d.Directive? edit = widget.edit;
+    if (edit == null) {
+      await widget.session.addTransaction(target, writeTransactionDraft(draft));
+    } else {
+      await widget.session.editTransaction(edit, target, writeTransactionDraft(draft));
+    }
     if (!mounted) return;
     if (widget.session.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.session.error!)));
@@ -396,7 +550,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     final List<d.Account> accounts = _eligibleAccounts();
     final List<String> currencies = _ledgerCurrencies();
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.newTransaction)),
+      appBar: AppBar(title: Text(widget.edit == null ? l10n.newTransaction : l10n.editTransaction)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
@@ -494,7 +648,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             key: const Key('save'),
             onPressed: _canSave ? _save : null,
             icon: const Icon(Icons.check),
-            label: Text(l10n.addTransactionButton),
+            label: Text(widget.edit == null ? l10n.addTransactionButton : l10n.editTransactionButton),
           ),
           if (_advanced)
             Padding(
@@ -1232,6 +1386,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                     'date',
                     'account',
                     'currency',
+                    'amount',
                     'tag',
                     'boolean',
                   ])

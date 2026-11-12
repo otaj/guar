@@ -773,6 +773,19 @@ class GuarLocalizationsEn extends GuarLocalizations {
   String get openAccount => 'Open account';
 
   @override
+  String get editTransaction => 'Edit transaction';
+
+  @override
+  String get editTransactionButton => 'Save transaction';
+
+  @override
+  String get editNeedsAdvanced =>
+      'This transaction uses advanced features. Turn on Advanced UI in Settings to edit it.';
+
+  @override
+  String get cannotEditGenerated => 'Generated entries cannot be edited.';
+
+  @override
   String get labelDate => 'Date';
 
   @override

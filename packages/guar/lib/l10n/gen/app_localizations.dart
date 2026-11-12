@@ -1483,6 +1483,30 @@ abstract class GuarLocalizations {
   /// **'Open account'**
   String get openAccount;
 
+  /// No description provided for @editTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit transaction'**
+  String get editTransaction;
+
+  /// No description provided for @editTransactionButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save transaction'**
+  String get editTransactionButton;
+
+  /// No description provided for @editNeedsAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'This transaction uses advanced features. Turn on Advanced UI in Settings to edit it.'**
+  String get editNeedsAdvanced;
+
+  /// No description provided for @cannotEditGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated entries cannot be edited.'**
+  String get cannotEditGenerated;
+
   /// No description provided for @labelDate.
   ///
   /// In en, this message translates to:
