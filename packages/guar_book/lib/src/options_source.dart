@@ -66,6 +66,7 @@ class GuarOptions {
     this.advancedUi = false,
     this.writeDefaultOptions = false,
     this.allowUnopenedAccounts = false,
+    this.includeInferredPrices = false,
     this.hidden = const <String>{},
     this.language,
   });
@@ -73,6 +74,9 @@ class GuarOptions {
   final bool advancedUi;
   final bool writeDefaultOptions;
   final bool allowUnopenedAccounts;
+
+  // Whether the price database lists prices inferred from transaction postings.
+  final bool includeInferredPrices;
 
   final Set<String> hidden;
 
@@ -94,6 +98,7 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
   final _GuarBoolScan advancedUi = _scanGuarBool(source, parsed, 'advanced_ui');
   final _GuarBoolScan writeDefaults = _scanGuarBool(source, parsed, 'write_default_options');
   final _GuarBoolScan allowUnopened = _scanGuarBool(source, parsed, 'allow_unopened_accounts');
+  final _GuarBoolScan includeInferred = _scanGuarBool(source, parsed, 'include_inferred_prices');
   final ({String? value, List<String> errors}) language = _scanGuarText(source, parsed, 'language');
   final ({Set<String> values, List<String> errors}) hidden = _readHide(source, parsed);
   return LoadedLedgerOptions(
@@ -103,6 +108,7 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
       ...advancedUi.errors,
       ...writeDefaults.errors,
       ...allowUnopened.errors,
+      ...includeInferred.errors,
       ...language.errors,
       ...hidden.errors,
     ],
@@ -110,6 +116,7 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
       advancedUi: advancedUi.value,
       writeDefaultOptions: writeDefaults.value,
       allowUnopenedAccounts: allowUnopened.value,
+      includeInferredPrices: includeInferred.value,
       hidden: hidden.values,
       language: language.value,
     ),
@@ -149,6 +156,7 @@ String writeLedgerOptions(
       ..applyBool(key: 'write_default_options', enabled: guar.writeDefaultOptions, today: date)
       ..applyBool(key: 'advanced_ui', enabled: guar.advancedUi, today: date)
       ..applyBool(key: 'allow_unopened_accounts', enabled: guar.allowUnopenedAccounts, today: date)
+      ..applyBool(key: 'include_inferred_prices', enabled: guar.includeInferredPrices, today: date)
       ..applyText(key: 'language', value: guar.language, today: date);
   }
   if (!rewroteOptions && !rewrite.changed) {
@@ -451,6 +459,7 @@ class _Rewrite {
     'advanced_ui': _BoolAcc(),
     'write_default_options': _BoolAcc(),
     'allow_unopened_accounts': _BoolAcc(),
+    'include_inferred_prices': _BoolAcc(),
   };
   final Map<String, _TextAcc> texts = <String, _TextAcc>{'language': _TextAcc()};
   final List<_HideAcc> hides = <_HideAcc>[];
