@@ -2,6 +2,7 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:guar/src/amount_text.dart';
 import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/date_text.dart';
 import 'package:guar/src/ledger_session.dart';
@@ -229,7 +230,7 @@ class _TransactionTile extends StatelessWidget {
         trailing: displayAmount == null
             ? null
             : Text(
-                _amountText(displayAmount),
+                amountText(displayAmount),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
       ),
@@ -245,12 +246,6 @@ class _TransactionTile extends StatelessWidget {
 }
 
 // Keeps the parsed number's digits, e.g. 1.10 instead of Decimal's 1.1.
-String _amountText(Amount amount) {
-  final String number = amount.number.toString();
-  final int digits = number.contains('.') ? number.length - number.indexOf('.') - 1 : 0;
-  final String padded = amount.scale > digits ? '$number${'0' * (amount.scale - digits)}' : number;
-  return '$padded ${amount.currency.name}';
-}
 
 class _DirectiveTile extends StatelessWidget {
   const _DirectiveTile({required this.icon, required this.color, required this.label, this.meta});
@@ -409,17 +404,17 @@ String? _meta(DirectiveBody body) => switch (body) {
   OpenBody(:final List<Currency> currencies) =>
     currencies.isEmpty ? null : currencies.map((Currency c) => c.name).join(', '),
   BalanceBody(:final Amount amount, :final Decimal? tolerance) =>
-    '${_amountText(amount)}${tolerance == null ? '' : ' ~ $tolerance'}',
+    '${amountText(amount)}${tolerance == null ? '' : ' ~ $tolerance'}',
   CloseBody() => null,
   PadBody(:final Account sourceAccount) => 'from ${sourceAccount.name}',
-  PriceBody(:final Amount amount) => _amountText(amount),
+  PriceBody(:final Amount amount) => amountText(amount),
   CommodityBody() => null,
   NoteBody(:final String comment) => comment,
   DocumentBody(:final String filename) => filename,
   EventBody(:final String description) => description,
   QueryBody() => null,
   CustomBody(:final List<CustomValue> values) => values.isEmpty ? null : values.map(_customValue).join(' '),
-  BudgetBody(:final BudgetInterval interval, :final Amount amount) => '${_interval(interval)} ${_amountText(amount)}',
+  BudgetBody(:final BudgetInterval interval, :final Amount amount) => '${_interval(interval)} ${amountText(amount)}',
   BudgetOffBody(:final Currency? currency) => currency?.name,
 };
 

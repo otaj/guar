@@ -95,7 +95,11 @@ abstract class Inventory with _$Inventory {
 
     final List<Position> updated = <Position>[...positions];
     updated[index] = Position(
-      units: Amount(number: number, currency: units.currency),
+      units: Amount(
+        number: number,
+        currency: units.currency,
+        scale: existing.units.scale > units.scale ? existing.units.scale : units.scale,
+      ),
       cost: cost,
     );
     updated.sort(Position.compare);
