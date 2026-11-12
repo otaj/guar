@@ -15,6 +15,9 @@ class GuarLocalizationsEn extends GuarLocalizations {
   String get tabBalances => 'Balances';
 
   @override
+  String get tabPrices => 'Prices';
+
+  @override
   String get tabPlugins => 'Plugins';
 
   @override
@@ -125,6 +128,9 @@ class GuarLocalizationsEn extends GuarLocalizations {
 
   @override
   String get labelAllowUnopenedAccounts => 'Allow unopened accounts';
+
+  @override
+  String get labelIncludeInferredPrices => 'Include inferred prices';
 
   @override
   String get labelPreciseInterpolation => 'Precise interpolation';
@@ -302,6 +308,13 @@ class GuarLocalizationsEn extends GuarLocalizations {
   @override
   String get copyAllowUnopenedDetail =>
       'When this is on, the account pickers become plain text fields, so a posting can name an account no open directive shows, for example one a plugin such as autoopen opens. Accounts that nothing opens are still rejected when saving.';
+
+  @override
+  String get copyIncludeInferredSummary => 'List prices inferred from transactions.';
+
+  @override
+  String get copyIncludeInferredDetail =>
+      'The price database always shows explicit price directives. Turn this on to also list rates read from posting prices and costs in transactions, marked as inferred.';
 
   @override
   String get copyTitleSummary => 'Name shown for this ledger.';
@@ -686,6 +699,32 @@ class GuarLocalizationsEn extends GuarLocalizations {
 
   @override
   String get availableTitle => 'Available';
+
+  @override
+  String get viewByDate => 'By date';
+
+  @override
+  String get viewByPair => 'By pair';
+
+  @override
+  String get priceInferred => 'inferred';
+
+  @override
+  String get noPrices => 'This ledger has no prices.';
+
+  @override
+  String pricesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count prices',
+      one: '$count price',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get timeframeAll => 'All';
 
   @override
   String get dragTooltip => 'Drag to change the order';

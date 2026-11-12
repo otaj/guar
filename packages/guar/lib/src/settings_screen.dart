@@ -66,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _advancedUi = false;
   bool _writeDefaultOptions = false;
   bool _allowUnopenedAccounts = false;
+  bool _includeInferredPrices = false;
   Set<String> _hidden = <String>{};
   String _language = '';
   bool _renderCommas = false;
@@ -195,6 +196,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 allowUnopenedCopy(l10n),
                 _allowUnopenedAccounts,
                 (bool value) => _toggle(() => _allowUnopenedAccounts = value),
+              ),
+              _switch(
+                'includeInferredPrices',
+                l10n.labelIncludeInferredPrices,
+                includeInferredCopy(l10n),
+                _includeInferredPrices,
+                (bool value) => _toggle(() => _includeInferredPrices = value),
               ),
               _section(l10n.sectionLedgerScreen, l10n.ledgerScreenSummary),
               for (final GuarHide item in GuarHide.values)
@@ -546,6 +554,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _advancedUi = loaded.guar.advancedUi;
     _writeDefaultOptions = loaded.guar.writeDefaultOptions;
     _allowUnopenedAccounts = loaded.guar.allowUnopenedAccounts;
+    _includeInferredPrices = loaded.guar.includeInferredPrices;
     _hidden = Set<String>.of(loaded.guar.hidden);
     _language = loaded.guar.language ?? '';
     _booking = options.bookingMethod;
@@ -829,6 +838,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         advancedUi: _advancedUi,
         writeDefaultOptions: _writeDefaultOptions,
         allowUnopenedAccounts: _allowUnopenedAccounts,
+        includeInferredPrices: _includeInferredPrices,
         hidden: _hidden,
         language: _language.isEmpty ? null : _language,
       ),

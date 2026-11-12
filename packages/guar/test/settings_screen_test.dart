@@ -379,6 +379,33 @@ void main() {
     expect(tester.widget<SwitchListTile>(find.byKey(const Key('allowUnopenedAccounts'))).value, isFalse);
   });
 
+  testWidgets('writes include_inferred_prices when the switch is turned on', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('includeInferredPrices'))).value, isFalse);
+
+    await tester.ensureVisible(find.byKey(const Key('includeInferredPrices')));
+    await tester.tap(find.byKey(const Key('includeInferredPrices')));
+    await tester.pumpAndSettle();
+
+    final DateTime now = DateTime.now();
+    final String today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(documents.files[document.uri], '$today custom "guar_option" "include_inferred_prices" "TRUE"\n');
+
+    await tester.ensureVisible(find.byKey(const Key('includeInferredPrices')));
+    await tester.tap(find.byKey(const Key('includeInferredPrices')));
+    await tester.pumpAndSettle();
+
+    expect(documents.files[document.uri], '');
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('includeInferredPrices'))).value, isFalse);
+  });
+
   testWidgets('writes default option lines when the switch is turned on', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
