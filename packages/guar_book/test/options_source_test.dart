@@ -283,6 +283,50 @@ void main() {
     expect(loaded.errors, <String>['allow_unopened_accounts expects TRUE or FALSE']);
   });
 
+  test('reads include_inferred_prices from a guar_option directive', () {
+    expect(
+      readLedgerOptions(
+        '2020-01-01 custom "guar_option" "include_inferred_prices" "TRUE"\n',
+      ).guar.includeInferredPrices,
+      isTrue,
+    );
+    expect(
+      readLedgerOptions(
+        '2020-01-01 custom "guar_option" "include_inferred_prices" "false"\n',
+      ).guar.includeInferredPrices,
+      isFalse,
+    );
+    const String latest =
+        '2020-06-01 custom "guar_option" "include_inferred_prices" "TRUE"\n'
+        '2020-01-01 custom "guar_option" "include_inferred_prices" "FALSE"\n';
+    expect(readLedgerOptions(latest).guar.includeInferredPrices, isTrue);
+  });
+
+  test('reports a bad include_inferred_prices value', () {
+    const String source = '2020-01-01 custom "guar_option" "include_inferred_prices" "maybe"\n';
+    final LoadedLedgerOptions loaded = readLedgerOptions(source);
+    expect(loaded.guar.includeInferredPrices, isFalse);
+    expect(loaded.errors, <String>['include_inferred_prices expects TRUE or FALSE']);
+  });
+
+  test('writes and removes include_inferred_prices like the other guar bools', () {
+    final String written = writeLedgerOptions(
+      '2020-01-01 open Assets:Cash\n',
+      LedgerOptions(),
+      guar: const GuarOptions(includeInferredPrices: true),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(
+      written,
+      '2020-01-02 custom "guar_option" "include_inferred_prices" "TRUE"\n'
+      '2020-01-01 open Assets:Cash\n',
+    );
+    expect(
+      writeLedgerOptions(written, LedgerOptions(), guar: const GuarOptions(), today: DateTime(2020, 1, 2)),
+      '2020-01-01 open Assets:Cash\n',
+    );
+  });
+
   test('writes and removes allow_unopened_accounts like the other guar bools', () {
     final String written = writeLedgerOptions(
       '2020-01-01 open Assets:Cash\n',

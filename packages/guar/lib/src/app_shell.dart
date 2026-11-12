@@ -9,23 +9,29 @@ import 'package:guar/src/directives_screen.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar/src/open_account_screen.dart';
 import 'package:guar/src/plugins_screen.dart';
+import 'package:guar/src/prices_screen.dart';
 import 'package:guar/src/settings_screen.dart';
 import 'package:guar/src/transaction_editor_screen.dart';
 
 enum _Tab {
   ledger(Icons.list_alt_outlined, Icons.list_alt),
   balances(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet),
-  plugins(Icons.extension_outlined, Icons.extension),
+  prices(Icons.sell_outlined, Icons.sell, advancedOnly: true),
+  plugins(Icons.extension_outlined, Icons.extension, advancedOnly: true),
   settings(Icons.tune_outlined, Icons.tune);
 
-  const _Tab(this.icon, this.selectedIcon);
+  const _Tab(this.icon, this.selectedIcon, {this.advancedOnly = false});
 
   final IconData icon;
   final IconData selectedIcon;
 
+  // Hidden with the plugins screen unless advanced mode is on.
+  final bool advancedOnly;
+
   String label(GuarLocalizations l10n) => switch (this) {
     _Tab.ledger => l10n.tabLedger,
     _Tab.balances => l10n.tabBalances,
+    _Tab.prices => l10n.tabPrices,
     _Tab.plugins => l10n.tabPlugins,
     _Tab.settings => l10n.tabSettings,
   };
@@ -74,7 +80,7 @@ class _AppShellState extends State<AppShell> {
         _tab = _Tab.settings;
       } else if (uri != _openUri) {
         _tab = _Tab.ledger;
-      } else if (!_advanced && _tab == _Tab.plugins) {
+      } else if (!_advanced && _tab.advancedOnly) {
         _tab = _Tab.settings;
       }
       _openUri = uri;
@@ -90,10 +96,11 @@ class _AppShellState extends State<AppShell> {
     }
     final bool loaded = _session.settled && _session.document != null;
     final bool advanced = loaded && _advanced;
-    final _Tab visible = !loaded || (!advanced && _tab == _Tab.plugins) ? _Tab.settings : _tab;
+    final _Tab visible = !loaded || (!advanced && _tab.advancedOnly) ? _Tab.settings : _tab;
     final List<_Tab> tabs = <_Tab>[
       if (loaded) _Tab.ledger,
       if (loaded) _Tab.balances,
+      if (loaded && advanced) _Tab.prices,
       if (loaded && advanced) _Tab.plugins,
       _Tab.settings,
     ];
@@ -106,6 +113,7 @@ class _AppShellState extends State<AppShell> {
             switch (tab) {
               _Tab.ledger => DirectivesScreen(key: const Key('directives'), session: _session),
               _Tab.balances => BalancesScreen(key: const Key('balances'), session: _session),
+              _Tab.prices => PricesScreen(key: const Key('prices'), session: _session),
               _Tab.plugins => PluginsScreen(key: const Key('plugins'), session: _session),
               _Tab.settings => SettingsScreen(key: const Key('settings'), session: _session),
             },

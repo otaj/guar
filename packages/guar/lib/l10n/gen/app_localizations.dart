@@ -103,6 +103,12 @@ abstract class GuarLocalizations {
   /// **'Balances'**
   String get tabBalances;
 
+  /// No description provided for @tabPrices.
+  ///
+  /// In en, this message translates to:
+  /// **'Prices'**
+  String get tabPrices;
+
   /// No description provided for @tabPlugins.
   ///
   /// In en, this message translates to:
@@ -324,6 +330,12 @@ abstract class GuarLocalizations {
   /// In en, this message translates to:
   /// **'Allow unopened accounts'**
   String get labelAllowUnopenedAccounts;
+
+  /// No description provided for @labelIncludeInferredPrices.
+  ///
+  /// In en, this message translates to:
+  /// **'Include inferred prices'**
+  String get labelIncludeInferredPrices;
 
   /// No description provided for @labelPreciseInterpolation.
   ///
@@ -666,6 +678,18 @@ abstract class GuarLocalizations {
   /// In en, this message translates to:
   /// **'When this is on, the account pickers become plain text fields, so a posting can name an account no open directive shows, for example one a plugin such as autoopen opens. Accounts that nothing opens are still rejected when saving.'**
   String get copyAllowUnopenedDetail;
+
+  /// No description provided for @copyIncludeInferredSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'List prices inferred from transactions.'**
+  String get copyIncludeInferredSummary;
+
+  /// No description provided for @copyIncludeInferredDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The price database always shows explicit price directives. Turn this on to also list rates read from posting prices and costs in transactions, marked as inferred.'**
+  String get copyIncludeInferredDetail;
 
   /// No description provided for @copyTitleSummary.
   ///
@@ -1332,6 +1356,42 @@ abstract class GuarLocalizations {
   /// In en, this message translates to:
   /// **'Available'**
   String get availableTitle;
+
+  /// No description provided for @viewByDate.
+  ///
+  /// In en, this message translates to:
+  /// **'By date'**
+  String get viewByDate;
+
+  /// No description provided for @viewByPair.
+  ///
+  /// In en, this message translates to:
+  /// **'By pair'**
+  String get viewByPair;
+
+  /// No description provided for @priceInferred.
+  ///
+  /// In en, this message translates to:
+  /// **'inferred'**
+  String get priceInferred;
+
+  /// No description provided for @noPrices.
+  ///
+  /// In en, this message translates to:
+  /// **'This ledger has no prices.'**
+  String get noPrices;
+
+  /// No description provided for @pricesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {{count} price} other {{count} prices}}'**
+  String pricesCount(int count);
+
+  /// No description provided for @timeframeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get timeframeAll;
 
   /// No description provided for @dragTooltip.
   ///

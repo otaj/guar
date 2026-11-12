@@ -41,6 +41,9 @@ SettingCopy writeDefaultsCopy(GuarLocalizations l10n) =>
 SettingCopy allowUnopenedCopy(GuarLocalizations l10n) =>
     (summary: l10n.copyAllowUnopenedSummary, detail: l10n.copyAllowUnopenedDetail, warning: null);
 
+SettingCopy includeInferredCopy(GuarLocalizations l10n) =>
+    (summary: l10n.copyIncludeInferredSummary, detail: l10n.copyIncludeInferredDetail, warning: null);
+
 SettingCopy titleCopy(GuarLocalizations l10n) =>
     (summary: l10n.copyTitleSummary, detail: l10n.copyTitleDetail, warning: null);
 
