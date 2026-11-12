@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:guar/src/balances_screen.dart';
 import 'package:guar/src/directives_screen.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_session.dart';
@@ -13,6 +14,7 @@ import 'package:guar/src/transaction_editor_screen.dart';
 
 enum _Tab {
   ledger('Ledger', Icons.list_alt_outlined, Icons.list_alt),
+  balances('Balances', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet),
   plugins('Plugins', Icons.extension_outlined, Icons.extension),
   settings('Settings', Icons.tune_outlined, Icons.tune);
 
@@ -87,6 +89,7 @@ class _AppShellState extends State<AppShell> {
     final _Tab visible = !loaded || (!advanced && _tab == _Tab.plugins) ? _Tab.settings : _tab;
     final List<_Tab> tabs = <_Tab>[
       if (loaded) _Tab.ledger,
+      if (loaded) _Tab.balances,
       if (loaded && advanced) _Tab.plugins,
       _Tab.settings,
     ];
@@ -98,6 +101,7 @@ class _AppShellState extends State<AppShell> {
           for (final _Tab tab in _Tab.values)
             switch (tab) {
               _Tab.ledger => DirectivesScreen(key: const Key('directives'), session: _session),
+              _Tab.balances => BalancesScreen(key: const Key('balances'), session: _session),
               _Tab.plugins => PluginsScreen(key: const Key('plugins'), session: _session),
               _Tab.settings => SettingsScreen(key: const Key('settings'), session: _session),
             },
