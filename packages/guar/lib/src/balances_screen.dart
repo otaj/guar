@@ -2,10 +2,12 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
 import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
+import 'package:intl/intl.dart';
 
 class BalancesScreen extends StatefulWidget {
   const BalancesScreen({required this.session, super.key});
@@ -220,7 +222,7 @@ class _TypeHeader extends StatelessWidget {
           Icon(_typeIcon(type), size: 18, color: _typeColor(type, colors)),
           const SizedBox(width: 8),
           Text(
-            _typeLabel(type),
+            _typeLabel(type, GuarLocalizations.of(context)),
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(color: _typeColor(type, colors), fontWeight: FontWeight.w600),
@@ -246,7 +248,13 @@ class _TypeHeader extends StatelessWidget {
     AccountType.equity => colors.tertiary,
   };
 
-  String _typeLabel(AccountType type) => '${type.name[0].toUpperCase()}${type.name.substring(1)}';
+  String _typeLabel(AccountType type, GuarLocalizations l10n) => switch (type) {
+    AccountType.assets => l10n.typeAssets,
+    AccountType.expenses => l10n.typeExpenses,
+    AccountType.income => l10n.typeIncome,
+    AccountType.liabilities => l10n.typeLiabilities,
+    AccountType.equity => l10n.typeEquity,
+  };
 }
 
 class _AccountTile extends StatelessWidget {
@@ -292,13 +300,14 @@ class _AccountTile extends StatelessWidget {
   }
 
   Widget? _trailing(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final TextTheme text = Theme.of(context).textTheme;
     final ColorScheme colors = Theme.of(context).colorScheme;
     if (node.closeDate != null) {
       return ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 140),
         child: Text(
-          'Closed ${_shortDate(node.closeDate!)}',
+          l10n.closedDate(_shortDate(node.closeDate!, Localizations.localeOf(context).toString())),
           style: text.bodySmall?.copyWith(color: colors.error),
           overflow: TextOverflow.ellipsis,
         ),
@@ -306,7 +315,7 @@ class _AccountTile extends StatelessWidget {
     }
     if (node.balance.isEmpty) {
       final String placeholder = node.isVirtual || node.declaredCurrencies.isEmpty
-          ? 'No activity'
+          ? l10n.noActivity
           : node.declaredCurrencies.join(', ');
       return ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 140),
@@ -349,7 +358,7 @@ class _AccountTile extends StatelessWidget {
             )
           else if (sorted.length > 2)
             Text(
-              '+${sorted.length - 1} more',
+              l10n.moreCount(sorted.length - 1),
               maxLines: 1,
               textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
@@ -373,21 +382,6 @@ class _AccountTile extends StatelessWidget {
     return numberText;
   }
 
-  String _shortDate(BeanDate date) {
-    const List<String> months = <String>[
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}';
-  }
+  String _shortDate(BeanDate date, String locale) =>
+      DateFormat.MMMd(locale).format(DateTime(date.year, date.month, date.day));
 }

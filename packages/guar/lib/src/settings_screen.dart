@@ -3,6 +3,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
+import 'package:guar/src/app_errors.dart';
 import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_option_draft.dart';
 import 'package:guar/src/ledger_session.dart';
@@ -10,6 +12,9 @@ import 'package:guar/src/settings_copy.dart';
 import 'package:guar/src/settings_field.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
+
+// Native names for the languages Guar is translated to; they are not localized.
+const Map<String, String> _languageNames = <String, String>{'en': 'English'};
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({required this.session, super.key});
@@ -43,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _pumping = false;
   bool _again = false;
   int _seen = 0;
-  String? _fieldError;
+  OptionError? _fieldError;
   VoidCallback? _unbindFlush;
 
   LedgerDocument? get _document => widget.session.document;
@@ -54,7 +59,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool get _settled => widget.session.settled;
 
-  String? get _error => widget.session.error;
   List<String> _parseErrors = <String>[];
   Timer? _timer;
 
@@ -63,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _writeDefaultOptions = false;
   bool _allowUnopenedAccounts = false;
   Set<String> _hidden = <String>{};
+  String _language = '';
   bool _renderCommas = false;
   bool _insertPythonpath = false;
   bool _allowPipeSeparator = false;
@@ -104,11 +109,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final ColorScheme colors = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
     final LedgerDocument? document = _document;
-    final String? error = _error;
-    final String? fieldError = _fieldError;
+    final String? error = sessionMessage(widget.session, l10n);
+    final OptionError? fieldError = _fieldError;
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -117,17 +123,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: <Widget>[
             FilledButton(
               onPressed: _pickerBusy ? null : () => unawaited(_choose(widget.session.documents.openExisting)),
-              child: Text(document?.displayName ?? 'Open a ledger'),
+              child: Text(document?.displayName ?? l10n.openLedger),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Choose the root ledger file. That choice stays in the app.',
-              style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
-            ),
+            Text(l10n.pickLedgerHint, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
             const SizedBox(height: 16),
             FilledButton.tonal(
               onPressed: _pickerBusy ? null : () => unawaited(_choose(widget.session.documents.createNew)),
-              child: const Text('Create a new ledger'),
+              child: Text(l10n.createLedger),
             ),
             if (error != null) ...<Widget>[
               const SizedBox(height: 16),
@@ -135,12 +138,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             if (_busy) ...<Widget>[const SizedBox(height: 16), const LinearProgressIndicator()],
             const SizedBox(height: 32),
-            Text('Options', style: text.titleLarge),
+            Text(l10n.optionsTitle, style: text.titleLarge),
             const SizedBox(height: 12),
             if (!_settled)
               const SizedBox.shrink()
             else if (document == null)
-              Text('No ledger is selected.', style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant))
+              Text(l10n.noLedgerSelected, style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant))
             else ...<Widget>[
               for (final String message in _parseErrors)
                 Padding(
@@ -150,108 +153,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (fieldError != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(fieldError, style: text.bodyMedium?.copyWith(color: colors.error)),
+                  child: Text(
+                    optionErrorText(l10n, fieldError),
+                    style: text.bodyMedium?.copyWith(color: colors.error),
+                  ),
                 ),
               _switch(
                 'showAdvanced',
-                'Advanced settings',
-                showAdvancedCopy,
+                l10n.labelAdvancedSettings,
+                showAdvancedCopy(l10n),
                 _showAdvanced,
                 _setShowAdvanced,
               ),
-              _section('App', 'How Guar presents this ledger, and which options it writes.'),
+              _section(l10n.sectionApp, l10n.appSummary),
+              _menu<String>(
+                'language',
+                l10n.languageLabel,
+                languageCopy(l10n),
+                _language,
+                _languageValues(),
+                _languageLabel,
+                (String value) => _toggle(() => _language = value),
+              ),
               _switch(
                 'advancedUi',
-                'Advanced UI',
-                advancedUiCopy,
+                l10n.labelAdvancedUi,
+                advancedUiCopy(l10n),
                 _advancedUi,
                 (bool value) => _toggle(() => _advancedUi = value),
               ),
               _switch(
                 'writeDefaultOptions',
-                'Write default options',
-                writeDefaultsCopy,
+                l10n.labelWriteDefaultOptions,
+                writeDefaultsCopy(l10n),
                 _writeDefaultOptions,
                 (bool value) => _toggle(() => _writeDefaultOptions = value),
               ),
               _switch(
                 'allowUnopenedAccounts',
-                'Allow unopened accounts',
-                allowUnopenedCopy,
+                l10n.labelAllowUnopenedAccounts,
+                allowUnopenedCopy(l10n),
                 _allowUnopenedAccounts,
                 (bool value) => _toggle(() => _allowUnopenedAccounts = value),
               ),
-              _section(
-                'Ledger screen',
-                'Choose types to leave off the ledger screen. The entries stay in the file.',
-              ),
+              _section(l10n.sectionLedgerScreen, l10n.ledgerScreenSummary),
               for (final GuarHide item in GuarHide.values)
                 _switch(
                   'hide-${item.token}',
-                  item.label,
-                  hideCopy(item),
+                  hideLabel(item, l10n),
+                  hideCopy(item, l10n),
                   _hidden.contains(item.token),
                   (bool value) => _setHidden(item.token, hidden: value),
                 ),
-              _section('Ledger', 'The name of the books, the currencies, and how lots are booked.'),
-              _textField('title', 'Title', titleCopy),
+              _section(l10n.sectionLedger, l10n.ledgerSummary),
+              _textField('title', l10n.labelTitle, titleCopy(l10n)),
               _stringList(
                 'currencies',
-                'Operating currencies',
-                operatingCopy,
+                l10n.labelOperatingCurrencies,
+                operatingCopy(l10n),
                 _currencies,
                 _currencyFocus,
                 _addCurrency,
                 _removeCurrency,
               ),
-              _textField('conversion', 'Conversion currency', conversionCopy),
+              _textField('conversion', l10n.labelConversionCurrency, conversionCopy(l10n)),
               _menu<BookingMethod>(
                 'booking',
-                'Booking method',
-                bookingCopy,
+                l10n.labelBookingMethod,
+                bookingCopy(l10n),
                 _booking,
                 BookingMethod.values,
                 _bookingLabel,
                 (BookingMethod value) => _toggle(() => _booking = value),
               ),
-              _section('Account names', 'Every account starts with one of these five roots.'),
-              _textField('assets', 'Assets', assetsCopy),
-              _textField('liabilities', 'Liabilities', liabilitiesCopy),
-              _textField('equity', 'Equity', equityCopy),
-              _textField('income', 'Income', incomeCopy),
-              _textField('expenses', 'Expenses', expensesCopy),
+              _section(l10n.sectionAccountNames, l10n.accountNamesSummary),
+              _textField('assets', l10n.labelAssets, assetsCopy(l10n)),
+              _textField('liabilities', l10n.labelLiabilities, liabilitiesCopy(l10n)),
+              _textField('equity', l10n.labelEquity, equityCopy(l10n)),
+              _textField('income', l10n.labelIncome, incomeCopy(l10n)),
+              _textField('expenses', l10n.labelExpenses, expensesCopy(l10n)),
               if (_showAdvanced) ...<Widget>[
-                _section('Documents', 'Where document directives look for files.'),
+                _section(l10n.sectionDocuments, l10n.documentsSummary),
                 _stringList(
                   'documents',
-                  'Documents',
-                  documentsCopy,
+                  l10n.labelDocumentsField,
+                  documentsCopy(l10n),
                   _documents,
                   _documentFocus,
                   _addDocument,
                   _removeDocument,
                 ),
-                _section('Booking details', 'Tolerances, interpolation, and where leftover cents go.'),
+                _section(l10n.sectionBookingDetails, l10n.bookingDetailsSummary),
                 _switch(
                   'precise',
-                  'Precise interpolation',
-                  preciseCopy,
+                  l10n.labelPreciseInterpolation,
+                  preciseCopy(l10n),
                   _usePreciseInterpolation,
                   (bool value) => _toggle(() => _usePreciseInterpolation = value),
                 ),
                 _switch(
                   'inferCost',
-                  'Infer tolerance from cost',
-                  inferCostCopy,
+                  l10n.labelInferToleranceFromCost,
+                  inferCostCopy(l10n),
                   _inferToleranceFromCost,
                   (bool value) => _toggle(() => _inferToleranceFromCost = value),
                 ),
-                _textField('tolerance', 'Tolerance multiplier', toleranceCopy),
-                _textField('inferredMultiplier', 'Inferred tolerance multiplier', inferredMultiplierCopy),
+                _textField('tolerance', l10n.labelToleranceMultiplier, toleranceCopy(l10n)),
+                _textField('inferredMultiplier', l10n.labelInferredToleranceMultiplier, inferredMultiplierCopy(l10n)),
                 _pairList(
                   'tolerances',
-                  'Inferred tolerance defaults',
-                  inferredDefaultsCopy,
+                  l10n.labelInferredToleranceDefaults,
+                  inferredDefaultsCopy(l10n),
                   _toleranceKeys,
                   _toleranceValues,
                   _toleranceKeyFocus,
@@ -259,58 +271,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _addTolerance,
                   _removeTolerance,
                 ),
-                _textField('rounding', 'Rounding account', roundingCopy),
-                _section('System accounts', 'Accounts used when queries open, close, or clear the books.'),
-                _textField('previousBalances', 'Previous balances', previousBalancesCopy),
-                _textField('previousEarnings', 'Previous earnings', previousEarningsCopy),
-                _textField('previousConversions', 'Previous conversions', previousConversionsCopy),
-                _textField('currentEarnings', 'Current earnings', currentEarningsCopy),
-                _textField('currentConversions', 'Current conversions', currentConversionsCopy),
-                _textField('unrealizedGains', 'Unrealized gains', unrealizedCopy),
-                _section('Plugins', 'When plugins run relative to the other checks.'),
+                _textField('rounding', l10n.labelRoundingAccount, roundingCopy(l10n)),
+                _section(l10n.sectionSystemAccounts, l10n.systemAccountsSummary),
+                _textField('previousBalances', l10n.labelPreviousBalances, previousBalancesCopy(l10n)),
+                _textField('previousEarnings', l10n.labelPreviousEarnings, previousEarningsCopy(l10n)),
+                _textField('previousConversions', l10n.labelPreviousConversions, previousConversionsCopy(l10n)),
+                _textField('currentEarnings', l10n.labelCurrentEarnings, currentEarningsCopy(l10n)),
+                _textField('currentConversions', l10n.labelCurrentConversions, currentConversionsCopy(l10n)),
+                _textField('unrealizedGains', l10n.labelUnrealizedGains, unrealizedCopy(l10n)),
+                _section(l10n.sectionPlugins, l10n.pluginsSummary),
                 _menu<PluginProcessingMode>(
                   'pluginMode',
-                  'Plugin processing mode',
-                  pluginModeCopy,
+                  l10n.labelPluginMode,
+                  pluginModeCopy(l10n),
                   _pluginMode,
                   PluginProcessingMode.values,
                   _pluginLabel,
                   (PluginProcessingMode value) => _toggle(() => _pluginMode = value),
                 ),
-                _section('Compatibility', 'Older syntax, and options kept for other Beancount tools.'),
+                _section(l10n.sectionCompatibility, l10n.compatibilitySummary),
                 _switch(
                   'pipe',
-                  'Allow pipe separator',
-                  pipeCopy,
+                  l10n.labelAllowPipeSeparator,
+                  pipeCopy(l10n),
                   _allowPipeSeparator,
                   (bool value) => _toggle(() => _allowPipeSeparator = value),
                 ),
                 _switch(
                   'deprecatedNone',
-                  'Allow deprecated none for tags and links',
-                  deprecatedNoneCopy,
+                  l10n.labelAllowDeprecatedNone,
+                  deprecatedNoneCopy(l10n),
                   _allowDeprecatedNone,
                   (bool value) => _toggle(() => _allowDeprecatedNone = value),
                 ),
                 _switch(
                   'pythonpath',
-                  'Insert Python path',
-                  pythonPathCopy,
+                  l10n.labelInsertPythonPath,
+                  pythonPathCopy(l10n),
                   _insertPythonpath,
                   (bool value) => _toggle(() => _insertPythonpath = value),
                 ),
                 _switch(
                   'commas',
-                  'Render commas',
-                  renderCommasCopy,
+                  l10n.labelRenderCommas,
+                  renderCommasCopy(l10n),
                   _renderCommas,
                   (bool value) => _toggle(() => _renderCommas = value),
                 ),
-                _textField('maxlines', 'Long string max lines', maxLinesCopy),
+                _textField('maxlines', l10n.labelLongStringMaxLines, maxLinesCopy(l10n)),
                 _pairList(
                   'precision',
-                  'Display precision',
-                  precisionCopy,
+                  l10n.labelDisplayPrecision,
+                  precisionCopy(l10n),
                   _precisionKeys,
                   _precisionValues,
                   _precisionKeyFocus,
@@ -324,6 +336,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  // An empty string means the phone language; a handwritten unknown code stays visible.
+  List<String> _languageValues() {
+    final List<String> known = <String>[
+      for (final Locale locale in GuarLocalizations.supportedLocales) locale.languageCode,
+    ];
+    return <String>[
+      '',
+      ...known,
+      if (_language.isNotEmpty && !known.contains(_language)) _language,
+    ];
+  }
+
+  String _languageLabel(String value) {
+    if (value.isEmpty) return GuarLocalizations.of(context).languageSystem;
+    return _languageNames[value] ?? value;
   }
 
   Widget _section(String title, String summary) {
@@ -420,7 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton(onPressed: onAdd, child: Text('Add $label')),
+          child: TextButton(onPressed: onAdd, child: Text(GuarLocalizations.of(context).addLabel(label))),
         ),
       ],
     ),
@@ -450,7 +479,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: TextFormField(
                   controller: keys[index],
                   focusNode: keyNodes[index],
-                  decoration: const InputDecoration(labelText: 'Key', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: GuarLocalizations.of(context).keyLabel,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -458,7 +490,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: TextFormField(
                   controller: values[index],
                   focusNode: valueNodes[index],
-                  decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: GuarLocalizations.of(context).numberLabel,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ),
               IconButton(onPressed: () => onRemove(index), icon: const Icon(Icons.close)),
@@ -466,7 +501,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton(onPressed: onAdd, child: Text('Add $label')),
+          child: TextButton(onPressed: onAdd, child: Text(GuarLocalizations.of(context).addLabel(label))),
         ),
       ],
     ),
@@ -512,6 +547,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _writeDefaultOptions = loaded.guar.writeDefaultOptions;
     _allowUnopenedAccounts = loaded.guar.allowUnopenedAccounts;
     _hidden = Set<String>.of(loaded.guar.hidden);
+    _language = loaded.guar.language ?? '';
     _booking = options.bookingMethod;
     _pluginMode = options.pluginProcessingMode;
     _renderCommas = options.renderCommas;
@@ -767,11 +803,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final bool showAdvanced = _showAdvanced;
     final DraftedOptions drafted = draftLedgerOptions(_inputs(showAdvanced: showAdvanced));
-    final String? error = drafted.error;
+    final OptionError? error = drafted.error;
     final LedgerOptions? options = drafted.options;
     if (error != null || options == null) {
       if (mounted) {
-        setState(() => _fieldError = error ?? 'Could not save that option.');
+        setState(() => _fieldError = error);
       }
       return;
     }
@@ -794,6 +830,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         writeDefaultOptions: _writeDefaultOptions,
         allowUnopenedAccounts: _allowUnopenedAccounts,
         hidden: _hidden,
+        language: _language.isEmpty ? null : _language,
       ),
       preserveKeys: showAdvanced ? const <String>{} : advancedOptionKeys,
     );

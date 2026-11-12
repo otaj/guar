@@ -3,6 +3,14 @@
 import 'package:decimal/decimal.dart';
 import 'package:guar_domain/guar_domain.dart';
 
+enum OptionError {
+  invalidAccountName,
+  invalidCurrencyCode,
+  wholeNumberZeroOrGreater,
+  enterNumber,
+  quotesNotAllowed,
+}
+
 class OptionInputs {
   const OptionInputs({
     required this.title,
@@ -75,12 +83,12 @@ class DraftedOptions {
   const DraftedOptions.bad(this.error) : options = null, accounts = const <String, String>{};
 
   final LedgerOptions? options;
-  final String? error;
+  final OptionError? error;
   final Map<String, String> accounts;
 }
 
 DraftedOptions draftLedgerOptions(OptionInputs input) {
-  final String? quoted = _quoted(<String>[
+  final OptionError? quoted = _quoted(<String>[
     input.title,
     input.conversionCurrency,
     input.longStringMaxlines,
@@ -117,7 +125,7 @@ DraftedOptions draftLedgerOptions(OptionInputs input) {
   if (<String>[prefixes.assets, prefixes.liabilities, prefixes.equity, prefixes.income, prefixes.expenses].any(
     (String name) => !isValidAccountRoot(name),
   )) {
-    return const DraftedOptions.bad('not a valid account name');
+    return const DraftedOptions.bad(OptionError.invalidAccountName);
   }
 
   final LedgerOptions previous = LedgerOptions(accountPrefixes: input.baselinePrefixes);
@@ -150,11 +158,11 @@ DraftedOptions draftLedgerOptions(OptionInputs input) {
   }
 
   if (accounts.values.any((String name) => account(name) == null)) {
-    return const DraftedOptions.bad('not a valid account name');
+    return const DraftedOptions.bad(OptionError.invalidAccountName);
   }
   final String rounding = input.rounding.trim();
   if (rounding.isNotEmpty && account(rounding) == null) {
-    return const DraftedOptions.bad('not a valid account name');
+    return const DraftedOptions.bad(OptionError.invalidAccountName);
   }
 
   final List<Currency> operating = <Currency>[];
@@ -164,23 +172,23 @@ DraftedOptions draftLedgerOptions(OptionInputs input) {
     }
     final Currency? currency = _currency(name);
     if (currency == null) {
-      return const DraftedOptions.bad('not a valid currency code');
+      return const DraftedOptions.bad(OptionError.invalidCurrencyCode);
     }
     operating.add(currency);
   }
   final Currency? conversion = _currency(input.conversionCurrency.trim());
   if (conversion == null) {
-    return const DraftedOptions.bad('not a valid currency code');
+    return const DraftedOptions.bad(OptionError.invalidCurrencyCode);
   }
 
   final int? maxLines = int.tryParse(input.longStringMaxlines.trim());
   if (maxLines == null || maxLines < 0) {
-    return const DraftedOptions.bad('Enter a whole number zero or greater');
+    return const DraftedOptions.bad(OptionError.wholeNumberZeroOrGreater);
   }
   final OptionNumber? tolerance = _number(input.toleranceMultiplier);
   final OptionNumber? inferred = _number(input.inferredToleranceMultiplier);
   if (tolerance == null || inferred == null) {
-    return const DraftedOptions.bad('Enter a number');
+    return const DraftedOptions.bad(OptionError.enterNumber);
   }
 
   final List<InferredTolerance> tolerances = <InferredTolerance>[];
@@ -190,7 +198,7 @@ DraftedOptions draftLedgerOptions(OptionInputs input) {
     }
     final InferredTolerance? parsed = _tolerance(row.key.trim(), row.value.trim());
     if (parsed == null) {
-      return const DraftedOptions.bad('Enter a number');
+      return const DraftedOptions.bad(OptionError.enterNumber);
     }
     tolerances.add(parsed);
   }
@@ -201,7 +209,7 @@ DraftedOptions draftLedgerOptions(OptionInputs input) {
     }
     final DisplayPrecision? parsed = _precision(row.key.trim(), row.value.trim());
     if (parsed == null) {
-      return const DraftedOptions.bad('Enter a number');
+      return const DraftedOptions.bad(OptionError.enterNumber);
     }
     precisions.add(parsed);
   }
@@ -243,10 +251,10 @@ DraftedOptions draftLedgerOptions(OptionInputs input) {
 
 String _snap(String current, Account previous, Account updated) => current == previous.name ? updated.name : current;
 
-String? _quoted(List<String> values) {
+OptionError? _quoted(List<String> values) {
   for (final String value in values) {
     if (value.contains('"')) {
-      return 'Quotes cannot be stored in an option value';
+      return OptionError.quotesNotAllowed;
     }
   }
   return null;

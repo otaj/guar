@@ -5,6 +5,8 @@ import 'dart:async';
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
+import 'package:guar/src/app_errors.dart';
 import 'package:guar/src/arithmetic.dart';
 import 'package:guar/src/date_text.dart';
 import 'package:guar/src/ledger_session.dart';
@@ -390,10 +392,11 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final List<d.Account> accounts = _eligibleAccounts();
     final List<String> currencies = _ledgerCurrencies();
     return Scaffold(
-      appBar: AppBar(title: const Text('New transaction')),
+      appBar: AppBar(title: Text(l10n.newTransaction)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
@@ -403,21 +406,24 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             key: const Key('narration'),
             controller: _narration,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Description (optional)', prefixIcon: Icon(Icons.description)),
+            decoration: InputDecoration(labelText: l10n.labelDescription, prefixIcon: const Icon(Icons.description)),
             onChanged: (String _) => _queueCheck(),
           ),
           const SizedBox(height: 12),
           TextFormField(
             key: const Key('payee'),
             controller: _payee,
-            decoration: const InputDecoration(labelText: 'Payee (optional)', prefixIcon: Icon(Icons.person)),
+            decoration: InputDecoration(labelText: l10n.labelPayee, prefixIcon: const Icon(Icons.person)),
             onChanged: (String _) => _queueCheck(),
           ),
           if (_advanced) ...<Widget>[
             const SizedBox(height: 12),
             Row(
               children: <Widget>[
-                Text('Status', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  l10n.statusTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(width: 16),
                 ActionChip(
                   key: const Key('flag'),
@@ -432,7 +438,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             const SizedBox(height: 12),
             _linksSection(),
             const SizedBox(height: 12),
-            ..._metaSection(_meta, 'Transaction metadata'),
+            ..._metaSection(_meta, l10n.transactionMetaTitle),
           ],
           if (!_advanced) ...<Widget>[
             const SizedBox(height: 12),
@@ -443,7 +449,10 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
           if (_advanced) ...<Widget>[
             Row(
               children: <Widget>[
-                Text('Postings', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  l10n.postingsTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
                 const Spacer(),
                 TextButton.icon(
                   key: const Key('add-leg'),
@@ -452,7 +461,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                     _queueCheck();
                   },
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add posting'),
+                  label: Text(l10n.addPosting),
                 ),
               ],
             ),
@@ -462,7 +471,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               DropdownButtonFormField<String>(
                 key: const Key('target'),
                 initialValue: _target ?? _targets().first,
-                decoration: const InputDecoration(labelText: 'File'),
+                decoration: InputDecoration(labelText: l10n.labelFile),
                 items: <DropdownMenuItem<String>>[
                   for (final String target in _targets()) DropdownMenuItem<String>(value: target, child: Text(target)),
                 ],
@@ -477,7 +486,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
           for (final String error in _errors)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              child: Text(appendErrorText(l10n, error), style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
           if (_unknownAccounts().isNotEmpty) _unopenedPopup(_unknownAccounts().first),
           const SizedBox(height: 24),
@@ -485,13 +494,13 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             key: const Key('save'),
             onPressed: _canSave ? _save : null,
             icon: const Icon(Icons.check),
-            label: const Text('Add transaction'),
+            label: Text(l10n.addTransactionButton),
           ),
           if (_advanced)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
-                'Leave one posting amount empty for auto-balancing.',
+                l10n.autoBalanceHint,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withAlpha(130),
                 ),
@@ -513,8 +522,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'You need at least two open accounts to create a transaction. '
-                        'Open them with the plus button first.',
+                        l10n.needTwoAccounts,
                         style: TextStyle(color: Theme.of(context).colorScheme.onTertiaryContainer),
                       ),
                     ),
@@ -538,7 +546,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       leading: const Icon(Icons.calendar_today),
-      title: Text(formatBeanDate(_date)),
+      title: Text(formatBeanDate(_date, Localizations.localeOf(context).toString())),
       onTap: () async {
         final DateTime? picked = await showDatePicker(
           context: context,
@@ -564,7 +572,10 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         child: TextFormField(
           key: const Key('leg-0-number'),
           controller: TextEditingController(text: _legs[0].number),
-          decoration: const InputDecoration(labelText: 'Amount', prefixIcon: Icon(Icons.tag, size: 20)),
+          decoration: InputDecoration(
+            labelText: GuarLocalizations.of(context).labelAmount,
+            prefixIcon: const Icon(Icons.tag, size: 20),
+          ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
           inputFormatters: <TextInputFormatter>[
             FilteringTextInputFormatter.allow(RegExp(r'[0-9.+\-*/() ]')),
@@ -600,8 +611,9 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   ];
 
   Widget _accountField(int index, _LegDraft leg) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final List<d.Account> accounts = _eligibleAccounts();
-    final String label = index == 0 ? 'From account' : 'To account';
+    final String label = index == 0 ? l10n.fromAccount : l10n.toAccount;
     if (_freeAccounts) {
       return TextFormField(
         key: Key('leg-$index-account'),
@@ -618,7 +630,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     return DropdownButtonFormField<d.Account>(
       key: Key('leg-$index-account'),
       initialValue: leg.account,
-      decoration: const InputDecoration(labelText: 'Account'),
+      decoration: InputDecoration(labelText: l10n.labelAccount),
       isExpanded: true,
       items: <DropdownMenuItem<d.Account>>[
         for (final d.Account account in accounts)
@@ -640,7 +652,10 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Tags', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          GuarLocalizations.of(context).tagsTitle,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
         Wrap(
           key: const Key('tags'),
@@ -660,7 +675,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             ActionChip(
               key: const Key('add-tag'),
               avatar: Icon(Icons.add, size: 16, color: Theme.of(context).colorScheme.primary),
-              label: const Text('New tag'),
+              label: Text(GuarLocalizations.of(context).newTag),
               onPressed: () => _newNameDialog('#', (String name) => setState(() => _tags.add(name))),
               visualDensity: VisualDensity.compact,
             ),
@@ -675,7 +690,10 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Links', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          GuarLocalizations.of(context).linksTitle,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
         Wrap(
           key: const Key('links'),
@@ -695,7 +713,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             ActionChip(
               key: const Key('add-link'),
               avatar: Icon(Icons.add, size: 16, color: Theme.of(context).colorScheme.primary),
-              label: const Text('New link'),
+              label: Text(GuarLocalizations.of(context).newLink),
               onPressed: () => _newNameDialog('^', (String name) => setState(() => _links.add(name))),
               visualDensity: VisualDensity.compact,
             ),
@@ -706,27 +724,28 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   }
 
   Future<void> _newNameDialog(String prefix, void Function(String) onAdd) async {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final TextEditingController controller = TextEditingController();
     final String? name = await showDialog<String>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text('New ${prefix == '#' ? 'tag' : 'link'}'),
+        title: Text(prefix == '#' ? l10n.newTag : l10n.newLink),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: InputDecoration(labelText: 'Name', prefixText: prefix, hintText: 'e.g. trip-2024'),
+          decoration: InputDecoration(labelText: l10n.labelName, prefixText: prefix, hintText: l10n.nameHint),
           inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-_./]'))],
           onSubmitted: (String value) {
             if (value.trim().isNotEmpty) Navigator.of(dialogContext).pop(value.trim());
           },
         ),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.cancel)),
           FilledButton(
             onPressed: () {
               if (controller.text.trim().isNotEmpty) Navigator.of(dialogContext).pop(controller.text.trim());
             },
-            child: const Text('Add'),
+            child: Text(l10n.add),
           ),
         ],
       ),
@@ -738,6 +757,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   }
 
   Future<void> _pickFlag() async {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final d.Flag? picked = await showModalBottomSheet<d.Flag>(
       context: context,
       showDragHandle: true,
@@ -748,13 +768,13 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             for (final d.SpecialFlag flag in d.SpecialFlag.values)
               ListTile(
                 leading: Text(_specialSymbol(flag), style: Theme.of(context).textTheme.titleMedium),
-                title: Text(_specialName(flag)),
+                title: Text(_specialName(flag, l10n)),
                 trailing: _flag == d.Flag.special(flag) ? const Icon(Icons.check) : null,
                 onTap: () => Navigator.pop(sheetContext, d.Flag.special(flag)),
               ),
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Custom flag...'),
+              title: Text(l10n.customFlagEllipsis),
               onTap: () async {
                 Navigator.pop(sheetContext);
                 final d.Flag? flag = await _customFlagDialog();
@@ -775,29 +795,30 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   }
 
   Future<d.Flag?> _customFlagDialog() async {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final TextEditingController controller = TextEditingController();
     final String? text = await showDialog<String>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Custom Flag'),
+        title: Text(l10n.customFlagTitle),
         content: TextField(
           controller: controller,
           maxLength: 1,
           autofocus: true,
           textCapitalization: TextCapitalization.characters,
           inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp('[A-Za-z!&#?%]'))],
-          decoration: const InputDecoration(hintText: 'Single character'),
+          decoration: InputDecoration(hintText: l10n.singleCharacter),
           onSubmitted: (String value) {
             if (value.trim().isNotEmpty) Navigator.of(dialogContext).pop(value.trim());
           },
         ),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.cancel)),
           FilledButton(
             onPressed: () {
               if (controller.text.trim().isNotEmpty) Navigator.of(dialogContext).pop(controller.text.trim());
             },
-            child: const Text('Set'),
+            child: Text(l10n.set),
           ),
         ],
       ),
@@ -814,39 +835,43 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
       if (_unknownAccount.firstMatch(error) case final RegExpMatch match) match.group(1)!,
   ];
 
-  Widget _unopenedPopup(String account) => Card(
-    key: const Key('unopened-popup'),
-    margin: const EdgeInsets.only(top: 12),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text('$account is not opened.', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          const Text('Open the account, or turn a plugin on that opens it.'),
-          Row(
-            children: <Widget>[
-              TextButton(key: const Key('open-account'), onPressed: _openAccount, child: const Text('Open account')),
-              TextButton(
-                key: const Key('open-plugins'),
-                onPressed: () => Navigator.of(context).pop('plugins'),
-                child: const Text('Turn a plugin on'),
-              ),
-            ],
-          ),
-        ],
+  Widget _unopenedPopup(String account) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
+    return Card(
+      key: const Key('unopened-popup'),
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(l10n.notOpened(account), style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(l10n.notOpenedHint),
+            Row(
+              children: <Widget>[
+                TextButton(key: const Key('open-account'), onPressed: _openAccount, child: Text(l10n.openAccount)),
+                TextButton(
+                  key: const Key('open-plugins'),
+                  onPressed: () => Navigator.of(context).pop('plugins'),
+                  child: Text(l10n.turnPluginOn),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Future<void> _openAccount() async {
     final String target = _target ?? widget.session.document?.displayName ?? '';
     await widget.session.flush();
     await widget.session.addTransaction(target, '$_date open ${_unknownAccounts().first}\n');
     if (!mounted) return;
-    if (widget.session.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.session.error!)));
+    final String? message = sessionMessage(widget.session, GuarLocalizations.of(context));
+    if (message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -859,6 +884,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
 
   Widget _legCard(int index, List<d.Account> accounts, List<String> currencies) {
     final _LegDraft leg = _legs[index];
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final ThemeData theme = Theme.of(context);
     return Card(
       key: Key('leg-$index'),
@@ -871,7 +897,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             Row(
               children: <Widget>[
                 Text(
-                  'Posting ${index + 1}',
+                  l10n.postingIndex(index + 1),
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w600,
@@ -885,7 +911,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                     size: 16,
                     color: leg.flag.isEmpty ? theme.colorScheme.outline : theme.colorScheme.primary,
                   ),
-                  label: Text(leg.flag.isEmpty ? 'No flag' : leg.flag, style: const TextStyle(fontSize: 12)),
+                  label: Text(leg.flag.isEmpty ? l10n.noFlag : leg.flag, style: const TextStyle(fontSize: 12)),
                   visualDensity: VisualDensity.compact,
                   onPressed: () => _pickPostingFlag(leg),
                 ),
@@ -908,7 +934,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             const SizedBox(height: 8),
             _priceCostChips(
               mode: leg.priceMode,
-              noneLabel: 'No price',
+              noneLabel: l10n.noPrice,
               unitLabel: '@ unit',
               totalLabel: '@@ total',
               onMode: (String mode) {
@@ -923,7 +949,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                 currencyKey: Key('leg-$index-price-currency'),
                 number: leg.priceNumber,
                 currency: leg.priceCurrency,
-                label: leg.priceMode == 'total' ? 'Total price' : 'Price per unit',
+                label: leg.priceMode == 'total' ? l10n.totalPrice : l10n.pricePerUnit,
                 currencies: currencies,
                 onNumber: (String value) {
                   leg.priceNumber = value;
@@ -938,7 +964,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             const SizedBox(height: 8),
             _priceCostChips(
               mode: leg.costMode,
-              noneLabel: 'No cost',
+              noneLabel: l10n.noCost,
               unitLabel: '{} per unit',
               totalLabel: '{#} total',
               onMode: (String mode) {
@@ -953,7 +979,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                 currencyKey: Key('leg-$index-cost-currency'),
                 number: leg.costNumber,
                 currency: leg.costCurrency,
-                label: leg.costMode == 'total' ? 'Total cost' : 'Cost per unit',
+                label: leg.costMode == 'total' ? l10n.totalCost : l10n.costPerUnit,
                 currencies: currencies,
                 onNumber: (String value) {
                   leg.costNumber = value;
@@ -966,7 +992,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               ),
             ],
             const SizedBox(height: 4),
-            ..._metaSection(leg.meta, 'Posting metadata'),
+            ..._metaSection(leg.meta, l10n.postingMetaTitle),
           ],
         ),
       ),
@@ -974,11 +1000,12 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   }
 
   Widget _legAccountField(int index, _LegDraft leg, List<d.Account> accounts) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     if (_freeAccounts) {
       return TextFormField(
         key: Key('leg-$index-account'),
         controller: TextEditingController(text: leg.accountName),
-        decoration: const InputDecoration(labelText: 'Account'),
+        decoration: InputDecoration(labelText: l10n.labelAccount),
         onChanged: (String value) {
           leg
             ..accountName = value
@@ -990,7 +1017,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     return DropdownButtonFormField<d.Account>(
       key: Key('leg-$index-account'),
       initialValue: leg.account,
-      decoration: const InputDecoration(labelText: 'Account'),
+      decoration: InputDecoration(labelText: l10n.labelAccount),
       isExpanded: true,
       items: <DropdownMenuItem<d.Account>>[
         for (final d.Account account in accounts)
@@ -1015,10 +1042,10 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         child: TextFormField(
           key: Key('leg-$index-number'),
           controller: TextEditingController(text: leg.number),
-          decoration: const InputDecoration(
-            labelText: 'Amount',
-            hintText: 'Auto',
-            prefixIcon: Icon(Icons.tag, size: 20),
+          decoration: InputDecoration(
+            labelText: GuarLocalizations.of(context).labelAmount,
+            hintText: GuarLocalizations.of(context).autoHint,
+            prefixIcon: const Icon(Icons.tag, size: 20),
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
           inputFormatters: <TextInputFormatter>[
@@ -1113,6 +1140,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   );
 
   Future<void> _pickPostingFlag(_LegDraft leg) async {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final String? picked = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -1122,20 +1150,20 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
           children: <Widget>[
             ListTile(
               leading: const Icon(Icons.flag_outlined),
-              title: const Text('None'),
+              title: Text(l10n.none),
               trailing: leg.flag.isEmpty ? const Icon(Icons.check) : null,
               onTap: () => Navigator.pop(sheetContext, ''),
             ),
             for (final d.SpecialFlag flag in d.SpecialFlag.values)
               ListTile(
                 leading: Text(_specialSymbol(flag), style: Theme.of(context).textTheme.titleMedium),
-                title: Text(_specialName(flag)),
+                title: Text(_specialName(flag, l10n)),
                 trailing: leg.flag == _specialSymbol(flag) ? const Icon(Icons.check) : null,
                 onTap: () => Navigator.pop(sheetContext, _specialSymbol(flag)),
               ),
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Custom flag...'),
+              title: Text(l10n.customFlagEllipsis),
               onTap: () async {
                 Navigator.pop(sheetContext);
                 final d.Flag? flag = await _customFlagDialog();
@@ -1165,7 +1193,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
             _queueCheck();
           },
           icon: const Icon(Icons.add, size: 16),
-          label: const Text('Add'),
+          label: Text(GuarLocalizations.of(context).add),
           style: TextButton.styleFrom(visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 12)),
         ),
       ],
@@ -1180,7 +1208,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               child: TextFormField(
                 key: Key('meta-$index-key'),
                 controller: TextEditingController(text: rows[index].key),
-                decoration: const InputDecoration(hintText: 'key', isDense: true),
+                decoration: InputDecoration(hintText: GuarLocalizations.of(context).keyHint, isDense: true),
                 onChanged: (String value) {
                   rows[index].key = value;
                   _queueCheck();
@@ -1225,7 +1253,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               child: TextFormField(
                 key: Key('meta-$index-value'),
                 controller: TextEditingController(text: rows[index].value),
-                decoration: const InputDecoration(hintText: 'value', isDense: true),
+                decoration: InputDecoration(hintText: GuarLocalizations.of(context).valueHint, isDense: true),
                 onChanged: (String value) {
                   rows[index].value = value;
                   _queueCheck();
@@ -1299,7 +1327,7 @@ class _CurrencyFieldState extends State<_CurrencyField> {
           key: widget.fieldKey,
           controller: controller,
           focusNode: focusNode,
-          decoration: const InputDecoration(labelText: 'Currency', isDense: true),
+          decoration: InputDecoration(labelText: GuarLocalizations.of(context).labelCurrency, isDense: true),
           onChanged: widget.onChanged,
           onFieldSubmitted: (_) => onSubmitted(),
         ),
@@ -1354,8 +1382,8 @@ String _specialSymbol(d.SpecialFlag flag) => switch (flag) {
   d.SpecialFlag.percent => '%',
 };
 
-String _specialName(d.SpecialFlag flag) => switch (flag) {
-  d.SpecialFlag.asterisk => '* (Completed)',
-  d.SpecialFlag.exclamation => '! (Incomplete)',
+String _specialName(d.SpecialFlag flag, GuarLocalizations l10n) => switch (flag) {
+  d.SpecialFlag.asterisk => l10n.flagCompleted,
+  d.SpecialFlag.exclamation => l10n.flagIncomplete,
   _ => _specialSymbol(flag),
 };

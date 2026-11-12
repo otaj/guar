@@ -3,9 +3,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
 import 'package:guar/src/balances_screen.dart';
 import 'package:guar/src/directives_screen.dart';
-import 'package:guar/src/ledger_documents.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar/src/open_account_screen.dart';
 import 'package:guar/src/plugins_screen.dart';
@@ -13,50 +13,53 @@ import 'package:guar/src/settings_screen.dart';
 import 'package:guar/src/transaction_editor_screen.dart';
 
 enum _Tab {
-  ledger('Ledger', Icons.list_alt_outlined, Icons.list_alt),
-  balances('Balances', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet),
-  plugins('Plugins', Icons.extension_outlined, Icons.extension),
-  settings('Settings', Icons.tune_outlined, Icons.tune);
+  ledger(Icons.list_alt_outlined, Icons.list_alt),
+  balances(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet),
+  plugins(Icons.extension_outlined, Icons.extension),
+  settings(Icons.tune_outlined, Icons.tune);
 
-  const _Tab(this.label, this.icon, this.selectedIcon);
+  const _Tab(this.icon, this.selectedIcon);
 
-  final String label;
   final IconData icon;
   final IconData selectedIcon;
 
-  NavigationDestination get destination => NavigationDestination(
+  String label(GuarLocalizations l10n) => switch (this) {
+    _Tab.ledger => l10n.tabLedger,
+    _Tab.balances => l10n.tabBalances,
+    _Tab.plugins => l10n.tabPlugins,
+    _Tab.settings => l10n.tabSettings,
+  };
+
+  NavigationDestination destination(GuarLocalizations l10n) => NavigationDestination(
     icon: Icon(icon),
     selectedIcon: Icon(selectedIcon),
-    label: label,
+    label: label(l10n),
   );
 }
 
 class AppShell extends StatefulWidget {
-  const AppShell({required this.documents, super.key});
+  const AppShell({required this.session, super.key});
 
-  final LedgerDocuments documents;
+  final LedgerSession session;
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  late final LedgerSession _session;
+  LedgerSession get _session => widget.session;
   _Tab _tab = _Tab.settings;
   String? _openUri;
 
   @override
   void initState() {
     super.initState();
-    _session = LedgerSession(widget.documents)..addListener(_onSession);
-    unawaited(_session.load());
+    _session.addListener(_onSession);
   }
 
   @override
   void dispose() {
-    _session
-      ..removeListener(_onSession)
-      ..dispose();
+    _session.removeListener(_onSession);
     super.dispose();
   }
 
@@ -81,6 +84,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     if (_session.loading && _session.snapshot == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -94,7 +98,7 @@ class _AppShellState extends State<AppShell> {
       _Tab.settings,
     ];
     return Scaffold(
-      appBar: AppBar(title: Text(visible.label)),
+      appBar: AppBar(title: Text(visible.label(l10n))),
       body: IndexedStack(
         index: visible.index,
         children: <Widget>[
@@ -110,7 +114,7 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: loaded
           ? NavigationBar(
               selectedIndex: tabs.indexOf(visible),
-              destinations: <NavigationDestination>[for (final _Tab tab in tabs) tab.destination],
+              destinations: <NavigationDestination>[for (final _Tab tab in tabs) tab.destination(l10n)],
               onDestinationSelected: (int next) => unawaited(_select(tabs[next])),
             )
           : null,
@@ -141,13 +145,13 @@ class _AppShellState extends State<AppShell> {
               _AddOptionRow(
                 key: const Key('add-transaction-option'),
                 icon: Icons.receipt_long,
-                label: 'New transaction',
+                label: GuarLocalizations.of(context).newTransaction,
                 onTap: () => Navigator.pop(context, 'transaction'),
               ),
               _AddOptionRow(
                 key: const Key('add-account-option'),
                 icon: Icons.account_balance_wallet_outlined,
-                label: 'New account',
+                label: GuarLocalizations.of(context).newAccount,
                 onTap: () => Navigator.pop(context, 'account'),
               ),
             ],

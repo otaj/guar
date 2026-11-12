@@ -574,4 +574,69 @@ void main() {
       isTrue,
     );
   });
+
+  test('reads language from a guar_option directive', () {
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "language" "fr"\n').guar.language,
+      'fr',
+    );
+    expect(readLedgerOptions('2020-01-01 open Assets:Cash\n').guar.language, isNull);
+    const String latest =
+        '2020-01-01 custom "guar_option" "language" "fr"\n'
+        '2020-06-01 custom "guar_option" "language" "de"\n';
+    expect(readLedgerOptions(latest).guar.language, 'de');
+  });
+
+  test('reports a missing language value', () {
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "language"\n').errors,
+      <String>['language expects a language code'],
+    );
+    expect(
+      readLedgerOptions('2020-01-01 custom "guar_option" "language" 3\n').errors,
+      <String>['language expects a language code'],
+    );
+  });
+
+  test('writes language after the other guar options', () {
+    final String written = writeLedgerOptions(
+      '',
+      LedgerOptions(),
+      guar: const GuarOptions(language: 'fr'),
+      today: DateTime(2020, 1, 2),
+    );
+    expect(written, '2020-01-02 custom "guar_option" "language" "fr"\n');
+    expect(readLedgerOptions(written).guar.language, 'fr');
+  });
+
+  test('updates an existing language line in place', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "language" "fr"\n'
+        '2020-02-01 open Assets:Cash\n';
+    final String written = writeLedgerOptions(
+      source,
+      LedgerOptions(),
+      guar: const GuarOptions(language: 'de'),
+    );
+    expect(
+      written,
+      '2020-01-01 custom "guar_option" "language" "de"\n'
+      '2020-02-01 open Assets:Cash\n',
+    );
+  });
+
+  test('removes the language line when the option is cleared', () {
+    const String source =
+        '2020-01-01 custom "guar_option" "language" "fr"\n'
+        '2020-02-01 open Assets:Cash\n';
+    expect(
+      writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions()),
+      '2020-02-01 open Assets:Cash\n',
+    );
+  });
+
+  test('keeps a matching language line as written', () {
+    const String source = '2020-05-01 custom "guar_option" "language" "fr"\n';
+    expect(writeLedgerOptions(source, LedgerOptions(), guar: const GuarOptions(language: 'fr')), source);
+  });
 }
