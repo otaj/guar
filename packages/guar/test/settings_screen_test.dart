@@ -470,8 +470,8 @@ void main() {
     await tester.tap(find.widgetWithText(NavigationDestination, 'Ledger'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2020-01-05 · Price'), findsNothing);
-    expect(find.text('2020-01-01 · Open'), findsOneWidget);
+    expect(find.text('price EUR'), findsNothing);
+    expect(find.text('open Assets:Bank'), findsOneWidget);
     expect(find.text('Household'), findsOneWidget);
   });
 

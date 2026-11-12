@@ -1,4 +1,4 @@
-// Ledger screen: the open ledger's directives, first in either mode.
+// Ledger screen: the open ledger's directives, grouped by date in either mode.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +27,7 @@ void main() {
     );
   });
 
-  testWidgets('lists each directive and leaves postings off the row', (WidgetTester tester) async {
+  testWidgets('lists each directive under its date, newest day first', (WidgetTester tester) async {
     const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
     await _pumpApp(
       tester,
@@ -38,29 +38,38 @@ void main() {
     );
 
     expect(find.text('Household'), findsOneWidget);
-    expect(find.byType(Chip), findsNWidgets(7));
-    expect(find.byType(ListTile), findsNothing);
-    _expectChip(tester, '2020-01-01 · Open', Icons.lock_open_outlined);
-    _expectChip(tester, '2020-01-02 · Open', Icons.lock_open_outlined);
-    _expectChip(tester, '2020-01-03 · Transaction', Icons.receipt_long_outlined);
-    _expectChip(tester, '2020-01-04 · Note', Icons.sticky_note_2_outlined);
-    _expectChip(tester, '2020-01-05 · Price', Icons.sell_outlined);
-    _expectChip(tester, '2020-01-06 · Balance', Icons.account_balance_outlined);
-    _expectChip(tester, '2020-01-07 · Close', Icons.lock_outlined);
-    expect(find.text('Assets:Bank'), findsOneWidget);
-    expect(find.text('Expenses:Groceries'), findsNWidgets(2));
-    expect(find.text('* Shop — Groceries'), findsOneWidget);
-    expect(find.textContaining('12.34'), findsOneWidget);
-    expect(find.text('Assets:Bank rent due'), findsOneWidget);
-    expect(find.textContaining('EUR'), findsOneWidget);
+    expect(find.byType(Card), findsNWidgets(7));
+    _expectTile(tester, 'open Assets:Bank', Icons.lock_open_outlined);
+    _expectTile(tester, 'open Expenses:Groceries', Icons.lock_open_outlined);
+    _expectTile(tester, 'close Expenses:Groceries', Icons.lock_outlined);
+    _expectTile(tester, 'note Assets:Bank', Icons.sticky_note_2_outlined);
+    _expectTile(tester, 'price EUR', Icons.sell_outlined);
+    _expectTile(tester, 'balance Assets:Bank', Icons.account_balance_outlined);
+
+    // Transactions render as tiles with the payee and the positive amount.
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('Shop'), findsOneWidget);
+    expect(find.text('12.34 USD'), findsOneWidget);
+    expect(find.text('rent due'), findsOneWidget);
+    expect(find.text('1.10 USD'), findsOneWidget);
+    expect(find.text('-12.34 USD'), findsOneWidget);
     expect(find.textContaining('does not balance'), findsNothing);
 
-    expect(_top(tester, '2020-01-01 · Open'), lessThan(_top(tester, '2020-01-02 · Open')));
-    expect(_top(tester, '2020-01-02 · Open'), lessThan(_top(tester, '2020-01-03 · Transaction')));
-    expect(_top(tester, '2020-01-03 · Transaction'), lessThan(_top(tester, '2020-01-04 · Note')));
-    expect(_top(tester, '2020-01-04 · Note'), lessThan(_top(tester, '2020-01-05 · Price')));
-    expect(_top(tester, '2020-01-05 · Price'), lessThan(_top(tester, '2020-01-06 · Balance')));
-    expect(_top(tester, '2020-01-06 · Balance'), lessThan(_top(tester, '2020-01-07 · Close')));
+    // The date groups run newest first.
+    final List<String> days = <String>[
+      'Tuesday, January 7, 2020',
+      'Monday, January 6, 2020',
+      'Sunday, January 5, 2020',
+      'Saturday, January 4, 2020',
+      'Friday, January 3, 2020',
+      'Thursday, January 2, 2020',
+      'Wednesday, January 1, 2020',
+    ];
+    for (int i = 0; i < days.length - 1; i++) {
+      expect(_top(tester, days[i]), lessThan(_top(tester, days[i + 1])));
+    }
+    expect(_top(tester, 'Friday, January 3, 2020'), lessThan(_top(tester, 'Groceries')));
+    expect(_top(tester, 'Wednesday, January 1, 2020'), lessThan(_top(tester, 'open Assets:Bank')));
   });
 
   testWidgets('says when the ledger has no directives', (WidgetTester tester) async {
@@ -92,8 +101,11 @@ void main() {
       ),
     );
 
-    expect(find.text('Assets:Bank'), findsOneWidget);
-    expect(find.text('* Shop — Groceries'), findsOneWidget);
+    expect(find.text('open Assets:Bank'), findsOneWidget);
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.textContaining('does not balance'), findsNothing);
+    await tester.tap(find.text('1 warning'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('does not balance'), findsOneWidget);
   });
 
@@ -108,7 +120,7 @@ void main() {
     );
 
     expect(find.widgetWithText(AppBar, 'Ledger'), findsOneWidget);
-    expect(find.text('guar_option'), findsOneWidget);
+    expect(find.text('custom guar_option'), findsOneWidget);
     expect(
       tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Ledger')).dx,
       lessThan(tester.getTopLeft(find.widgetWithText(NavigationDestination, 'Plugins')).dx),
@@ -121,7 +133,7 @@ void main() {
     await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Settings'), findsOneWidget);
-    expect(find.text('* Shop — Groceries'), findsNothing);
+    expect(find.text('Groceries'), findsNothing);
   });
 
   testWidgets('switches to directives after a ledger is opened', (WidgetTester tester) async {
@@ -148,7 +160,8 @@ void main() {
     await _pumpApp(tester, documents);
 
     expect(find.text('First ledger'), findsOneWidget);
-    expect(find.text('* Alpha — First'), findsOneWidget);
+    expect(find.text('First'), findsOneWidget);
+    expect(find.text('Alpha'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
     await tester.pumpAndSettle();
@@ -158,9 +171,10 @@ void main() {
     expect(find.widgetWithText(AppBar, 'Ledger'), findsOneWidget);
     expect(find.text('Second ledger'), findsOneWidget);
     expect(find.text('second.beancount'), findsNothing);
-    expect(find.text('* Beta — Second'), findsOneWidget);
+    expect(find.text('Second'), findsOneWidget);
+    expect(find.text('Beta'), findsOneWidget);
     expect(find.text('First ledger'), findsNothing);
-    expect(find.text('* Alpha — First'), findsNothing);
+    expect(find.text('First'), findsNothing);
     expect(find.text('Open a ledger'), findsNothing);
   });
 
@@ -175,11 +189,11 @@ void main() {
       ),
     );
 
-    expect(find.text('2020-01-05 · Price'), findsNothing);
-    expect(find.textContaining('EUR'), findsNothing);
-    expect(find.text('2020-01-03 · Transaction'), findsOneWidget);
-    expect(find.text('2020-01-06 · Balance'), findsOneWidget);
-    expect(find.text('guar_option'), findsOneWidget);
+    expect(find.text('price EUR'), findsNothing);
+    expect(find.textContaining('1.10 USD'), findsNothing);
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('balance Assets:Bank'), findsOneWidget);
+    expect(find.text('custom guar_option'), findsOneWidget);
   });
 
   testWidgets('hides directives generated by a plugin or balance padding', (WidgetTester tester) async {
@@ -192,9 +206,10 @@ void main() {
     );
 
     expect(find.textContaining('Padding'), findsOneWidget);
-    expect(find.text('Expenses:Food'), findsOneWidget);
-    expect(find.text('* Shop — Groceries'), findsOneWidget);
-    expect(find.text('Assets:Bank Equity:Opening-Balances'), findsOneWidget);
+    expect(find.text('open Expenses:Food'), findsOneWidget);
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('pad Assets:Bank'), findsOneWidget);
+    expect(find.text('from Equity:Opening-Balances'), findsOneWidget);
 
     await _pumpApp(
       tester,
@@ -208,13 +223,14 @@ void main() {
 
     expect(find.text('Every directive is hidden.'), findsNothing);
     expect(find.textContaining('Padding'), findsNothing);
-    expect(find.text('Expenses:Food'), findsNothing);
-    expect(find.text('* Shop — Groceries'), findsOneWidget);
-    expect(find.text('Assets:Bank'), findsOneWidget);
-    expect(find.text('Equity:Opening-Balances'), findsOneWidget);
-    expect(find.text('Assets:Bank Equity:Opening-Balances'), findsOneWidget);
-    expect(find.text('fava-option'), findsOneWidget);
-    expect(find.text('2020-01-03 · Balance'), findsOneWidget);
+    expect(find.text('open Expenses:Food'), findsNothing);
+    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('open Assets:Bank'), findsOneWidget);
+    expect(find.text('open Equity:Opening-Balances'), findsOneWidget);
+    expect(find.text('pad Assets:Bank'), findsOneWidget);
+    expect(find.text('from Equity:Opening-Balances'), findsOneWidget);
+    expect(find.text('custom fava-option'), findsOneWidget);
+    expect(find.text('balance Assets:Bank'), findsOneWidget);
   });
 
   testWidgets('hiding transactions leaves generated opens on the ledger', (WidgetTester tester) async {
@@ -229,9 +245,9 @@ void main() {
     );
 
     expect(find.textContaining('Padding'), findsNothing);
-    expect(find.text('* Shop — Groceries'), findsNothing);
-    expect(find.text('Expenses:Food'), findsOneWidget);
-    expect(find.text('Assets:Bank Equity:Opening-Balances'), findsOneWidget);
+    expect(find.text('Groceries'), findsNothing);
+    expect(find.text('open Expenses:Food'), findsOneWidget);
+    expect(find.text('pad Assets:Bank'), findsOneWidget);
   });
 
   testWidgets('says when every directive is hidden', (WidgetTester tester) async {
@@ -267,8 +283,11 @@ void main() {
       ),
     );
 
-    expect(find.text('2020-01-05 · Price'), findsOneWidget);
-    expect(find.text('hide_price: found "true" expected "TRUE"'), findsOneWidget);
+    expect(find.text('price EUR'), findsOneWidget);
+    expect(find.textContaining('hide_price: found "true" expected "TRUE"'), findsNothing);
+    await tester.tap(find.text('1 warning'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('hide_price: found "true" expected "TRUE"'), findsOneWidget);
   });
 }
 
@@ -308,17 +327,15 @@ option "title" "Household"
 
 double _top(WidgetTester tester, String text) => tester.getTopLeft(find.text(text)).dy;
 
-void _expectChip(WidgetTester tester, String subtitle, IconData icon) {
-  final Finder chip = find.ancestor(of: find.text(subtitle), matching: find.byType(Chip));
-  final Finder typeIcon = find.descendant(of: chip, matching: find.byIcon(icon));
-  expect(chip, findsOneWidget);
+void _expectTile(WidgetTester tester, String label, IconData icon) {
+  final Finder tile = find.ancestor(of: find.text(label), matching: find.byType(ListTile));
+  final Finder typeIcon = find.descendant(of: tile, matching: find.byIcon(icon));
+  expect(tile, findsOneWidget);
   expect(typeIcon, findsOneWidget);
-  final Rect chipRect = tester.getRect(chip);
+  final Rect tileRect = tester.getRect(tile);
   final double screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
-  expect(chipRect.left, 28);
-  expect(chipRect.right, screen - 28);
-  expect(tester.getTopLeft(typeIcon).dx, lessThan(chipRect.center.dx));
-  expect(tester.getTopLeft(typeIcon).dx, lessThan(tester.getTopLeft(find.text(subtitle)).dx));
+  expect(tileRect.left, 12);
+  expect(tileRect.right, screen - 12);
 }
 
 Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {
