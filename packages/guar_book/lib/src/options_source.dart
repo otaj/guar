@@ -67,6 +67,7 @@ class GuarOptions {
     this.writeDefaultOptions = false,
     this.allowUnopenedAccounts = false,
     this.hidden = const <String>{},
+    this.language,
   });
 
   final bool advancedUi;
@@ -74,6 +75,9 @@ class GuarOptions {
   final bool allowUnopenedAccounts;
 
   final Set<String> hidden;
+
+  // Null follows the phone language; an unknown code falls back to English.
+  final String? language;
 }
 
 class LoadedLedgerOptions {
@@ -90,6 +94,7 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
   final _GuarBoolScan advancedUi = _scanGuarBool(source, parsed, 'advanced_ui');
   final _GuarBoolScan writeDefaults = _scanGuarBool(source, parsed, 'write_default_options');
   final _GuarBoolScan allowUnopened = _scanGuarBool(source, parsed, 'allow_unopened_accounts');
+  final ({String? value, List<String> errors}) language = _scanGuarText(source, parsed, 'language');
   final ({Set<String> values, List<String> errors}) hidden = _readHide(source, parsed);
   return LoadedLedgerOptions(
     options: defaultOptions(parsed.options),
@@ -98,6 +103,7 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
       ...advancedUi.errors,
       ...writeDefaults.errors,
       ...allowUnopened.errors,
+      ...language.errors,
       ...hidden.errors,
     ],
     guar: GuarOptions(
@@ -105,6 +111,7 @@ LoadedLedgerOptions readLedgerOptionsFrom(String source, p.ParsedLedger parsed) 
       writeDefaultOptions: writeDefaults.value,
       allowUnopenedAccounts: allowUnopened.value,
       hidden: hidden.values,
+      language: language.value,
     ),
   );
 }
@@ -141,7 +148,8 @@ String writeLedgerOptions(
     rewrite
       ..applyBool(key: 'write_default_options', enabled: guar.writeDefaultOptions, today: date)
       ..applyBool(key: 'advanced_ui', enabled: guar.advancedUi, today: date)
-      ..applyBool(key: 'allow_unopened_accounts', enabled: guar.allowUnopenedAccounts, today: date);
+      ..applyBool(key: 'allow_unopened_accounts', enabled: guar.allowUnopenedAccounts, today: date)
+      ..applyText(key: 'language', value: guar.language, today: date);
   }
   if (!rewroteOptions && !rewrite.changed) {
     return source;
@@ -428,6 +436,11 @@ class _HideAcc {
   final bool exact;
 }
 
+class _TextAcc {
+  String? value;
+  final List<_MutableSpan> hits = <_MutableSpan>[];
+}
+
 class _Rewrite {
   _Rewrite(this.lines, this.optionEnd);
 
@@ -439,6 +452,7 @@ class _Rewrite {
     'write_default_options': _BoolAcc(),
     'allow_unopened_accounts': _BoolAcc(),
   };
+  final Map<String, _TextAcc> texts = <String, _TextAcc>{'language': _TextAcc()};
   final List<_HideAcc> hides = <_HideAcc>[];
   bool changed = false;
 
@@ -467,6 +481,13 @@ class _Rewrite {
         if (body.values.length >= 2) {
           final bool? parsedValue = _guarBool(body.values[1]);
           if (parsedValue != null) acc.value = parsedValue;
+        }
+      }
+      final _TextAcc? textAcc = texts[key];
+      if (textAcc != null) {
+        textAcc.hits.add(span);
+        if (body.values.length >= 2 && body.values[1] is p.CustomText) {
+          textAcc.value = (body.values[1] as p.CustomText).value;
         }
       }
       final GuarHide? hide = _hideForKey(key);
@@ -558,6 +579,34 @@ class _Rewrite {
       ..sort((_MutableSpan a, _MutableSpan b) => b.start.compareTo(a.start))
       ..forEach(_remove);
     _replace(keep, _guarBoolLine(keep.date, key));
+  }
+
+  void applyText({required String key, required String? value, required DateTime today}) {
+    final _TextAcc acc = texts[key]!;
+    if (acc.value == value) return;
+    final List<_MutableSpan> hits = <_MutableSpan>[
+      for (final _MutableSpan hit in acc.hits)
+        if (hit.live) hit,
+    ];
+    if (value == null) {
+      hits
+        ..sort((_MutableSpan a, _MutableSpan b) => b.start.compareTo(a.start))
+        ..forEach(_remove);
+      return;
+    }
+    if (value.contains('"')) return;
+    if (hits.isEmpty) {
+      _insert(optionEnd, _guarTextLine(_isoDate(today), key, value));
+      return;
+    }
+    final _MutableSpan keep = hits.last;
+    <_MutableSpan>[
+        for (final _MutableSpan hit in hits)
+          if (!identical(hit, keep)) hit,
+      ]
+      ..sort((_MutableSpan a, _MutableSpan b) => b.start.compareTo(a.start))
+      ..forEach(_remove);
+    _replace(keep, _guarTextLine(keep.date, key, value));
   }
 
   int _hideInsertAt() {
@@ -774,6 +823,32 @@ bool? _guarBool(p.CustomValue value) => switch (value) {
   p.CustomAccount() || p.CustomDate() || p.CustomNumber() || p.CustomAmount() || p.CustomCurrency() => null,
 };
 
+({String? value, List<String> errors}) _scanGuarText(String source, p.ParsedLedger parsed, String key) {
+  final List<p.ParsedDirective> directives = switch (parsed) {
+    p.ParsedLedgerDirectives(:final List<p.ParsedDirective> directives) => directives,
+    p.ParsedLedgerErrors() => const <p.ParsedDirective>[],
+  };
+  String? value;
+  final List<String> errors = <String>[];
+  final String valueError = '$key expects a language code';
+  for (final p.ParsedDirective directive in directives) {
+    final p.DirectiveBody body = directive.body;
+    if (body is! p.CustomBody || body.type != 'guar_option' || body.values.isEmpty) {
+      continue;
+    }
+    final p.CustomValue name = body.values.first;
+    if (name is! p.CustomText || name.value != key) {
+      continue;
+    }
+    if (body.values.length < 2 || body.values[1] is! p.CustomText || (body.values[1] as p.CustomText).value.isEmpty) {
+      errors.add(valueError);
+      continue;
+    }
+    value = (body.values[1] as p.CustomText).value;
+  }
+  return (value: value, errors: errors);
+}
+
 bool? _guarTextBool(String value) => switch (value.toLowerCase()) {
   'true' || '1' => true,
   'false' || '0' => false,
@@ -890,6 +965,8 @@ String _hideMismatch(String key, p.CustomBody body) {
 }
 
 String _guarBoolLine(String date, String key) => '$date custom "guar_option" "$key" "TRUE"';
+
+String _guarTextLine(String date, String key, String value) => '$date custom "guar_option" "$key" "$value"';
 
 String _isoDate(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
