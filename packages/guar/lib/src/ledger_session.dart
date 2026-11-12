@@ -125,18 +125,20 @@ class LedgerSession extends ChangeNotifier {
     return _later(_drain);
   }
 
-  Future<List<String>> validateTransaction(String targetFilename, String snippet) {
+  Future<List<String>> validateTransaction(String targetFilename, String snippet, {Directive? replace}) {
     final LedgerDocument? current = document;
     // The editors only open over a selected ledger, so an empty list means there is nothing to check.
     if (current == null) return Future<List<String>>.value(const <String>[]);
-    return _engine
-        .appendTransaction(source, current.displayName, targetFilename, snippet)
-        .then(
-          (AppendOutcome outcome) => switch (outcome) {
-            AppendOk() => const <String>[],
-            AppendFailed(:final List<String> errors) => errors,
-          },
-        );
+    final ({int start, int end})? span = replace == null ? null : _span(replace);
+    final Future<AppendOutcome> outcome = replace == null || span == null
+        ? _engine.appendTransaction(source, current.displayName, targetFilename, snippet)
+        : _engine.replaceTransaction(source, current.displayName, targetFilename, span.start, span.end, snippet);
+    return outcome.then(
+      (AppendOutcome outcome) => switch (outcome) {
+        AppendOk() => const <String>[],
+        AppendFailed(:final List<String> errors) => errors,
+      },
+    );
   }
 
   Future<void> addTransaction(String targetFilename, String snippet) {
@@ -145,6 +147,23 @@ class LedgerSession extends ChangeNotifier {
     (_editFor(current.uri) ?? _startEdit(current)).transaction = (target: targetFilename, snippet: snippet);
     return _later(_drain);
   }
+
+  Future<void> editTransaction(Directive directive, String targetFilename, String snippet) {
+    final LedgerDocument? current = document;
+    if (current == null) return Future<void>.value();
+    (_editFor(current.uri) ?? _startEdit(current)).replacement = (
+      target: targetFilename,
+      directive: directive,
+      snippet: snippet,
+    );
+    return _later(_drain);
+  }
+
+  // Source lines a replacement covers; null for generated entries, which no file holds.
+  ({int start, int end})? _span(Directive directive) => switch (directive.origin) {
+    SourceOrigin(:final BeanLocation location) => (start: location.linenoBegin, end: location.linenoEnd),
+    _ => null,
+  };
 
   @override
   void dispose() {
@@ -236,6 +255,42 @@ class LedgerSession extends ChangeNotifier {
     try {
       while (_pending.isNotEmpty) {
         final _PendingEdit edit = _pending.first;
+        // A replacement runs first: its line span was captured against this source,
+        // and an option or plugin rewrite applied before it would shift the lines.
+        final ({String target, Directive directive, String snippet})? replacement = edit.replacement;
+        edit.replacement = null;
+        if (replacement != null) {
+          final ({int start, int end})? span = _span(replacement.directive);
+          final AppendOutcome outcome = span == null
+              ? const AppendFailed(<String>[])
+              : await _engine.replaceTransaction(
+                  edit.source,
+                  edit.document.displayName,
+                  replacement.target,
+                  span.start,
+                  span.end,
+                  replacement.snippet,
+                );
+          if (edit.replacement != null) continue;
+          switch (outcome) {
+            case AppendOk(:final String text):
+              if (replacement.target == edit.document.displayName) {
+                await _commit(edit, text);
+              } else {
+                try {
+                  included.write(replacement.target, text);
+                } on FileSystemException {
+                  _fail(edit, GuarFailure.couldNotWriteIncluded);
+                }
+              }
+            case AppendFailed(:final List<String> errors):
+              if (errors.isEmpty) {
+                _fail(edit, GuarFailure.couldNotSaveTransaction);
+              } else {
+                _failMessage(edit, errors.first);
+              }
+          }
+        }
         final ({LedgerOptions options, GuarOptions guar, Set<String> preserveKeys})? options = edit.options;
         final List<LedgerPlugin>? plugins = edit.plugins;
         edit
@@ -387,5 +442,6 @@ class _PendingEdit {
   String source;
   ({LedgerOptions options, GuarOptions guar, Set<String> preserveKeys})? options;
   List<LedgerPlugin>? plugins;
+  ({String target, Directive directive, String snippet})? replacement;
   ({String target, String snippet})? transaction;
 }

@@ -88,6 +88,25 @@ class LedgerEngine {
     return _afterRewriteGate(() => _remote!.appendTransaction(source, filename, targetFilename, snippet));
   }
 
+  Future<AppendOutcome> replaceTransaction(
+    String source,
+    String filename,
+    String targetFilename,
+    int startLine,
+    int endLine,
+    String snippet,
+  ) {
+    final _Memory? memory = _memory;
+    if (memory != null) {
+      return Future<AppendOutcome>.microtask(
+        () => memory.replaceTransaction(source, filename, targetFilename, startLine, endLine, snippet),
+      );
+    }
+    return _afterRewriteGate(
+      () => _remote!.replaceTransaction(source, filename, targetFilename, startLine, endLine, snippet),
+    );
+  }
+
   Future<T> _afterRewriteGate<T>(FutureOr<T> Function() work) {
     final Completer<void>? gate = debugLedgerRewriteGate;
     if (gate == null) return Future<T>.microtask(work);
@@ -155,6 +174,48 @@ class _Memory {
     final String text = '$base$snippet';
     final int firstLine = base.split('\n').length;
     final int lastLine = firstLine + snippet.split('\n').length - 2;
+    final _IncludeRead full = root
+        ? _parseWithIncludes(text, filename)
+        : _parseWithIncludes(source, filename, targetPath: targetFilename, targetText: text);
+    final Ledger ledger = Book().process(full.parsed, recover: true);
+    final List<ProcessingError> errors = switch (ledger) {
+      LedgerDirectives(:final List<ProcessingError> errors) => errors,
+      LedgerErrors(:final List<ProcessingError> errors) => errors,
+    };
+    final List<String> snippetErrors = <String>[
+      for (final ProcessingError error in errors)
+        if (error.location.filename == targetFilename &&
+            error.location.linenoBegin >= firstLine &&
+            error.location.linenoBegin <= lastLine)
+          error.message,
+    ];
+    if (snippetErrors.isNotEmpty) return AppendFailed(snippetErrors);
+    _includes = full.read;
+    _snapshot = null;
+    return AppendOk(text);
+  }
+
+  AppendOutcome replaceTransaction(
+    String source,
+    String filename,
+    String targetFilename,
+    int startLine,
+    int endLine,
+    String snippet,
+  ) {
+    final bool root = targetFilename == filename;
+    final String? original = root ? source : _readFile(targetFilename);
+    if (original == null) return const AppendFailed(<String>[couldNotReadTarget]);
+    final List<String> lines = original.split('\n');
+    final int begin = (startLine - 1).clamp(0, lines.length);
+    final int end = endLine.clamp(begin, lines.length);
+    final List<String> snippetLines = snippet.endsWith('\n')
+        ? snippet.substring(0, snippet.length - 1).split('\n')
+        : snippet.split('\n');
+    lines.replaceRange(begin, end, snippetLines);
+    final String text = lines.join('\n');
+    final int firstLine = begin + 1;
+    final int lastLine = firstLine + snippetLines.length - 1;
     final _IncludeRead full = root
         ? _parseWithIncludes(text, filename)
         : _parseWithIncludes(source, filename, targetPath: targetFilename, targetText: text);
@@ -264,6 +325,24 @@ class _AppendRequest {
   final String snippet;
 }
 
+class _ReplaceRequest {
+  const _ReplaceRequest(
+    this.source,
+    this.filename,
+    this.targetFilename,
+    this.startLine,
+    this.endLine,
+    this.snippet,
+  );
+
+  final String source;
+  final String filename;
+  final String targetFilename;
+  final int startLine;
+  final int endLine;
+  final String snippet;
+}
+
 class _Failure {
   const _Failure(this.kind, this.message);
 
@@ -295,6 +374,17 @@ class _RemoteMemory {
 
   Future<AppendOutcome> appendTransaction(String source, String filename, String targetFilename, String snippet) =>
       _call<AppendOutcome>(_AppendRequest(source, filename, targetFilename, snippet));
+
+  Future<AppendOutcome> replaceTransaction(
+    String source,
+    String filename,
+    String targetFilename,
+    int startLine,
+    int endLine,
+    String snippet,
+  ) => _call<AppendOutcome>(
+    _ReplaceRequest(source, filename, targetFilename, startLine, endLine, snippet),
+  );
 
   Future<void> close() async {
     _isolate?.kill(priority: Isolate.immediate);
@@ -380,6 +470,15 @@ Object _answer(_Memory memory, Object? request) {
       :final String snippet,
     ):
       return memory.appendTransaction(source, filename, targetFilename, snippet);
+    case _ReplaceRequest(
+      :final String source,
+      :final String filename,
+      :final String targetFilename,
+      :final int startLine,
+      :final int endLine,
+      :final String snippet,
+    ):
+      return memory.replaceTransaction(source, filename, targetFilename, startLine, endLine, snippet);
     default:
       throw ArgumentError('Unexpected ledger work');
   }
