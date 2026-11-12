@@ -3,8 +3,9 @@
 import 'package:guar_domain/guar_domain.dart';
 
 String amountText(Amount amount) {
-  final String number = amount.number.toString();
+  final String number = '${amount.number}';
   final int digits = number.contains('.') ? number.length - number.indexOf('.') - 1 : 0;
-  final String padded = amount.scale > digits ? '$number${'0' * (amount.scale - digits)}' : number;
-  return '$padded ${amount.currency.name}';
+  if (amount.scale <= digits) return '$number ${amount.currency.name}';
+  final String base = number.contains('.') ? number : '$number.';
+  return '$base${'0' * (amount.scale - digits)} ${amount.currency.name}';
 }

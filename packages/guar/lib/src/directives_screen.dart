@@ -1,5 +1,7 @@
 // Lists every booked directive in the open ledger, grouped by date.
 
+import 'dart:async';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:guar/l10n/gen/app_localizations.dart';
@@ -7,13 +9,17 @@ import 'package:guar/src/amount_text.dart';
 import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/date_text.dart';
 import 'package:guar/src/ledger_session.dart';
+import 'package:guar/src/transaction_editor_screen.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
 
 class DirectivesScreen extends StatefulWidget {
-  const DirectivesScreen({required this.session, super.key});
+  const DirectivesScreen({required this.session, this.onPluginsRequested, super.key});
 
   final LedgerSession session;
+
+  // Called when the transaction editor offers to turn a plugin on for an unopened account.
+  final VoidCallback? onPluginsRequested;
 
   @override
   State<DirectivesScreen> createState() => _DirectivesScreenState();
@@ -146,7 +152,10 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
   }
 
   Widget _tileRow(Directive directive, ColorScheme colors) => switch (directive.body) {
-    TransactionBody(:final Transaction value) => _TransactionTile(value),
+    TransactionBody(:final Transaction value) => _TransactionTile(
+      value,
+      onTap: () => unawaited(_openTransaction(directive)),
+    ),
     _ => _DirectiveTile(
       icon: _icon(directive.body),
       color: _color(directive.body, colors),
@@ -154,6 +163,30 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       meta: _meta(directive.body),
     ),
   };
+
+  Future<void> _openTransaction(Directive directive) async {
+    final BookedLedger? booked = widget.session.snapshot?.booked;
+    if (booked == null) return;
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
+    if (booked.isGenerated(directive)) {
+      _toast(l10n.cannotEditGenerated);
+      return;
+    }
+    if (transactionNeedsAdvanced(directive) && !(widget.session.snapshot?.options.guar.advancedUi ?? false)) {
+      _toast(l10n.editNeedsAdvanced);
+      return;
+    }
+    final Object? result = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute<Object?>(
+        builder: (BuildContext context) => TransactionEditorScreen(session: widget.session, edit: directive),
+      ),
+    );
+    if (result == 'plugins') widget.onPluginsRequested?.call();
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 }
 
 bool _hidden(Directive directive, BookedLedger booked) =>
@@ -188,9 +221,10 @@ class _DateHeader extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile(this.value);
+  const _TransactionTile(this.value, {required this.onTap});
 
   final Transaction value;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +255,7 @@ class _TransactionTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       child: ListTile(
+        onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: colors.secondaryContainer,
           child: Icon(Icons.receipt_long_outlined, color: colors.onSecondaryContainer, size: 20),

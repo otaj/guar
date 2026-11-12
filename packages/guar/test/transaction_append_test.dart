@@ -122,7 +122,123 @@ void main() {
     );
     expect(errors, isNotEmpty);
   });
+  test('replaceTransaction swaps the directive lines in place', () async {
+    final Directory dir = _tempLedger();
+    final LedgerEngine engine = LedgerEngine();
+    const String source =
+        '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+        '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n';
+    final AppendOutcome outcome = await engine.replaceTransaction(
+      source,
+      '${dir.path}/ledger.beancount',
+      '${dir.path}/ledger.beancount',
+      3,
+      5,
+      '2026-11-03 * "Baker" "Bread"\n  Expenses:Food  2.00 USD\n  Assets:Cash\n',
+    );
+    expect(
+      (outcome as AppendOk).text,
+      '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+      '2026-11-03 * "Baker" "Bread"\n  Expenses:Food  2.00 USD\n  Assets:Cash\n',
+    );
+  });
+
+  test('replaceTransaction rejects an unbalanced replacement with errors in the replaced span', () async {
+    final Directory dir = _tempLedger();
+    final LedgerEngine engine = LedgerEngine();
+    const String source =
+        '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+        '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n';
+    final AppendOutcome outcome = await engine.replaceTransaction(
+      source,
+      '${dir.path}/ledger.beancount',
+      '${dir.path}/ledger.beancount',
+      3,
+      5,
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash  1.00 USD\n',
+    );
+    expect(outcome, isA<AppendFailed>());
+    expect((outcome as AppendFailed).errors, isNotEmpty);
+  });
+
+  test('session editTransaction replaces the transaction in the root file', () async {
+    final Directory dir = _tempLedger();
+    final String path = '${dir.path}/ledger.beancount';
+    File(path).writeAsStringSync(
+      '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+    );
+    final _PathDocuments documents = _PathDocuments(path, File(path).readAsStringSync());
+    final LedgerSession session = LedgerSession(documents);
+    addTearDown(session.dispose);
+    await session.load();
+    final Directive directive = _firstTransaction(session.snapshot!);
+
+    expect(
+      await session.validateTransaction(
+        path,
+        '2026-11-02 * "Grocer" "Brunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+        replace: directive,
+      ),
+      isEmpty,
+    );
+
+    await session.editTransaction(
+      directive,
+      path,
+      '2026-11-02 * "Grocer" "Brunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+    );
+    expect(session.error, isNull);
+    expect(
+      documents.files[path],
+      '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+      '2026-11-02 * "Grocer" "Brunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+    );
+    final LedgerSnapshot? snapshot = session.snapshot;
+    expect(_narration(_firstTransaction(snapshot!)), 'Brunch');
+  });
+
+  test('session editTransaction reports an invalid replacement', () async {
+    final Directory dir = _tempLedger();
+    final String path = '${dir.path}/ledger.beancount';
+    File(path).writeAsStringSync(
+      '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+    );
+    final _PathDocuments documents = _PathDocuments(path, File(path).readAsStringSync());
+    final LedgerSession session = LedgerSession(documents);
+    addTearDown(session.dispose);
+    await session.load();
+    final Directive directive = _firstTransaction(session.snapshot!);
+
+    final List<String> errors = await session.validateTransaction(
+      path,
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash  1.00 USD\n',
+      replace: directive,
+    );
+    expect(errors, isNotEmpty);
+
+    await session.editTransaction(
+      directive,
+      path,
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash  1.00 USD\n',
+    );
+    expect(session.error, isNotNull);
+    expect(documents.files[path], '${File(path).readAsStringSync().trimRight()}\n');
+  });
 }
+
+Directive _firstTransaction(LedgerSnapshot snapshot) => switch (snapshot.booked.ledger) {
+  LedgerDirectives(:final List<Directive> directives) => directives.firstWhere(
+    (Directive directive) => directive.body is TransactionBody,
+  ),
+  _ => throw StateError('ledger failed to book'),
+};
+
+String _narration(Directive directive) => switch (directive.body) {
+  TransactionBody(:final Transaction value) => value.narration,
+  _ => '',
+};
 
 class _PathDocuments implements LedgerDocuments {
   _PathDocuments(this.path, String text) : files = <String, String>{path: text};

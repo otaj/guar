@@ -289,7 +289,87 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('hide_price: found "true" expected "TRUE"'), findsOneWidget);
   });
+
+  testWidgets('opens the transaction editor from a transaction tile', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    await _pumpApp(
+      tester,
+      _FakeLedgerDocuments(
+        currentDocument: document,
+        files: const <String, String>{'content://ledger/1': _ledger},
+      ),
+    );
+
+    await tester.tap(find.text('Groceries'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Edit transaction'), findsOneWidget);
+    expect(tester.widget<TextFormField>(find.byKey(const Key('narration'))).controller!.text, 'Groceries');
+    expect(tester.widget<TextFormField>(find.byKey(const Key('leg-0-number'))).controller!.text, '12.34');
+    expect(find.text('Add transaction'), findsNothing);
+  });
+
+  testWidgets('refuses to edit a transaction with advanced features', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    await _pumpApp(
+      tester,
+      _FakeLedgerDocuments(
+        currentDocument: document,
+        files: const <String, String>{'content://ledger/1': _pricedTransaction},
+      ),
+    );
+
+    await tester.tap(find.text('foreign cash'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Edit transaction'), findsNothing);
+    expect(
+      find.text('This transaction uses advanced features. Turn on Advanced UI in Settings to edit it.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('edits an advanced transaction when advanced mode is on', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    await _pumpApp(
+      tester,
+      _FakeLedgerDocuments(
+        currentDocument: document,
+        files: const <String, String>{'content://ledger/1': '$_pricedTransaction$_advanced'},
+      ),
+    );
+
+    await tester.tap(find.text('foreign cash'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Edit transaction'), findsOneWidget);
+    expect(tester.widget<TextFormField>(find.byKey(const Key('leg-1-number'))).controller!.text, '-10.00');
+    expect(tester.widget<TextFormField>(find.byKey(const Key('leg-1-price'))).controller!.text, '0.90');
+  });
+
+  testWidgets('refuses to edit a generated entry', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    await _pumpApp(
+      tester,
+      _FakeLedgerDocuments(
+        currentDocument: document,
+        files: const <String, String>{'content://ledger/1': _generatedLedger},
+      ),
+    );
+
+    await tester.tap(find.textContaining('Padding'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Edit transaction'), findsNothing);
+    expect(find.text('Generated entries cannot be edited.'), findsOneWidget);
+  });
 }
+
+const String _pricedTransaction = '''
+option "title" "Household"
+
+2020-01-01 open Assets:Bank USD
+2020-01-01 open Assets:Bank EUR
+2020-01-05 * "Buy" "foreign cash"
+  Assets:Bank  9.00 USD
+  Assets:Bank -10.00 EUR @ 0.90 USD
+''';
 
 String _hide(List<String> tokens) => <String>[
   for (final String token in tokens) '2020-01-08 custom "guar_option" "hide_$token" "TRUE"\n',
