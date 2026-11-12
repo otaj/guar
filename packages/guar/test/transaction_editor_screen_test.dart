@@ -103,6 +103,28 @@ void main() {
     expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNull);
   });
 
+  testWidgets('simple mode evaluates arithmetic amounts', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path: '2026-01-01 open Assets:Cash\n2026-01-01 open Expenses:Food\n',
+    });
+    await _openSession(tester, documents);
+
+    await _openEditor(tester);
+    await tester.enterText(find.byKey(const Key('leg-0-number')), '12.30*2');
+    await tester.enterText(find.byKey(const Key('leg-0-currency')), 'USD');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const Key('save')));
+    await tester.pumpAndSettle();
+    expect(find.text('New transaction'), findsNothing);
+    expect(documents.files[path], contains('  Assets:Cash  -24.6 USD\n  Expenses:Food  24.6 USD\n'));
+  });
+
   testWidgets('advanced mode saves an elided leg and shows the extras', (WidgetTester tester) async {
     final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
     addTearDown(() => dir.deleteSync(recursive: true));
@@ -224,6 +246,118 @@ void main() {
       '  Assets:Auto:Opened  -12.30 USD\n'
       '  Assets:Cash  12.30 USD\n',
     );
+  });
+  testWidgets('advanced mode picks tags with chips and the new-tag dialog', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path:
+          '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+          '2026-01-01 open Assets:Cash\n'
+          '2026-01-01 open Expenses:Food\n'
+          '2026-01-15 * "seed" #trip-2024\n'
+          '  Assets:Cash  1 USD\n'
+          '  Expenses:Food  1 USD\n',
+    });
+    await _openSession(tester, documents);
+
+    await _openEditor(tester);
+    _tallViewport(tester);
+    await tester.pumpAndSettle();
+
+    // An existing ledger tag appears as a selectable chip.
+    expect(find.text('#trip-2024'), findsOneWidget);
+    await tester.tap(find.text('#trip-2024'));
+    await tester.pumpAndSettle();
+
+    // The new-tag dialog appends a tag that is not in the ledger yet.
+    await tester.tap(find.byKey(const Key('add-tag')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)), 'beach');
+    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(FilledButton, 'Add')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('leg-0-number')), '12.30');
+    await tester.enterText(find.byKey(const Key('leg-0-currency')), 'USD');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('save')));
+    await tester.pumpAndSettle();
+    expect(find.text('New transaction'), findsNothing);
+    expect(documents.files[path], contains('#trip-2024'));
+    expect(documents.files[path], contains('#beach'));
+  });
+
+  testWidgets('advanced mode picks transaction and posting flags', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path:
+          '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+          '2026-01-01 open Assets:Cash\n'
+          '2026-01-01 open Expenses:Food\n',
+    });
+    await _openSession(tester, documents);
+
+    await _openEditor(tester);
+    _tallViewport(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('flag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('! (Incomplete)'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('leg-0-flag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('! (Incomplete)'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('leg-0-number')), '12.30');
+    await tester.enterText(find.byKey(const Key('leg-0-currency')), 'USD');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('save')));
+    await tester.pumpAndSettle();
+    expect(find.text('New transaction'), findsNothing);
+    expect(documents.files[path], contains('$today ! ""\n  ! Assets:Cash  12.30 USD\n  Expenses:Food\n'));
+  });
+
+  testWidgets('advanced mode adds a unit price through the price chips', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path:
+          '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+          '2026-01-01 open Assets:Cash\n'
+          '2026-01-01 open Expenses:Food\n',
+    });
+    await _openSession(tester, documents);
+
+    await _openEditor(tester);
+    _tallViewport(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('leg-0-price')), findsNothing);
+
+    await tester.tap(find.text('@ unit').first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('leg-0-price')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('leg-0-price')), '2.00');
+    await tester.enterText(find.byKey(const Key('leg-0-price-currency')), 'USD');
+    await tester.enterText(find.byKey(const Key('leg-0-number')), '12.30');
+    await tester.enterText(find.byKey(const Key('leg-0-currency')), 'USD');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('save')));
+    await tester.pumpAndSettle();
+    expect(find.text('New transaction'), findsNothing);
+    expect(documents.files[path], contains('  Assets:Cash  12.30 USD @ 2.00 USD\n  Expenses:Food\n'));
   });
 }
 
