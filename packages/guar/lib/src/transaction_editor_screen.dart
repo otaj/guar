@@ -6,6 +6,7 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:guar/src/arithmetic.dart';
+import 'package:guar/src/date_text.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart' as d;
@@ -537,7 +538,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       leading: const Icon(Icons.calendar_today),
-      title: Text(_formatDate(_date)),
+      title: Text(formatBeanDate(_date)),
       onTap: () async {
         final DateTime? picked = await showDatePicker(
           context: context,
@@ -1358,31 +1359,3 @@ String _specialName(d.SpecialFlag flag) => switch (flag) {
   d.SpecialFlag.exclamation => '! (Incomplete)',
   _ => _specialSymbol(flag),
 };
-
-String _formatDate(d.BeanDate date) {
-  const List<String> months = <String>[
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-  const List<String> weekdays = <String>[
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-  final int weekday = DateTime(date.year, date.month, date.day).weekday;
-  return '${weekdays[weekday - 1]}, ${months[date.month - 1]} ${date.day}, ${date.year}';
-}

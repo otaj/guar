@@ -1,7 +1,9 @@
-// Lists every booked directive in the open ledger.
+// Lists every booked directive in the open ledger, grouped by date.
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:guar/src/book_ledger.dart';
+import 'package:guar/src/date_text.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar_book/guar_book.dart';
 import 'package:guar_domain/guar_domain.dart';
@@ -16,6 +18,8 @@ class DirectivesScreen extends StatefulWidget {
 }
 
 class _DirectivesScreenState extends State<DirectivesScreen> {
+  bool _warningsExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,16 +66,17 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       for (final Directive directive in directives)
         if (!_hidden(directive, booked)) directive,
     ];
-    final List<ProcessingError> errors = switch (ledger) {
-      LedgerDirectives(:final List<ProcessingError> errors) => errors,
-      LedgerErrors(:final List<ProcessingError> errors) => errors,
-    };
+    final List<String> messages = <String>[
+      ?sessionError,
+      ...booked.optionWarnings,
+      for (final ProcessingError error in _errors(ledger)) error.message,
+    ];
     final String? emptyMessage = _emptyMessage(
       visible: visible,
       directives: directives,
-      errors: errors,
-      sessionError: sessionError,
+      messages: messages,
     );
+    final List<Widget> rows = _rows(visible);
     return CustomScrollView(
       slivers: <Widget>[
         SliverToBoxAdapter(
@@ -81,18 +86,6 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(ledger.options.title, style: text.titleMedium),
-                if (sessionError != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(sessionError, style: text.bodyMedium?.copyWith(color: colors.error)),
-                ],
-                for (final String warning in booked.optionWarnings) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(warning, style: text.bodyMedium?.copyWith(color: colors.error)),
-                ],
-                for (final ProcessingError error in errors) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(error.message, style: text.bodyMedium?.copyWith(color: colors.error)),
-                ],
                 if (session.busy || session.loading) ...<Widget>[
                   const SizedBox(height: 12),
                   const LinearProgressIndicator(),
@@ -101,6 +94,13 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
             ),
           ),
         ),
+        if (messages.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
+              child: _WarningBanner(messages: messages, expanded: _warningsExpanded, onToggle: _toggleWarnings),
+            ),
+          ),
         if (emptyMessage != null)
           SliverToBoxAdapter(
             child: Padding(
@@ -109,12 +109,47 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
             ),
           ),
         SliverList.builder(
-          itemCount: visible.length,
-          itemBuilder: (BuildContext context, int index) => _DirectiveChip(directive: visible[index]),
+          itemCount: rows.length,
+          itemBuilder: (BuildContext context, int index) => rows[index],
         ),
       ],
     );
   }
+
+  void _toggleWarnings() {
+    setState(() => _warningsExpanded = !_warningsExpanded);
+  }
+
+  List<ProcessingError> _errors(Ledger ledger) => switch (ledger) {
+    LedgerDirectives(:final List<ProcessingError> errors) => errors,
+    LedgerErrors(:final List<ProcessingError> errors) => errors,
+  };
+
+  // Date groups newest first; directives within a day keep file order.
+  List<Widget> _rows(List<Directive> visible) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    final Map<BeanDate, List<Directive>> grouped = <BeanDate, List<Directive>>{};
+    for (final Directive directive in visible) {
+      grouped.putIfAbsent(directive.date, () => <Directive>[]).add(directive);
+    }
+    final List<BeanDate> dates = grouped.keys.toList()..sort((BeanDate a, BeanDate b) => compareBeanDate(b, a));
+    return <Widget>[
+      for (final BeanDate date in dates) ...<Widget>[
+        _DateHeader(date),
+        for (final Directive directive in grouped[date]!) _tileRow(directive, colors),
+      ],
+    ];
+  }
+
+  Widget _tileRow(Directive directive, ColorScheme colors) => switch (directive.body) {
+    TransactionBody(:final Transaction value) => _TransactionTile(value),
+    _ => _DirectiveTile(
+      icon: _icon(directive.body),
+      color: _color(directive.body, colors),
+      label: _label(directive.body),
+      meta: _meta(directive.body),
+    ),
+  };
 }
 
 bool _hidden(Directive directive, BookedLedger booked) =>
@@ -124,44 +159,193 @@ bool _hidden(Directive directive, BookedLedger booked) =>
 String? _emptyMessage({
   required List<Directive> visible,
   required List<Directive> directives,
-  required List<ProcessingError> errors,
-  required String? sessionError,
+  required List<String> messages,
 }) {
   if (visible.isNotEmpty) return null;
   if (directives.isNotEmpty) return 'Every directive is hidden.';
-  if (errors.isEmpty && sessionError == null) return 'This ledger has no directives.';
+  if (messages.isEmpty) return 'This ledger has no directives.';
   return null;
 }
 
-class _DirectiveChip extends StatelessWidget {
-  const _DirectiveChip({required this.directive});
+class _DateHeader extends StatelessWidget {
+  const _DateHeader(this.date);
 
-  final Directive directive;
+  final BeanDate date;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+    child: Text(
+      formatBeanDate(date),
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary),
+    ),
+  );
+}
+
+class _TransactionTile extends StatelessWidget {
+  const _TransactionTile(this.value);
+
+  final Transaction value;
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
-    final TextTheme text = Theme.of(context).textTheme;
-    final DirectiveBody body = directive.body;
-    final String kind = _kind(body);
-    final String detail = _detail(body);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 4, 28, 4),
-      child: Chip(
-        avatar: Icon(_icon(body)),
-        labelPadding: EdgeInsets.zero,
-        labelStyle: text.bodyLarge?.copyWith(color: colors.onSurface),
-        label: SizedBox(
-          width: double.infinity,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(detail.isEmpty ? kind : detail),
-                Text('${directive.date} · $kind', style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
-              ],
+    final List<Posting> debits = <Posting>[
+      for (final Posting posting in value.postings)
+        if (posting.units.number > Decimal.zero) posting,
+    ];
+    final List<Posting> credits = <Posting>[
+      for (final Posting posting in value.postings)
+        if (posting.units.number < Decimal.zero) posting,
+    ];
+    final Amount? displayAmount = debits.isEmpty ? null : debits.first.units;
+    String subtitle;
+    if (value.payee != null && value.payee!.isNotEmpty) {
+      subtitle = value.payee!;
+    } else if (credits.isNotEmpty && debits.isNotEmpty) {
+      subtitle = '${_leaves(credits)} → ${_leaves(debits)}';
+    } else if (value.postings.isNotEmpty) {
+      subtitle = _leaf(value.postings.first.account.name);
+    } else {
+      subtitle = '';
+    }
+    if (value.postings.length > 2) {
+      subtitle += ' (${value.postings.length} postings)';
+    }
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: colors.secondaryContainer,
+          child: Icon(Icons.receipt_long_outlined, color: colors.onSecondaryContainer, size: 20),
+        ),
+        title: Text(
+          value.narration.isEmpty ? '(no description)' : value.narration,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(fontStyle: value.narration.isEmpty ? FontStyle.italic : FontStyle.normal),
+        ),
+        subtitle: subtitle.isEmpty ? null : Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+        trailing: displayAmount == null
+            ? null
+            : Text(
+                _amountText(displayAmount),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+      ),
+    );
+  }
+
+  String _leaves(List<Posting> postings) {
+    final Set<String> leaves = <String>{for (final Posting posting in postings) _leaf(posting.account.name)};
+    return leaves.join(', ');
+  }
+
+  String _leaf(String name) => name.split(':').last;
+}
+
+// Keeps the parsed number's digits, e.g. 1.10 instead of Decimal's 1.1.
+String _amountText(Amount amount) {
+  final String number = amount.number.toString();
+  final int digits = number.contains('.') ? number.length - number.indexOf('.') - 1 : 0;
+  final String padded = amount.scale > digits ? '$number${'0' * (amount.scale - digits)}' : number;
+  return '$padded ${amount.currency.name}';
+}
+
+class _DirectiveTile extends StatelessWidget {
+  const _DirectiveTile({required this.icon, required this.color, required this.label, this.meta});
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String? meta;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+    color: color.withAlpha(15),
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+      side: BorderSide(color: color.withAlpha(40)),
+    ),
+    child: ListTile(
+      dense: true,
+      leading: Icon(icon, color: color, size: 20),
+      title: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: color, fontFamily: 'monospace'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: meta == null || meta!.isEmpty
+          ? null
+          : Text(
+              meta!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withAlpha(150)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+    ),
+  );
+}
+
+class _WarningBanner extends StatelessWidget {
+  const _WarningBanner({required this.messages, required this.expanded, required this.onToggle});
+
+  final List<String> messages;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.tertiaryContainer.withAlpha(120),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onToggle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(Icons.warning_amber_rounded, size: 18, color: colors.tertiary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${messages.length} ${messages.length == 1 ? 'warning' : 'warnings'}',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(color: colors.tertiary),
+                    ),
+                  ),
+                  Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 18, color: colors.tertiary),
+                ],
+              ),
+              if (expanded)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      for (final String message in messages)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            message,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -171,14 +355,14 @@ class _DirectiveChip extends StatelessWidget {
 
 IconData _icon(DirectiveBody body) => switch (body) {
   TransactionBody() => Icons.receipt_long_outlined,
-  PriceBody() => Icons.sell_outlined,
-  BalanceBody() => Icons.account_balance_outlined,
   OpenBody() => Icons.lock_open_outlined,
   CloseBody() => Icons.lock_outlined,
-  CommodityBody() => Icons.paid_outlined,
+  BalanceBody() => Icons.account_balance_outlined,
   PadBody() => Icons.align_vertical_center_outlined,
-  DocumentBody() => Icons.description_outlined,
+  PriceBody() => Icons.sell_outlined,
+  CommodityBody() => Icons.paid_outlined,
   NoteBody() => Icons.sticky_note_2_outlined,
+  DocumentBody() => Icons.description_outlined,
   EventBody() => Icons.event_outlined,
   QueryBody() => Icons.manage_search_outlined,
   CustomBody() => Icons.category_outlined,
@@ -186,62 +370,67 @@ IconData _icon(DirectiveBody body) => switch (body) {
   BudgetOffBody() => Icons.money_off_outlined,
 };
 
-String _kind(DirectiveBody body) => switch (body) {
-  TransactionBody() => 'Transaction',
-  PriceBody() => 'Price',
-  BalanceBody() => 'Balance',
-  OpenBody() => 'Open',
-  CloseBody() => 'Close',
-  CommodityBody() => 'Commodity',
-  PadBody() => 'Pad',
-  DocumentBody() => 'Document',
-  NoteBody() => 'Note',
-  EventBody() => 'Event',
-  QueryBody() => 'Query',
-  CustomBody() => 'Custom',
-  BudgetBody() => 'Budget',
-  BudgetOffBody() => 'Budget off',
+Color _color(DirectiveBody body, ColorScheme colors) => switch (body) {
+  TransactionBody() => colors.primary,
+  OpenBody() => Colors.green,
+  CloseBody() => colors.error,
+  BalanceBody() => colors.tertiary,
+  PadBody() => colors.secondary,
+  PriceBody() => colors.secondary,
+  CommodityBody() => colors.onSurface.withAlpha(180),
+  NoteBody() => colors.onSurface.withAlpha(160),
+  DocumentBody() => colors.secondary,
+  EventBody() => colors.tertiary,
+  QueryBody() => colors.primary,
+  CustomBody() => colors.onSurface.withAlpha(180),
+  BudgetBody() => colors.tertiary,
+  BudgetOffBody() => colors.tertiary,
 };
 
-String _detail(DirectiveBody body) => switch (body) {
-  TransactionBody(:final Transaction value) => _transaction(value),
-  PriceBody(:final Currency currency, :final Amount amount) => '${currency.name} $amount',
-  BalanceBody(:final Account account, :final Amount amount) => '${account.name} $amount',
-  OpenBody(:final Account account) => account.name,
-  CloseBody(:final Account account) => account.name,
-  CommodityBody(:final Currency currency) => currency.name,
-  PadBody(:final Account account, :final Account sourceAccount) => '${account.name} ${sourceAccount.name}',
+String _label(DirectiveBody body) => switch (body) {
+  TransactionBody() => '',
+  OpenBody(:final Account account) => 'open ${account.name}',
+  CloseBody(:final Account account) => 'close ${account.name}',
+  BalanceBody(:final Account account) => 'balance ${account.name}',
+  PadBody(:final Account account) => 'pad ${account.name}',
+  PriceBody(:final Currency currency) => 'price ${currency.name}',
+  CommodityBody(:final Currency currency) => 'commodity ${currency.name}',
+  NoteBody(:final Account account) => 'note ${account.name}',
+  DocumentBody(:final Account account) => 'document ${account.name}',
+  EventBody(:final String name) => 'event "$name"',
+  QueryBody(:final String name) => 'query $name',
+  CustomBody(:final String type) => 'custom $type',
+  BudgetBody(:final Account account) => 'budget ${account.name}',
+  BudgetOffBody(:final Account account) => 'budget off ${account.name}',
+};
+
+String? _meta(DirectiveBody body) => switch (body) {
+  TransactionBody() => null,
+  OpenBody(:final List<Currency> currencies) =>
+    currencies.isEmpty ? null : currencies.map((Currency c) => c.name).join(', '),
+  BalanceBody(:final Amount amount, :final Decimal? tolerance) =>
+    '${_amountText(amount)}${tolerance == null ? '' : ' ~ $tolerance'}',
+  CloseBody() => null,
+  PadBody(:final Account sourceAccount) => 'from ${sourceAccount.name}',
+  PriceBody(:final Amount amount) => _amountText(amount),
+  CommodityBody() => null,
+  NoteBody(:final String comment) => comment,
   DocumentBody(:final String filename) => filename,
-  NoteBody(:final Account account, :final String comment) => '${account.name} $comment',
-  EventBody(:final String name, :final String description) => '$name $description',
-  QueryBody(:final String name) => name,
-  CustomBody(:final String type) => type,
-  BudgetBody(:final Account account, :final BudgetInterval interval, :final Amount amount) =>
-    '${account.name} ${_interval(interval)} $amount',
-  BudgetOffBody(:final Account account, :final Currency? currency) =>
-    currency == null ? account.name : '${account.name} ${currency.name}',
+  EventBody(:final String description) => description,
+  QueryBody() => null,
+  CustomBody(:final List<CustomValue> values) => values.isEmpty ? null : values.map(_customValue).join(' '),
+  BudgetBody(:final BudgetInterval interval, :final Amount amount) => '${_interval(interval)} ${_amountText(amount)}',
+  BudgetOffBody(:final Currency? currency) => currency?.name,
 };
 
-String _transaction(Transaction value) {
-  final String text = <String>[
-    if (value.payee != null && value.payee!.isNotEmpty) value.payee!,
-    if (value.narration.isNotEmpty) value.narration,
-  ].join(' — ');
-  final String flag = _flag(value.flag);
-  if (text.isEmpty) return flag;
-  return '$flag $text';
-}
-
-String _flag(Flag flag) => switch (flag) {
-  SpecialFlagValue(:final SpecialFlag value) => switch (value) {
-    SpecialFlag.asterisk => '*',
-    SpecialFlag.exclamation => '!',
-    SpecialFlag.hash => '#',
-    SpecialFlag.ampersand => '&',
-    SpecialFlag.question => '?',
-    SpecialFlag.percent => '%',
-  },
-  LetterFlag(:final String value) => value,
+String _customValue(CustomValue value) => switch (value) {
+  CustomText(:final String value) => value,
+  CustomAccount(:final Account value) => value.name,
+  CustomDate(:final BeanDate value) => '$value',
+  CustomBoolean(:final bool value) => '$value',
+  CustomNumber(:final Decimal value) => '$value',
+  CustomAmount(:final Amount value) => '$value',
+  CustomCurrency(:final Currency value) => value.name,
 };
 
 String _interval(BudgetInterval interval) => switch (interval) {
