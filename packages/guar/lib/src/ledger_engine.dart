@@ -13,6 +13,8 @@ bool debugForceLedgerIsolate = false;
 
 int debugLedgerParses = 0;
 
+const String couldNotReadTarget = 'Could not read the target file.';
+
 // Holds a rewrite so a test can open another file before that save lands.
 Completer<void>? debugLedgerRewriteGate;
 
@@ -148,7 +150,7 @@ class _Memory {
   AppendOutcome appendTransaction(String source, String filename, String targetFilename, String snippet) {
     final bool root = targetFilename == filename;
     final String? original = root ? source : _readFile(targetFilename);
-    if (original == null) return const AppendFailed(<String>['Could not read the target file.']);
+    if (original == null) return const AppendFailed(<String>[couldNotReadTarget]);
     final String base = original.isEmpty || original.endsWith('\n') ? original : '$original\n';
     final String text = '$base$snippet';
     final int firstLine = base.split('\n').length;

@@ -4,6 +4,8 @@ import 'dart:async';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
+import 'package:guar/src/app_errors.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar_domain/guar_domain.dart' as d;
 
@@ -148,146 +150,156 @@ class _OpenAccountScreenState extends State<OpenAccountScreen> {
     await widget.session.flush();
     await widget.session.addTransaction(widget.session.document?.displayName ?? '', snippet);
     if (!mounted) return;
-    if (widget.session.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.session.error!)));
+    final String? message = sessionMessage(widget.session, GuarLocalizations.of(context));
+    if (message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       return;
     }
     Navigator.of(context).pop();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Open account')),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: <Widget>[
-        TextFormField(
-          key: const Key('date'),
-          controller: _date,
-          decoration: const InputDecoration(labelText: 'Date'),
-          onChanged: (String _) => _queueCheck(),
-        ),
-        TextFormField(
-          key: const Key('account'),
-          controller: _account,
-          decoration: const InputDecoration(labelText: 'Account'),
-          onChanged: (String _) => _queueCheck(),
-        ),
-        if (_advanced) ...<Widget>[
+  Widget build(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.openAccount)),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
           TextFormField(
-            key: const Key('currencies'),
-            controller: _currencies,
-            decoration: const InputDecoration(labelText: 'Currencies (comma separated)'),
+            key: const Key('date'),
+            controller: _date,
+            decoration: InputDecoration(labelText: l10n.labelDate),
             onChanged: (String _) => _queueCheck(),
           ),
-          DropdownButtonFormField<d.BookingMethod?>(
-            key: const Key('booking'),
-            initialValue: _booking,
-            decoration: const InputDecoration(labelText: 'Booking method'),
-            items: <DropdownMenuItem<d.BookingMethod?>>[
-              const DropdownMenuItem<d.BookingMethod?>(child: Text('Default')),
-              for (final d.BookingMethod method in d.BookingMethod.values)
-                DropdownMenuItem<d.BookingMethod?>(value: method, child: Text(_bookingText(method))),
-            ],
-            onChanged: (d.BookingMethod? booking) {
-              if (mounted) {
-                setState(() => _booking = booking);
-              }
-              _queueCheck();
-            },
+          TextFormField(
+            key: const Key('account'),
+            controller: _account,
+            decoration: InputDecoration(labelText: l10n.labelAccount),
+            onChanged: (String _) => _queueCheck(),
           ),
-          ..._metaSection(),
-        ],
-        for (final String error in _errors)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-        const SizedBox(height: 24),
-        FilledButton(
-          key: const Key('save'),
-          onPressed: _canSave ? _save : null,
-          child: const Text('Open account'),
-        ),
-      ],
-    ),
-  );
-
-  List<Widget> _metaSection() => <Widget>[
-    Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        children: <Widget>[
-          const Text('Metadata'),
-          IconButton(
-            key: const Key('add-meta'),
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              setState(() => _meta.add(_MetaDraft()));
-              _queueCheck();
-            },
-          ),
-        ],
-      ),
-    ),
-    for (int index = 0; index < _meta.length; index++)
-      Row(
-        children: <Widget>[
-          Expanded(
-            child: TextFormField(
-              key: Key('meta-$index-key'),
-              controller: TextEditingController(text: _meta[index].key),
-              decoration: const InputDecoration(labelText: 'Key'),
-              onChanged: (String value) {
-                _meta[index].key = value;
-                _queueCheck();
-              },
+          if (_advanced) ...<Widget>[
+            TextFormField(
+              key: const Key('currencies'),
+              controller: _currencies,
+              decoration: InputDecoration(labelText: l10n.labelCurrenciesComma),
+              onChanged: (String _) => _queueCheck(),
             ),
-          ),
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              initialValue: _meta[index].type,
-              items: <DropdownMenuItem<String>>[
-                for (final String type in const <String>[
-                  'text',
-                  'number',
-                  'date',
-                  'account',
-                  'currency',
-                  'tag',
-                  'boolean',
-                ])
-                  DropdownMenuItem<String>(value: type, child: Text(type)),
+            DropdownButtonFormField<d.BookingMethod?>(
+              key: const Key('booking'),
+              initialValue: _booking,
+              decoration: InputDecoration(labelText: l10n.labelBookingMethod),
+              items: <DropdownMenuItem<d.BookingMethod?>>[
+                DropdownMenuItem<d.BookingMethod?>(child: Text(l10n.bookingDefault)),
+                for (final d.BookingMethod method in d.BookingMethod.values)
+                  DropdownMenuItem<d.BookingMethod?>(value: method, child: Text(_bookingText(method))),
               ],
-              onChanged: (String? type) {
-                if (type != null) {
-                  setState(() => _meta[index].type = type);
-                  _queueCheck();
+              onChanged: (d.BookingMethod? booking) {
+                if (mounted) {
+                  setState(() => _booking = booking);
                 }
-              },
-            ),
-          ),
-          Expanded(
-            child: TextFormField(
-              key: Key('meta-$index-value'),
-              controller: TextEditingController(text: _meta[index].value),
-              decoration: const InputDecoration(labelText: 'Value'),
-              onChanged: (String value) {
-                _meta[index].value = value;
                 _queueCheck();
               },
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () {
-              setState(() => _meta.removeAt(index));
-              _queueCheck();
-            },
+            ..._metaSection(),
+          ],
+          for (final String error in _errors)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                appendErrorText(l10n, error),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          const SizedBox(height: 24),
+          FilledButton(
+            key: const Key('save'),
+            onPressed: _canSave ? _save : null,
+            child: Text(l10n.openAccount),
           ),
         ],
       ),
-  ];
+    );
+  }
+
+  List<Widget> _metaSection() {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
+    return <Widget>[
+      Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: <Widget>[
+            Text(l10n.metadata),
+            IconButton(
+              key: const Key('add-meta'),
+              icon: const Icon(Icons.add),
+              onPressed: () {
+                setState(() => _meta.add(_MetaDraft()));
+                _queueCheck();
+              },
+            ),
+          ],
+        ),
+      ),
+      for (int index = 0; index < _meta.length; index++)
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: TextFormField(
+                key: Key('meta-$index-key'),
+                controller: TextEditingController(text: _meta[index].key),
+                decoration: InputDecoration(labelText: l10n.keyLabel),
+                onChanged: (String value) {
+                  _meta[index].key = value;
+                  _queueCheck();
+                },
+              ),
+            ),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _meta[index].type,
+                items: <DropdownMenuItem<String>>[
+                  for (final String type in const <String>[
+                    'text',
+                    'number',
+                    'date',
+                    'account',
+                    'currency',
+                    'tag',
+                    'boolean',
+                  ])
+                    DropdownMenuItem<String>(value: type, child: Text(type)),
+                ],
+                onChanged: (String? type) {
+                  if (type != null) {
+                    setState(() => _meta[index].type = type);
+                    _queueCheck();
+                  }
+                },
+              ),
+            ),
+            Expanded(
+              child: TextFormField(
+                key: Key('meta-$index-value'),
+                controller: TextEditingController(text: _meta[index].value),
+                decoration: InputDecoration(labelText: l10n.valueLabel),
+                onChanged: (String value) {
+                  _meta[index].value = value;
+                  _queueCheck();
+                },
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                setState(() => _meta.removeAt(index));
+                _queueCheck();
+              },
+            ),
+          ],
+        ),
+    ];
+  }
 }
 
 String _bookingText(d.BookingMethod method) => switch (method) {

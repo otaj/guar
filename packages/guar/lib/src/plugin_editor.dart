@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar_plugins/guar_plugins.dart';
 
@@ -153,6 +154,7 @@ class _PluginEditorState extends State<PluginEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final ColorScheme colors = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
     final int? reorderIndex = widget.reorderIndex;
@@ -170,7 +172,7 @@ class _PluginEditorState extends State<PluginEditor> {
                   ReorderableDragStartListener(
                     index: reorderIndex,
                     child: Tooltip(
-                      message: 'Drag to change the order',
+                      message: l10n.dragTooltip,
                       child: Padding(
                         key: Key('drag-${widget.name}'),
                         padding: const EdgeInsets.all(8),
@@ -194,7 +196,7 @@ class _PluginEditorState extends State<PluginEditor> {
                 ),
                 IconButton(
                   key: Key('about-${widget.name}'),
-                  tooltip: _expanded ? 'Hide description' : 'Show description',
+                  tooltip: _expanded ? l10n.hideDescription : l10n.showDescription,
                   onPressed: () {
                     if (_expanded) unawaited(flush());
                     setState(() => _expanded = !_expanded);
@@ -209,7 +211,7 @@ class _PluginEditorState extends State<PluginEditor> {
               ],
             ),
             if (_expanded) ...<Widget>[
-              Text(widget.description ?? _unknown, style: text.bodyMedium),
+              Text(widget.description ?? l10n.unknownPlugin, style: text.bodyMedium),
               if (_showConfig) ..._configFields(text),
               if (shownError != null)
                 Padding(
@@ -240,7 +242,10 @@ class _PluginEditorState extends State<PluginEditor> {
             controller: raw.controller,
             focusNode: raw.focus,
             maxLines: 4,
-            decoration: const InputDecoration(labelText: 'Configuration', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+              labelText: GuarLocalizations.of(context).configLabel,
+              border: const OutlineInputBorder(),
+            ),
           ),
         ),
       ];
@@ -324,7 +329,7 @@ class _PluginEditorState extends State<PluginEditor> {
           child: TextButton(
             key: Key('add-${widget.name}-${field.id}'),
             onPressed: () => _addTableRow(field),
-            child: Text('Add ${field.label}'),
+            child: Text(GuarLocalizations.of(context).addLabel(field.label)),
           ),
         ),
       ],
@@ -342,7 +347,7 @@ class _PluginEditorState extends State<PluginEditor> {
         child: TextButton(
           key: Key('add-${widget.name}-${field.id}'),
           onPressed: _addRule,
-          child: const Text('Add rule'),
+          child: Text(GuarLocalizations.of(context).addRule),
         ),
       ),
     ],
@@ -358,13 +363,19 @@ class _PluginEditorState extends State<PluginEditor> {
           TextFormField(
             controller: rule.name.controller,
             focusNode: rule.name.focus,
-            decoration: const InputDecoration(labelText: 'Rule name', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+              labelText: GuarLocalizations.of(context).ruleName,
+              border: const OutlineInputBorder(),
+            ),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: rule.pattern.controller,
             focusNode: rule.pattern.focus,
-            decoration: const InputDecoration(labelText: 'Account pattern', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+              labelText: GuarLocalizations.of(context).accountPattern,
+              border: const OutlineInputBorder(),
+            ),
           ),
           for (int insert = 0; insert < rule.inserts.length; insert++)
             Padding(
@@ -374,13 +385,19 @@ class _PluginEditorState extends State<PluginEditor> {
                   TextFormField(
                     controller: rule.inserts[insert][0].controller,
                     focusNode: rule.inserts[insert][0].focus,
-                    decoration: const InputDecoration(labelText: 'Account template', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: GuarLocalizations.of(context).accountTemplate,
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: rule.inserts[insert][1].controller,
                     focusNode: rule.inserts[insert][1].focus,
-                    decoration: const InputDecoration(labelText: 'Currencies template', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: GuarLocalizations.of(context).currenciesTemplate,
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                   Align(
                     alignment: Alignment.centerRight,
@@ -391,11 +408,17 @@ class _PluginEditorState extends State<PluginEditor> {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(onPressed: () => _addInsert(index), child: const Text('Add insert')),
+            child: TextButton(
+              onPressed: () => _addInsert(index),
+              child: Text(GuarLocalizations.of(context).addInsert),
+            ),
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(onPressed: () => _removeRule(index), child: const Text('Remove rule')),
+            child: TextButton(
+              onPressed: () => _removeRule(index),
+              child: Text(GuarLocalizations.of(context).removeRule),
+            ),
           ),
         ],
       ),
@@ -474,7 +497,9 @@ class _PluginEditorState extends State<PluginEditor> {
       switch (field) {
         case PluginDecimalField(:final String id):
           final String raw = _text[id]?.controller.text.trim() ?? '';
-          if (raw.isNotEmpty && Decimal.tryParse(raw) == null) return const PluginWrite.bad('Enter a decimal');
+          if (raw.isNotEmpty && Decimal.tryParse(raw) == null) {
+            return PluginWrite.bad(GuarLocalizations.of(context).enterDecimal);
+          }
         case PluginTableField(:final String id, :final List<PluginColumn> columns):
           for (final List<_Input> row in _tables[id] ?? const <List<_Input>>[]) {
             for (int column = 0; column < columns.length && column < row.length; column++) {
@@ -491,11 +516,14 @@ class _PluginEditorState extends State<PluginEditor> {
     return null;
   }
 
-  PluginWrite? _cellError(PluginColumnKind kind, String raw) => switch (kind) {
-    PluginColumnKind.text => null,
-    PluginColumnKind.decimal => Decimal.tryParse(raw) == null ? const PluginWrite.bad('Enter a decimal') : null,
-    PluginColumnKind.integer => int.tryParse(raw) == null ? const PluginWrite.bad('Enter a whole number') : null,
-  };
+  PluginWrite? _cellError(PluginColumnKind kind, String raw) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
+    return switch (kind) {
+      PluginColumnKind.text => null,
+      PluginColumnKind.decimal => Decimal.tryParse(raw) == null ? PluginWrite.bad(l10n.enterDecimal) : null,
+      PluginColumnKind.integer => int.tryParse(raw) == null ? PluginWrite.bad(l10n.enterWholeNumber) : null,
+    };
+  }
 
   PluginStored _collect() => PluginStored(
     text: <String, String>{
@@ -598,9 +626,6 @@ class _PluginEditorState extends State<PluginEditor> {
     unawaited(flush());
   }
 }
-
-const String _unknown =
-    'This plugin is not one of the built-in plugins. Its configuration is kept as written in the ledger.';
 
 String _label(String name) {
   final int dot = name.lastIndexOf('.');

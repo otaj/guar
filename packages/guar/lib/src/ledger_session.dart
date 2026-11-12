@@ -14,6 +14,9 @@ import 'package:guar_domain/guar_domain.dart';
 
 const Duration ledgerOptionSaveDelay = Duration(milliseconds: 500);
 
+// Known failure reasons, kept apart from raw engine and platform messages so the UI can translate them.
+enum GuarFailure { couldNotWriteIncluded, couldNotSaveTransaction, couldNotUseFile }
+
 class LedgerSession extends ChangeNotifier {
   LedgerSession(this.documents, {this.included = const IoIncludedFiles()});
 
@@ -26,6 +29,7 @@ class LedgerSession extends ChangeNotifier {
   String source = '';
   bool busy = false;
   bool settled = false;
+  GuarFailure? failure;
   String? error;
   int generation = 0;
 
@@ -61,9 +65,9 @@ class LedgerSession extends ChangeNotifier {
       await _show(current, epoch);
     } on PlatformException catch (error) {
       if (_disposed || epoch != _epoch) return;
-      this.error = _message(error);
       settled = true;
       _reading = false;
+      _failPlatform(error, GuarFailure.couldNotUseFile);
       _publishStatus();
     }
   }
@@ -73,6 +77,7 @@ class LedgerSession extends ChangeNotifier {
     final int epoch = ++_epoch;
     busy = true;
     error = null;
+    failure = null;
     _publishStatus();
     try {
       final LedgerDocument? picked = await pick();
@@ -91,7 +96,7 @@ class LedgerSession extends ChangeNotifier {
       busy = false;
       _reading = false;
       settled = true;
-      this.error = _message(error);
+      _failPlatform(error, GuarFailure.couldNotUseFile);
       _publishStatus();
     }
   }
@@ -122,7 +127,8 @@ class LedgerSession extends ChangeNotifier {
 
   Future<List<String>> validateTransaction(String targetFilename, String snippet) {
     final LedgerDocument? current = document;
-    if (current == null) return Future<List<String>>.value(const <String>['No ledger is open.']);
+    // The editors only open over a selected ledger, so an empty list means there is nothing to check.
+    if (current == null) return Future<List<String>>.value(const <String>[]);
     return _engine
         .appendTransaction(source, current.displayName, targetFilename, snippet)
         .then(
@@ -173,6 +179,8 @@ class LedgerSession extends ChangeNotifier {
       _reading = false;
       busy = false;
       settled = true;
+      error = null;
+      failure = null;
       _publishDocument();
       return;
     }
@@ -187,7 +195,7 @@ class LedgerSession extends ChangeNotifier {
       _reading = false;
       busy = false;
       settled = true;
-      this.error = _message(error);
+      _failPlatform(error, GuarFailure.couldNotUseFile);
       _publishStatus();
       return;
     }
@@ -198,6 +206,7 @@ class LedgerSession extends ChangeNotifier {
     source = text;
     snapshot = prepared;
     error = null;
+    failure = null;
     _reading = false;
     busy = false;
     settled = true;
@@ -272,11 +281,15 @@ class LedgerSession extends ChangeNotifier {
                 try {
                   included.write(txn.target, text);
                 } on FileSystemException {
-                  _fail(edit, 'Could not write the included ledger file.');
+                  _fail(edit, GuarFailure.couldNotWriteIncluded);
                 }
               }
             case AppendFailed(:final List<String> errors):
-              _fail(edit, errors.isEmpty ? 'Could not save the transaction.' : errors.first);
+              if (errors.isEmpty) {
+                _fail(edit, GuarFailure.couldNotSaveTransaction);
+              } else {
+                _failMessage(edit, errors.first);
+              }
           }
         }
         if (edit.options == null && edit.plugins == null && edit.transaction == null) _pending.removeAt(0);
@@ -315,18 +328,37 @@ class LedgerSession extends ChangeNotifier {
     try {
       await documents.write(edit.document, next);
     } on PlatformException catch (error) {
-      if (!_disposed && document?.uri == edit.document.uri) this.error = _message(error);
+      if (!_disposed && document?.uri == edit.document.uri) _failPlatform(error, GuarFailure.couldNotUseFile);
       return;
     }
     edit.source = next;
     if (_disposed || document?.uri != edit.document.uri) return;
     source = next;
     error = null;
+    failure = null;
   }
 
-  void _fail(_PendingEdit edit, String message) {
+  void _fail(_PendingEdit edit, GuarFailure reason) {
+    if (_disposed || document?.uri != edit.document.uri) return;
+    failure = reason;
+    error = null;
+  }
+
+  void _failMessage(_PendingEdit edit, String message) {
     if (_disposed || document?.uri != edit.document.uri) return;
     error = message;
+    failure = null;
+  }
+
+  void _failPlatform(PlatformException error, GuarFailure fallback) {
+    final String? message = error.message;
+    if (message == null || message.isEmpty) {
+      failure = fallback;
+      this.error = null;
+      return;
+    }
+    this.error = message;
+    failure = null;
   }
 
   Future<void> _refresh() async {
@@ -345,12 +377,6 @@ class LedgerSession extends ChangeNotifier {
   void _publishDocument() {
     generation += 1;
     _publishStatus();
-  }
-
-  String _message(PlatformException error) {
-    final String? message = error.message;
-    if (message == null || message.isEmpty) return 'Could not use that file.';
-    return message;
   }
 }
 

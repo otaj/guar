@@ -539,6 +539,60 @@ void main() {
 
     expect(documents.files[document.uri], '');
   });
+
+  testWidgets('writes a language option and removes it for the system default', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(currentDocument: document);
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('language'))).initialValue, '');
+
+    await tester.ensureVisible(find.byKey(const Key('language')));
+    await tester.tap(find.byKey(const Key('language')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English').last);
+    await tester.pumpAndSettle();
+
+    final DateTime now = DateTime.now();
+    final String today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(documents.files[document.uri], '$today custom "guar_option" "language" "en"\n');
+
+    await tester.ensureVisible(find.byKey(const Key('language')));
+    await tester.tap(find.byKey(const Key('language')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('System default').last);
+    await tester.pumpAndSettle();
+
+    expect(documents.files[document.uri], '');
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('language'))).initialValue, '');
+  });
+
+  testWidgets('keeps a handwritten language and lets the system default remove it', (WidgetTester tester) async {
+    const LedgerDocument document = LedgerDocument(uri: 'content://ledger/1', displayName: 'taxes.beancount');
+    final _FakeLedgerDocuments documents = _FakeLedgerDocuments(
+      currentDocument: document,
+      files: const <String, String>{
+        'content://ledger/1': '2020-01-01 custom "guar_option" "language" "xx"\n',
+      },
+    );
+    await _pumpApp(tester, documents);
+    await _showSettings(tester);
+
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('language'))).initialValue, 'xx');
+    expect(find.text('xx'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('language')));
+    await tester.tap(find.byKey(const Key('language')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('System default').last);
+    await tester.pumpAndSettle();
+
+    expect(documents.files[document.uri], '');
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, LedgerDocuments documents) async {

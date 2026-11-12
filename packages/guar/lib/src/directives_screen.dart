@@ -2,6 +2,7 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
 import 'package:guar/src/amount_text.dart';
 import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/date_text.dart';
@@ -41,6 +42,7 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final LedgerSession session = widget.session;
     final BookedLedger? booked = session.snapshot?.booked;
     if (!session.settled || booked == null) {
@@ -52,7 +54,7 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       return Padding(
         padding: const EdgeInsets.all(28),
         child: Text(
-          sessionError ?? 'No ledger is selected. Choose one in Settings.',
+          sessionError ?? l10n.noLedgerSelectedSettings,
           style: text.bodyLarge?.copyWith(color: sessionError == null ? colors.onSurfaceVariant : colors.error),
         ),
       );
@@ -76,6 +78,7 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       visible: visible,
       directives: directives,
       messages: messages,
+      l10n: l10n,
     );
     final List<Widget> rows = _rows(visible);
     return CustomScrollView(
@@ -161,10 +164,11 @@ String? _emptyMessage({
   required List<Directive> visible,
   required List<Directive> directives,
   required List<String> messages,
+  required GuarLocalizations l10n,
 }) {
   if (visible.isNotEmpty) return null;
-  if (directives.isNotEmpty) return 'Every directive is hidden.';
-  if (messages.isEmpty) return 'This ledger has no directives.';
+  if (directives.isNotEmpty) return l10n.everyDirectiveHidden;
+  if (messages.isEmpty) return l10n.noDirectives;
   return null;
 }
 
@@ -177,7 +181,7 @@ class _DateHeader extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
     child: Text(
-      formatBeanDate(date),
+      formatBeanDate(date, Localizations.localeOf(context).toString()),
       style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary),
     ),
   );
@@ -190,6 +194,7 @@ class _TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final ColorScheme colors = Theme.of(context).colorScheme;
     final List<Posting> debits = <Posting>[
       for (final Posting posting in value.postings)
@@ -211,7 +216,7 @@ class _TransactionTile extends StatelessWidget {
       subtitle = '';
     }
     if (value.postings.length > 2) {
-      subtitle += ' (${value.postings.length} postings)';
+      subtitle += ' (${l10n.postingsCount(value.postings.length)})';
     }
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
@@ -221,7 +226,7 @@ class _TransactionTile extends StatelessWidget {
           child: Icon(Icons.receipt_long_outlined, color: colors.onSecondaryContainer, size: 20),
         ),
         title: Text(
-          value.narration.isEmpty ? '(no description)' : value.narration,
+          value.narration.isEmpty ? l10n.noDescription : value.narration,
           style: Theme.of(
             context,
           ).textTheme.bodyLarge?.copyWith(fontStyle: value.narration.isEmpty ? FontStyle.italic : FontStyle.normal),
@@ -316,7 +321,7 @@ class _WarningBanner extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${messages.length} ${messages.length == 1 ? 'warning' : 'warnings'}',
+                      GuarLocalizations.of(context).warningsCount(messages.length),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(color: colors.tertiary),
                     ),
                   ),

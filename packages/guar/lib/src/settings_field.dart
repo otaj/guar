@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
 import 'package:guar/src/settings_copy.dart';
 
 class SettingSwitch extends StatelessWidget {
@@ -104,7 +105,10 @@ class _SettingHelp extends StatelessWidget {
           title: Text(label),
           content: SingleChildScrollView(child: Text(detail)),
           actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(GuarLocalizations.of(context).closeLabel),
+            ),
           ],
         ),
       ),

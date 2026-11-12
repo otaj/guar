@@ -3,6 +3,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:guar/l10n/gen/app_localizations.dart';
+import 'package:guar/src/app_errors.dart';
 import 'package:guar/src/ledger_session.dart';
 import 'package:guar/src/plugin_editor.dart';
 import 'package:guar_book/guar_book.dart';
@@ -59,14 +61,15 @@ class _PluginsScreenState extends State<PluginsScreen> {
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
+    final GuarLocalizations l10n = GuarLocalizations.of(context);
     final LedgerSession session = widget.session;
-    final String? error = session.error ?? _error;
+    final String? error = sessionMessage(session, l10n) ?? _error;
     if (!session.settled) return const SizedBox.shrink();
     if (session.document == null) {
       return Padding(
         padding: const EdgeInsets.all(28),
         child: Text(
-          'No ledger is selected. Choose one in Settings.',
+          l10n.noLedgerSelectedSettings,
           style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
         ),
       );
@@ -83,7 +86,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
                 Text(session.document!.displayName, style: text.titleMedium),
                 const SizedBox(height: 8),
                 Text(
-                  'Plugins run from top to bottom. Drag a plugin to change that order.',
+                  l10n.pluginsHint,
                   style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
                 ),
                 if (error != null) ...<Widget>[
@@ -102,7 +105,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 12, 28, 12),
-              child: Text('None of the plugins are turned on.', style: text.bodyLarge),
+              child: Text(l10n.noPluginsOn, style: text.bodyLarge),
             ),
           ),
         SliverReorderableList(
@@ -130,7 +133,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(28, 24, 28, 8),
-            child: Text('Available', style: text.titleLarge),
+            child: Text(l10n.availableTitle, style: text.titleLarge),
           ),
         ),
         SliverList(
