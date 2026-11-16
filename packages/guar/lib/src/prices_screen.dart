@@ -58,7 +58,7 @@ class _PricesScreenState extends State<PricesScreen> {
     final bool includeInferred = booked.guar.includeInferredPrices;
     final List<_Quote> quotes = _collectQuotes(directives, includeInferred: includeInferred);
     final Map<CurrencyPair, List<PricePoint>> rates = _rates(directives, includeInferred: includeInferred);
-    final List<Widget> rows = _byPair ? _pairRows(rates, l10n) : _quoteRows(quotes);
+    final List<Object> rows = _byPair ? _pairRows(rates) : _quoteRows(quotes);
     return CustomScrollView(
       slivers: <Widget>[
         SliverToBoxAdapter(
@@ -115,14 +115,22 @@ class _PricesScreenState extends State<PricesScreen> {
           ),
         SliverList.builder(
           itemCount: rows.length,
-          itemBuilder: (BuildContext context, int index) => rows[index],
+          itemBuilder: (BuildContext context, int index) => _rowTile(context, rows[index]),
         ),
       ],
     );
   }
 
-  List<Widget> _pairRows(Map<CurrencyPair, List<PricePoint>> rates, GuarLocalizations l10n) => <Widget>[
-    for (final MapEntry<CurrencyPair, List<PricePoint>> entry in rates.entries) _pairCard(entry.key, entry.value, l10n),
+  // The list holds data, not widgets, so SliverList builds only the visible rows.
+  Widget _rowTile(BuildContext context, Object row) => switch (row) {
+    final BeanDate date => _DateHeader(date),
+    final _Quote quote => _QuoteTile(quote: quote, color: Theme.of(context).colorScheme.secondary),
+    final (CurrencyPair, List<PricePoint>) pair => _pairCard(pair.$1, pair.$2, GuarLocalizations.of(context)),
+    _ => const SizedBox.shrink(),
+  };
+
+  List<Object> _pairRows(Map<CurrencyPair, List<PricePoint>> rates) => <Object>[
+    for (final MapEntry<CurrencyPair, List<PricePoint>> entry in rates.entries) (entry.key, entry.value),
   ];
 
   Widget _pairCard(CurrencyPair pair, List<PricePoint> series, GuarLocalizations l10n) {
@@ -172,17 +180,16 @@ class _PricesScreenState extends State<PricesScreen> {
     );
   }
 
-  List<Widget> _quoteRows(List<_Quote> quotes) {
-    final ColorScheme colors = Theme.of(context).colorScheme;
+  List<Object> _quoteRows(List<_Quote> quotes) {
     final Map<BeanDate, List<_Quote>> grouped = <BeanDate, List<_Quote>>{};
     for (final _Quote quote in quotes) {
       grouped.putIfAbsent(quote.date, () => <_Quote>[]).add(quote);
     }
     final List<BeanDate> dates = grouped.keys.toList()..sort((BeanDate a, BeanDate b) => compareBeanDate(b, a));
-    return <Widget>[
-      for (final BeanDate date in dates) ...<Widget>[
-        _DateHeader(date),
-        for (final _Quote quote in grouped[date]!) _QuoteTile(quote: quote, color: colors.secondary),
+    return <Object>[
+      for (final BeanDate date in dates) ...<Object>[
+        date,
+        ...grouped[date]!,
       ],
     ];
   }
