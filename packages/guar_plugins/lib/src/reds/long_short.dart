@@ -57,7 +57,7 @@ BookPluginResult longShort(List<Directive> directives, LedgerOptions options, Pr
     }
     final List<Posting> orig = <Posting>[
       for (final Posting posting in transaction.postings)
-        if (match.hasMatch(posting.account.name)) posting,
+        if (match.matchAsPrefix(posting.account.name) != null) posting,
     ];
     if (orig.isEmpty) {
       out.add(directive);
@@ -78,7 +78,7 @@ BookPluginResult longShort(List<Directive> directives, LedgerOptions options, Pr
     }
     final List<Posting> kept = <Posting>[
       for (final Posting posting in transaction.postings)
-        if (!match.hasMatch(posting.account.name)) posting,
+        if (match.matchAsPrefix(posting.account.name) == null) posting,
     ];
     final Posting template = orig.first;
     if (shortGains != Decimal.zero) {
@@ -115,7 +115,7 @@ bool _interesting(Transaction transaction, RegExp match, String shortRepl, Strin
     if (posting.account.name.contains(shortRepl) || posting.account.name.contains(longRepl)) {
       return false;
     }
-    if (match.hasMatch(posting.account.name)) generic = true;
+    if (match.matchAsPrefix(posting.account.name) != null) generic = true;
   }
   return generic;
 }

@@ -40,7 +40,8 @@ BookPluginResult gainLoss(List<Directive> directives, LedgerOptions options, Pro
     for (final Posting posting in transaction.postings) {
       String account = posting.account.name;
       for (final (RegExp, String, String, String) rule in rewrites) {
-        if (!rule.$1.hasMatch(account)) continue;
+        // Python matches with re.match, anchored at the start of the account.
+        if (rule.$1.matchAsPrefix(account) == null) continue;
         account = posting.units.number < Decimal.zero
             ? account.replaceAll(rule.$2, rule.$3)
             : account.replaceAll(rule.$2, rule.$4);
