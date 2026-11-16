@@ -36,7 +36,8 @@ BookPluginResult effectiveDate(List<Directive> directives, LedgerOptions options
     interesting.add(directive);
   }
 
-  final Random random = Random();
+  // Seeded like zerosum so the generated link names stay stable across runs.
+  final Random random = Random(6);
   final List<Directive> linked = <Directive>[
     for (final Directive directive in interesting) _withLink(directive, random),
   ];
@@ -85,10 +86,10 @@ Map<String, Map<String, String>>? _holdingAccounts(String? config) {
   for (final MapEntry<Object?, Object?> entry in parsed.map!.entries) {
     if (entry.key is! String || entry.value is! Map) return null;
     final Map<Object?, Object?> inner = entry.value! as Map<Object?, Object?>;
-    holding[entry.key! as String] = <String, String>{
-      for (final MapEntry<Object?, Object?> item in inner.entries)
-        if (item.key is String && item.value is String) item.key! as String: item.value! as String,
-    };
+    final Object? earlier = inner['earlier'];
+    final Object? later = inner['later'];
+    if (earlier is! String || later is! String) return null;
+    holding[entry.key! as String] = <String, String>{'earlier': earlier, 'later': later};
   }
   return holding;
 }

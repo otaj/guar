@@ -12,6 +12,22 @@ void main() {
     expect(booked(_plugin), isEmpty);
   });
 
+  test('a holding map without both earlier and later is a config error, not a crash', () {
+    expect(
+      messages(
+        'plugin "beancount_reds_plugins.effective_date.effective_date" '
+        '"{\'Income\': {\'earlier\': \'Assets:Hold:Income\'}}"\n'
+        '2014-01-01 open Liabilities:Mastercard\n'
+        '2014-01-01 open Expenses:Taxes:Federal\n'
+        '2014-02-01 * "Estimated taxes for 2013"\n'
+        '  Liabilities:Mastercard        -2000 USD\n'
+        '  Expenses:Taxes:Federal         2000 USD\n'
+        '    effective_date: 2013-12-31\n',
+      ),
+      contains('Invalid configuration for effective_date plugin; skipping.'),
+    );
+  });
+
   test('leaves transactions without effective dates unchanged', () {
     const String source =
         '$_plugin'

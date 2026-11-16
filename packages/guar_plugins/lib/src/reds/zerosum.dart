@@ -53,7 +53,7 @@ _parse(String? config) {
     for (final MapEntry<Object?, Object?> entry in rawAccounts.entries) {
       if (entry.key is! String || entry.value is! List) return null;
       final List<Object?> spec = entry.value! as List<Object?>;
-      if (spec.length < 2) return null;
+      if (spec.length < 2 || spec[1] is! num) return null;
       accounts[entry.key! as String] = (target: spec[0]?.toString() ?? '', dateRange: (spec[1]! as num).toInt());
     }
   }
@@ -65,11 +65,21 @@ _parse(String? config) {
     replaceTo = replace[1]?.toString() ?? '';
   }
   final Object? toleranceValue = map.remove('tolerance');
+  Decimal? tolerance;
+  if (toleranceValue == null) {
+    tolerance = zerosumDefaultTolerance;
+  } else {
+    try {
+      tolerance = toDecimal(toleranceValue);
+    } on FormatException {
+      return null;
+    }
+  }
   return (
     accounts: accounts,
     replaceFrom: replaceFrom,
     replaceTo: replaceTo,
-    tolerance: toleranceValue == null ? zerosumDefaultTolerance : toDecimal(toleranceValue),
+    tolerance: tolerance,
     matchMetadata: map.remove('match_metadata') == true,
     matchMetadataName: map.remove('match_metadata_name')?.toString() ?? zerosumDefaultMetadataName,
     linkTransactions: map.remove('link_transactions') == true,
