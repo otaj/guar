@@ -20,7 +20,7 @@ import 'package:guar_parser/src/domain/domain.dart';
     if (number == null || currency == null) {
       return;
     }
-    digits.putIfAbsent(currency.name, () => <int>[]).add(_fractionalDigits(number));
+    digits.putIfAbsent(currency.name, () => <int>[]).add(number.places);
   }
 
   for (final ParsedDirective directive in directives) {
@@ -63,17 +63,6 @@ import 'package:guar_parser/src/domain/domain.dart';
     commodities: List<Currency>.unmodifiable(commodities),
     displayContext: DisplayContext(precisions: precisions),
   );
-}
-
-int _fractionalDigits(BeanNumber number) {
-  final String compact = number.verbatim.replaceAll(',', '').replaceAll(' ', '');
-  if (RegExp(r'^[+-]?\d+(\.\d+)?$').hasMatch(compact)) {
-    final int dot = compact.indexOf('.');
-    return dot < 0 ? 0 : compact.length - dot - 1;
-  }
-  final String resolved = number.resolved.toString();
-  final int dot = resolved.indexOf('.');
-  return dot < 0 ? 0 : resolved.length - dot - 1;
 }
 
 int _mode(List<int> samples) {
