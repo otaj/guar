@@ -591,13 +591,9 @@ class _Group {
     }
     try {
       return <QueryValue>[
+        // _compileSelect rejects non-aggregates outside GROUP BY, so every i is in groupIndexes.
         for (int i = 0; i < targets.length; i++)
-          if (targets[i].isAggregate)
-            targets[i].eval.call(const Object())
-          else if (groupIndexes.contains(i))
-            keys[groupIndexes.indexOf(i)]
-          else
-            throw QueryException('column must appear in the GROUP BY clause or be used in an aggregate'),
+          if (targets[i].isAggregate) targets[i].eval.call(const Object()) else keys[groupIndexes.indexOf(i)],
       ];
     } finally {
       for (final _Aggregate aggregate in aggregates) {
@@ -1036,13 +1032,17 @@ class _Quantified extends _Eval {
       rhs = QueryValue.list((right as _Subquery).values());
     }
     final Set<String> items = membershipStrings(rhs);
+    // The needle side does not change per row; compile it once.
+    final RegExp? needlePattern = op == '~' || op == '?~'
+        ? userRegExp(needle.asText() ?? _stringifyValue(needle))
+        : null;
     bool test(String item) {
       final String text = needle.asText() ?? _stringifyValue(needle);
       return switch (op) {
         '=' => text == item,
         '!=' => text != item,
-        '~' => userRegExp(item).hasMatch(text) || userRegExp(text).hasMatch(item),
-        '?~' => userRegExp(item).matchAsPrefix(text) != null || userRegExp(text).matchAsPrefix(item) != null,
+        '~' => userRegExp(item).hasMatch(text) || needlePattern!.hasMatch(item),
+        '?~' => userRegExp(item).matchAsPrefix(text) != null || needlePattern!.matchAsPrefix(item) != null,
         _ => text == item,
       };
     }
@@ -1230,18 +1230,18 @@ class _Coalesce extends _Eval {
 }
 
 class _Subquery extends _Eval {
-  _Subquery(this.compiler, this.select);
+  // Compiled in the constructor, so placeholders resolve in text order; executed once.
+  _Subquery(this.compiler, this.select) : compiled = compiler._compileSelect(select);
   final _Compiler compiler;
   final SelectStatement select;
+  final _CompiledSelect compiled;
   List<QueryValue>? _cached;
   @override
   QueryType get type => QueryType.set;
 
-  // Subqueries are uncorrelated, so they run once, not once per outer row.
   List<QueryValue> values() {
     final List<QueryValue>? cached = _cached;
     if (cached != null) return cached;
-    final _CompiledSelect compiled = compiler._compileSelect(select);
     final QueryResult result = compiler._execute(compiled);
     if (result is! QueryTable) return const <QueryValue>[];
     return _cached = <QueryValue>[

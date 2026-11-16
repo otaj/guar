@@ -459,5 +459,16 @@ option "operating_currency" "USD"
       );
       expect((table.rows.single.values[0] as QueryInteger).value, 5);
     });
+
+    test('subquery placeholders resolve in text order', () {
+      final Ledger ledger = book(common);
+      final QueryTable table = run(
+        ledger,
+        'SELECT count(*) FROM postings WHERE account IN (SELECT account WHERE account ~ %s) AND year = %s',
+        params: <Object>['Expenses', 2011],
+      );
+      // Only the 2011 Expenses posting passes both the subquery filter and the year filter.
+      expect((table.rows.single.values[0] as QueryInteger).value, 1);
+    });
   });
 }
