@@ -190,6 +190,109 @@ void main() {
     expect((outcome as AppendFailed).errors, isNotEmpty);
   });
 
+  test('a spliced append equals a fresh full parse of the edited text', () async {
+    final Directory dir = _tempLedger();
+    const String filename = 'ledger.beancount';
+    const String source = '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n';
+    const String snippet = '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n';
+    const String edited = '$source$snippet';
+
+    final LedgerEngine engine = LedgerEngine();
+    final LedgerSnapshot warm = await _editedSnapshot(() async {
+      await engine.prepare(source, '${dir.path}/$filename');
+      final AppendOutcome outcome = await engine.appendTransaction(
+        source,
+        '${dir.path}/$filename',
+        '${dir.path}/$filename',
+        snippet,
+      );
+      return engine.prepare((outcome as AppendOk).text, '${dir.path}/$filename');
+    });
+    final LedgerSnapshot cold = await LedgerEngine().prepare(edited, '${dir.path}/$filename');
+
+    expect(warm.booked.ledger, cold.booked.ledger);
+  });
+
+  test('a spliced replace equals a fresh full parse of the edited text', () async {
+    final Directory dir = _tempLedger();
+    const String filename = 'ledger.beancount';
+    const String source =
+        '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+        '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n';
+    const String snippet = '2026-11-03 * "Baker" "Bread"\n  Expenses:Food  2.00 USD\n  Assets:Cash\n';
+    const String edited =
+        '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n'
+        '2026-11-03 * "Baker" "Bread"\n  Expenses:Food  2.00 USD\n  Assets:Cash\n';
+
+    final LedgerEngine engine = LedgerEngine();
+    final LedgerSnapshot warm = await _editedSnapshot(() async {
+      await engine.prepare(source, '${dir.path}/$filename');
+      final AppendOutcome outcome = await engine.replaceTransaction(
+        source,
+        '${dir.path}/$filename',
+        '${dir.path}/$filename',
+        3,
+        5,
+        snippet,
+      );
+      return engine.prepare((outcome as AppendOk).text, '${dir.path}/$filename');
+    });
+    final LedgerSnapshot cold = await LedgerEngine().prepare(edited, '${dir.path}/$filename');
+
+    expect(warm.booked.ledger, cold.booked.ledger);
+  });
+
+  test('a save after a spliced append rebooks without reparsing', () async {
+    final Directory dir = _tempLedger();
+    const String filename = 'ledger.beancount';
+    const String source = '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\n';
+    const String snippet = '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n';
+    final LedgerEngine engine = LedgerEngine();
+    await engine.prepare(source, '${dir.path}/$filename');
+    final int parses = debugLedgerParses;
+
+    final AppendOutcome outcome = await engine.appendTransaction(
+      source,
+      '${dir.path}/$filename',
+      '${dir.path}/$filename',
+      snippet,
+    );
+    await engine.prepare((outcome as AppendOk).text, '${dir.path}/$filename');
+
+    expect(debugLedgerParses, parses);
+  });
+
+  test('a spliced append into an included file refreshes without a reparse', () async {
+    final Directory dir = _tempLedger();
+    final String root = '${dir.path}/ledger.beancount';
+    final String included = '${dir.path}/2026.beancount';
+    File(root).writeAsStringSync(
+      '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\ninclude "2026.beancount"\n',
+    );
+    File(included).writeAsStringSync('');
+    final LedgerEngine engine = LedgerEngine();
+    await engine.prepare(File(root).readAsStringSync(), root);
+    final int parses = debugLedgerParses;
+
+    final AppendOutcome outcome = await engine.appendTransaction(
+      File(root).readAsStringSync(),
+      root,
+      included,
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+    );
+    expect(outcome, isA<AppendOk>());
+    // The session writes the target before refreshing; mirror that here.
+    File(included).writeAsStringSync((outcome as AppendOk).text);
+    final LedgerSnapshot snapshot = await engine.prepare(File(root).readAsStringSync(), root);
+    expect(debugLedgerParses, parses);
+    final int directives = switch (snapshot.booked.ledger) {
+      LedgerDirectives(:final List<Directive> directives) => directives.length,
+      _ => 0,
+    };
+    // Two opens plus the appended transaction.
+    expect(directives, 3);
+  });
+
   test('session editTransaction replaces the transaction in the root file', () async {
     final Directory dir = _tempLedger();
     final String path = '${dir.path}/ledger.beancount';
@@ -256,6 +359,8 @@ void main() {
     expect(documents.files[path], '${File(path).readAsStringSync().trimRight()}\n');
   });
 }
+
+Future<LedgerSnapshot> _editedSnapshot(Future<LedgerSnapshot> Function() edit) => edit();
 
 Directive _firstTransaction(LedgerSnapshot snapshot) => switch (snapshot.booked.ledger) {
   LedgerDirectives(:final List<Directive> directives) => directives.firstWhere(
