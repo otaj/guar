@@ -111,11 +111,15 @@ class _LiteralParser {
       if (_current == r'\') {
         _offset++;
         if (_atEnd) _fail('Unterminated escape in string');
+        // Python string semantics: known escapes resolve, unknown ones keep the backslash.
         buffer.write(switch (_current) {
           'n' => '\n',
           't' => '\t',
           'r' => '\r',
-          _ => _current,
+          "'" => "'",
+          '"' => '"',
+          r'\' => r'\',
+          _ => '\\$_current',
         });
         _offset++;
         continue;

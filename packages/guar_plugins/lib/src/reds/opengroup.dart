@@ -53,6 +53,13 @@ BookPluginResult opengroup(List<Directive> directives, LedgerOptions options, Pr
   if (rules == null) {
     return configError(directives, 'Invalid configuration for opengroup plugin; skipping.');
   }
+  for (final ({String pattern, List<(String, String)> inserts}) rule in rules.values) {
+    try {
+      pythonRegExp(rule.pattern);
+    } on FormatException {
+      return configError(directives, 'Invalid configuration for opengroup plugin; skipping.');
+    }
+  }
   final String opCurrency = options.operatingCurrency.isNotEmpty ? options.operatingCurrency.first.name : 'USD';
   final List<Directive> inserted = <Directive>[];
   for (final Directive directive in directives) {

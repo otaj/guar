@@ -19,7 +19,12 @@ BookPluginResult longShort(List<Directive> directives, LedgerOptions options, Pr
   if (spec.length < 3 || spec.any((Object? item) => item is! String)) {
     return configError(directives, 'Invalid configuration for long_short plugin; skipping.');
   }
-  final RegExp match = pythonRegExp(first.key! as String);
+  final RegExp match;
+  try {
+    match = pythonRegExp(first.key! as String);
+  } on FormatException {
+    return configError(directives, 'Invalid configuration for long_short plugin; skipping.');
+  }
   final String needle = spec[0]! as String;
   final String shortRepl = spec[1]! as String;
   final String longRepl = spec[2]! as String;

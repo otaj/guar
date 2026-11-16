@@ -20,7 +20,11 @@ BookPluginResult gainLoss(List<Directive> directives, LedgerOptions options, Pro
     if (spec.length < 3 || spec[0] is! String || spec[1] is! String || spec[2] is! String) {
       return configError(directives, 'Invalid configuration for gain_loss plugin; skipping.');
     }
-    rewrites.add((pythonRegExp(entry.key! as String), spec[0]! as String, spec[1]! as String, spec[2]! as String));
+    try {
+      rewrites.add((pythonRegExp(entry.key! as String), spec[0]! as String, spec[1]! as String, spec[2]! as String));
+    } on FormatException {
+      return configError(directives, 'Invalid configuration for gain_loss plugin; skipping.');
+    }
   }
 
   final Set<String> newAccounts = <String>{};
