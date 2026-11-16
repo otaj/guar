@@ -1095,15 +1095,17 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                     key: Key('leg-$index-remove'),
                     icon: Icon(Icons.close, size: 20, color: theme.colorScheme.error),
                     onPressed: () {
-                      final _LegDraft removed = _legs.removeAt(index);
-                      removed.accountCtl?.dispose();
-                      removed.numberCtl?.dispose();
-                      removed.costCtl?.dispose();
-                      removed.priceCtl?.dispose();
-                      for (final _MetaDraft row in removed.meta) {
-                        row.keyCtl?.dispose();
-                        row.valueCtl?.dispose();
-                      }
+                      setState(() {
+                        final _LegDraft removed = _legs.removeAt(index);
+                        removed.accountCtl?.dispose();
+                        removed.numberCtl?.dispose();
+                        removed.costCtl?.dispose();
+                        removed.priceCtl?.dispose();
+                        for (final _MetaDraft row in removed.meta) {
+                          row.keyCtl?.dispose();
+                          row.valueCtl?.dispose();
+                        }
+                      });
                       _queueCheck();
                     },
                   ),
