@@ -392,7 +392,13 @@ internal fun writeBackup(
     bytes: ByteArray,
 ) {
     directory.mkdirs()
-    File(directory, name).writeBytes(bytes)
+    // Keep the previous generation: a corrupted file must not erase the last good copy.
+    val current = File(directory, name)
+    val previous = File(directory, "$name.old")
+    if (current.exists()) {
+        current.renameTo(previous)
+    }
+    current.writeBytes(bytes)
 }
 
 private fun picked(
