@@ -94,6 +94,8 @@ abstract class Inventory with _$Inventory {
     }
 
     final List<Position> updated = <Position>[...positions];
+    // Same-currency-and-cost lots always merge into one, so the sort key of this slot
+    // cannot change and the list stays ordered.
     updated[index] = Position(
       units: Amount(
         number: number,
@@ -102,7 +104,6 @@ abstract class Inventory with _$Inventory {
       ),
       cost: cost,
     );
-    updated.sort(Position.compare);
     return InventoryAdd(
       inventory: Inventory(positions: updated),
       result: booking,
@@ -135,6 +136,9 @@ abstract class LedgerInventory with _$LedgerInventory {
   const LedgerInventory._();
 
   LedgerInventory addPosition(Account account, Position position) {
+    // shortcut: the immutable accounts list is copied per posting, O(accounts); with tens of
+    // thousands of postings over thousands of accounts this is quadratic — upgrade to a
+    // map-backed model if booking large ledgers gets slow.
     final int index = accounts.indexWhere((AccountInventory entry) => entry.account == account);
     if (index < 0) {
       final List<AccountInventory> next = <AccountInventory>[
