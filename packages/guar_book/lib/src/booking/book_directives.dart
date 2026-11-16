@@ -214,9 +214,9 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
     working[posting.account.name] = updated;
   }
 
-  final InferredTolerances tolerancesMax = inferTolerances(booked, options);
-  final InferredTolerances tolerancesInterp = options.usePreciseInterpolation
-      ? inferTolerances(booked, options, mode: ToleranceMode.min)
+  final d.InferredTolerances tolerancesMax = _inferTolerances(booked, options);
+  final d.InferredTolerances tolerancesInterp = options.usePreciseInterpolation
+      ? _inferTolerances(booked, options, mode: d.ToleranceMode.min)
       : tolerancesMax;
 
   final ({List<d.ProcessingError> errors, List<MutablePosting> postings}) interpolated = interpolateGroup(
@@ -284,6 +284,31 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
     errors: const <d.ProcessingError>[],
   );
 }
+
+// Tolerance inference works on pre-booking records; the mutable postings map onto them.
+d.InferredTolerances _inferTolerances(
+  List<MutablePosting> postings,
+  d.LedgerOptions options, {
+  d.ToleranceMode mode = d.ToleranceMode.max,
+}) => d.inferTolerances(
+  <d.TolerancePosting>[
+    for (final MutablePosting posting in postings)
+      (
+        units: posting.units,
+        cost: posting.cost,
+        price: posting.price,
+        pendingCost: posting.pendingCost == null
+            ? null
+            : (
+                numberPer: posting.pendingCost!.numberPer,
+                numberTotal: posting.pendingCost!.numberTotal,
+                currency: posting.pendingCost!.currency,
+              ),
+      ),
+  ],
+  options,
+  mode: mode,
+);
 
 bool _isReducedBy(d.Inventory balance, d.Amount units) {
   for (final d.Position position in balance.positions) {

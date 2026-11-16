@@ -81,142 +81,13 @@ class PendingCost {
 
 Amount postingWeight(MutablePosting posting) {
   final Amount units = posting.units!;
-  if (posting.cost != null) {
-    return Amount(number: units.number * posting.cost!.number, currency: posting.cost!.currency);
-  }
   if (posting.pendingCost != null && posting.pendingCost!.numberPer != null && posting.pendingCost!.currency != null) {
     return Amount(number: units.number * posting.pendingCost!.numberPer!, currency: posting.pendingCost!.currency!);
   }
-  if (posting.price != null) {
-    return Amount(number: units.number * posting.price!.number, currency: posting.price!.currency);
-  }
-  return units;
+  return postingWeightOf(units, cost: posting.cost, price: posting.price);
 }
 
-enum ToleranceMode { max, min }
-
-class InferredTolerances {
-  InferredTolerances(this._values, {Decimal? fallback}) : fallback = fallback ?? Decimal.zero;
-
-  final Map<String, Decimal> _values;
-  final Decimal fallback;
-
-  Decimal operator [](String currency) => _values[currency] ?? fallback;
-}
-
-final Decimal _maximumTolerance = Decimal.parse('0.5');
 const int _maxToleranceDigits = 5;
-
-InferredTolerances inferPostingTolerances(
-  List<Posting> postings,
-  LedgerOptions options, {
-  ToleranceMode mode = ToleranceMode.max,
-}) => inferTolerances(
-  <MutablePosting>[
-    for (final Posting posting in postings)
-      MutablePosting(
-        origin: posting.origin,
-        meta: posting.meta,
-        account: posting.account,
-        units: posting.units,
-        cost: posting.cost,
-        price: posting.price,
-      ),
-  ],
-  options,
-  mode: mode,
-);
-
-InferredTolerances inferTolerances(
-  List<MutablePosting> postings,
-  LedgerOptions options, {
-  ToleranceMode mode = ToleranceMode.max,
-}) {
-  final bool useCost = options.inferToleranceFromCost;
-  final Decimal multiplier = options.inferredToleranceMultiplier.value;
-  Decimal agg(Decimal left, Decimal right) => switch (mode) {
-    ToleranceMode.max => left > right ? left : right,
-    ToleranceMode.min => left < right ? left : right,
-  };
-
-  final Set<String> seen = <String>{};
-  for (final MutablePosting posting in postings) {
-    final Amount? units = posting.units;
-    if (units != null) seen.add(units.currency.name);
-    final Cost? cost = posting.cost;
-    if (cost != null) seen.add(cost.currency.name);
-    final PendingCost? pending = posting.pendingCost;
-    if (pending?.currency != null) seen.add(pending!.currency!.name);
-    final Amount? price = posting.price;
-    if (price != null) seen.add(price.currency.name);
-  }
-
-  final Map<String, Decimal> tolerances = <String, Decimal>{};
-  for (final InferredTolerance preset in options.inferredToleranceDefault) {
-    switch (preset.key) {
-      case CurrencyKeyAll():
-        tolerances['*'] = preset.value;
-      case CurrencyKeyCurrency(:final Currency value):
-        if (seen.contains(value.name)) {
-          tolerances[value.name] = preset.value;
-        }
-    }
-  }
-
-  final Map<String, Decimal> costTolerances = <String, Decimal>{};
-  for (final MutablePosting posting in postings) {
-    final Amount? units = posting.units;
-    if (units == null) continue;
-    final int scale = units.scale;
-    if (scale <= 0) continue;
-    final Decimal tolerance = Decimal.one.shift(-scale) * multiplier;
-    final String currency = units.currency.name;
-    final Decimal? existing = tolerances[currency];
-    tolerances[currency] = existing == null ? tolerance : agg(tolerance, existing);
-
-    if (!useCost) continue;
-
-    final Cost? cost = posting.cost;
-    final PendingCost? pending = posting.pendingCost;
-    if (cost != null) {
-      final Decimal costTolerance = _minDecimal(tolerance * cost.number.abs(), _maximumTolerance);
-      costTolerances.update(
-        cost.currency.name,
-        (Decimal value) => value + costTolerance,
-        ifAbsent: () => costTolerance,
-      );
-    } else if (pending != null && pending.currency != null) {
-      Decimal costTolerance = _maximumTolerance;
-      for (final Decimal? number in <Decimal?>[pending.numberTotal, pending.numberPer]) {
-        if (number == null) continue;
-        costTolerance = _minDecimal(tolerance * number.abs(), costTolerance);
-      }
-      costTolerances.update(
-        pending.currency!.name,
-        (Decimal value) => value + costTolerance,
-        ifAbsent: () => costTolerance,
-      );
-    }
-
-    final Amount? price = posting.price;
-    if (price != null) {
-      final Decimal priceTolerance = _minDecimal(tolerance * price.number.abs(), _maximumTolerance);
-      costTolerances.update(
-        price.currency.name,
-        (Decimal value) => value + priceTolerance,
-        ifAbsent: () => priceTolerance,
-      );
-    }
-  }
-
-  for (final MapEntry<String, Decimal> entry in costTolerances.entries) {
-    final Decimal? existing = tolerances[entry.key];
-    tolerances[entry.key] = existing == null ? entry.value : agg(entry.value, existing);
-  }
-
-  final Decimal fallback = tolerances.remove('*') ?? Decimal.zero;
-  return InferredTolerances(tolerances, fallback: fallback);
-}
 
 Decimal quantizeWithTolerance(InferredTolerances tolerances, String currency, Decimal number) {
   final Decimal tolerance = tolerances[currency];
@@ -227,8 +98,6 @@ Decimal quantizeWithTolerance(InferredTolerances tolerances, String currency, De
   final BigInt rounded = (number / quantum).round();
   return quantum * Decimal.fromBigInt(rounded);
 }
-
-Decimal _minDecimal(Decimal left, Decimal right) => left < right ? left : right;
 
 int _coefficientDigits(Decimal number) {
   final String digits = number.abs().toString().replaceAll('.', '').replaceFirst(RegExp('^0+'), '');

@@ -7,6 +7,7 @@ import 'package:guar/src/amount_text.dart';
 import 'package:guar/src/book_ledger.dart';
 import 'package:guar/src/date_text.dart';
 import 'package:guar/src/ledger_session.dart';
+import 'package:guar_book/guar_book.dart' show inventoryFromDirectives;
 import 'package:guar_domain/guar_domain.dart';
 
 enum _PriceTimeframe { month1, month3, month6, year1, all }
@@ -230,42 +231,36 @@ class _Quote {
 }
 
 List<_Quote> _collectQuotes(List<Directive> directives, {required bool includeInferred}) {
-  final List<_Quote> quotes = <_Quote>[];
-  final Map<Account, Inventory> balances = <Account, Inventory>{};
-  for (final Directive directive in directives) {
-    switch (directive.body) {
-      case PriceBody(:final Currency currency, :final Amount amount):
-        if (currency != amount.currency) {
-          quotes.add(
-            _Quote(date: directive.date, label: 'price ${currency.name}', meta: amountText(amount), inferred: false),
-          );
-        }
-      case TransactionBody(:final Transaction value):
-        if (!includeInferred) break;
-        for (final Posting posting in value.postings) {
-          final InventoryAdd booking = (balances[posting.account] ?? const Inventory()).addPosition(
-            Position(units: posting.units, cost: posting.cost),
-          );
-          balances[posting.account] = booking.inventory;
-          final Amount? quote =
-              posting.price ??
-              (booking.result != MatchResult.reduced && posting.cost != null
-                  ? Amount(number: posting.cost!.number, currency: posting.cost!.currency)
-                  : null);
-          if (quote == null || quote.currency == posting.units.currency) continue;
-          quotes.add(
-            _Quote(
-              date: directive.date,
-              label: 'price ${posting.units.currency.name}',
-              meta: '${amountText(quote)} · inferred',
-              inferred: true,
-            ),
-          );
-        }
-      default:
-        break;
-    }
+  final List<_Quote> quotes = <_Quote>[
+    for (final Directive directive in directives)
+      if (directive.body case PriceBody(
+        :final Currency currency,
+        :final Amount amount,
+      ) when currency != amount.currency)
+        _Quote(date: directive.date, label: 'price ${currency.name}', meta: amountText(amount), inferred: false),
+  ];
+  if (!includeInferred) {
+    return quotes;
   }
+  inventoryFromDirectives(
+    directives,
+    onPosting: (Directive directive, Posting posting, MatchResult result) {
+      final Amount? quote =
+          posting.price ??
+          (result != MatchResult.reduced && posting.cost != null
+              ? Amount(number: posting.cost!.number, currency: posting.cost!.currency)
+              : null);
+      if (quote == null || quote.currency == posting.units.currency) return;
+      quotes.add(
+        _Quote(
+          date: directive.date,
+          label: 'price ${posting.units.currency.name}',
+          meta: '${amountText(quote)} · inferred',
+          inferred: true,
+        ),
+      );
+    },
+  );
   return quotes;
 }
 
