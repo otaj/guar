@@ -135,24 +135,25 @@ abstract class LedgerInventory with _$LedgerInventory {
   const factory LedgerInventory({@Default(<AccountInventory>[]) List<AccountInventory> accounts}) = _LedgerInventory;
   const LedgerInventory._();
 
-  LedgerInventory addPosition(Account account, Position position) {
+  LedgerInventory addPosition(Account account, Position position) => addPositionWithResult(account, position).inventory;
+
+  ({LedgerInventory inventory, MatchResult result}) addPositionWithResult(Account account, Position position) {
     // shortcut: the immutable accounts list is copied per posting, O(accounts); with tens of
     // thousands of postings over thousands of accounts this is quadratic — upgrade to a
     // map-backed model if booking large ledgers gets slow.
     final int index = accounts.indexWhere((AccountInventory entry) => entry.account == account);
     if (index < 0) {
+      final InventoryAdd added = const Inventory().addPosition(position);
       final List<AccountInventory> next = <AccountInventory>[
         ...accounts,
-        AccountInventory(account: account, inventory: const Inventory().addPosition(position).inventory),
+        AccountInventory(account: account, inventory: added.inventory),
       ]..sort((AccountInventory a, AccountInventory b) => a.account.name.compareTo(b.account.name));
-      return LedgerInventory(accounts: next);
+      return (inventory: LedgerInventory(accounts: next), result: added.result);
     }
+    final InventoryAdd added = accounts[index].inventory.addPosition(position);
     final List<AccountInventory> updated = <AccountInventory>[...accounts];
-    updated[index] = AccountInventory(
-      account: account,
-      inventory: accounts[index].inventory.addPosition(position).inventory,
-    );
-    return LedgerInventory(accounts: updated);
+    updated[index] = AccountInventory(account: account, inventory: added.inventory);
+    return (inventory: LedgerInventory(accounts: updated), result: added.result);
   }
 
   Inventory? inventoryFor(Account account) {

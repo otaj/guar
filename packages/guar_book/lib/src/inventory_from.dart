@@ -7,7 +7,11 @@ LedgerInventory inventoryFromLedger(Ledger ledger) => switch (ledger) {
   LedgerDirectives(:final List<Directive> directives) => inventoryFromDirectives(directives),
 };
 
-LedgerInventory inventoryFromDirectives(Iterable<Directive> directives) {
+// Reports every replayed posting with its booking result (created, reduced, augmented).
+LedgerInventory inventoryFromDirectives(
+  Iterable<Directive> directives, {
+  void Function(Directive directive, Posting posting, MatchResult result)? onPosting,
+}) {
   LedgerInventory inventory = const LedgerInventory();
   for (final Directive directive in directives) {
     final DirectiveBody body = directive.body;
@@ -15,7 +19,12 @@ LedgerInventory inventoryFromDirectives(Iterable<Directive> directives) {
       continue;
     }
     for (final Posting posting in body.value.postings) {
-      inventory = inventory.addPosition(posting.account, Position(units: posting.units, cost: posting.cost));
+      final ({LedgerInventory inventory, MatchResult result}) booked = inventory.addPositionWithResult(
+        posting.account,
+        Position(units: posting.units, cost: posting.cost),
+      );
+      onPosting?.call(directive, posting, booked.result);
+      inventory = booked.inventory;
     }
   }
   return inventory;
