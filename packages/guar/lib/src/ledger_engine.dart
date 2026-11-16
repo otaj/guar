@@ -123,22 +123,38 @@ class LedgerEngine {
 class _Memory {
   String? _source;
   String? _filename;
+  // Root-only parse, for option and plugin rewrites.
   parser.ParsedLedger? _parsed;
+  // Root and includes parse, for booking and for splicing edits without a full reparse.
+  parser.ParsedLedger? _merged;
   LedgerSnapshot? _snapshot;
   Map<String, String> _includes = const <String, String>{};
 
   LedgerSnapshot prepare(String source, String filename) {
     if (_snapshot != null && _source == source && _filename == filename && _includesUnchanged()) return _snapshot!;
+    final parser.ParsedLedger? merged = _merged;
+    if (merged != null && _source == source && _filename == filename && _includesUnchanged()) {
+      // The merged parse already reflects this source; only booking is needed.
+      _snapshot = prepareLedger(
+        source,
+        filename: filename,
+        parsed: _parsedFor(source, filename),
+        parsedIncludes: merged,
+      );
+      return _snapshot!;
+    }
     final _IncludeRead full = _parseWithIncludes(source, filename);
     if (full.read.isEmpty) {
-      // Without includes one parse serves both booking and the later rewrites.
+      // Without includes one parse serves booking, the rewrites, and later splices.
       _parsed = full.parsed;
+      _merged = full.parsed;
       _source = source;
       _filename = filename;
       _snapshot = prepareLedger(source, filename: filename, parsed: full.parsed);
       _includes = const <String, String>{};
       return _snapshot!;
     }
+    _merged = full.parsed;
     _snapshot = prepareLedger(
       source,
       filename: filename,
@@ -173,26 +189,18 @@ class _Memory {
     final String base = original.isEmpty || original.endsWith('\n') ? original : '$original\n';
     final String text = '$base$snippet';
     final int firstLine = base.split('\n').length;
-    final int lastLine = firstLine + snippet.split('\n').length - 2;
-    final _IncludeRead full = root
-        ? _parseWithIncludes(text, filename)
-        : _parseWithIncludes(source, filename, targetPath: targetFilename, targetText: text);
-    final Ledger ledger = Book().process(full.parsed, recover: true);
-    final List<ProcessingError> errors = switch (ledger) {
-      LedgerDirectives(:final List<ProcessingError> errors) => errors,
-      LedgerErrors(:final List<ProcessingError> errors) => errors,
-    };
-    final List<String> snippetErrors = <String>[
-      for (final ProcessingError error in errors)
-        if (error.location.filename == targetFilename &&
-            error.location.linenoBegin >= firstLine &&
-            error.location.linenoBegin <= lastLine)
-          error.message,
-    ];
-    if (snippetErrors.isNotEmpty) return AppendFailed(snippetErrors);
-    _includes = full.read;
-    _snapshot = null;
-    return AppendOk(text);
+    return _bookEdit(
+      source: source,
+      filename: filename,
+      targetFilename: targetFilename,
+      targetText: text,
+      original: original,
+      snippet: snippet,
+      // Pure insertion: the snippet occupies firstLine..lastLine after the old content.
+      startLine: firstLine,
+      endLine: firstLine - 1,
+      firstLine: firstLine,
+    );
   }
 
   AppendOutcome replaceTransaction(
@@ -215,11 +223,60 @@ class _Memory {
     lines.replaceRange(begin, end, snippetLines);
     final String text = lines.join('\n');
     final int firstLine = begin + 1;
-    final int lastLine = firstLine + snippetLines.length - 1;
-    final _IncludeRead full = root
-        ? _parseWithIncludes(text, filename)
-        : _parseWithIncludes(source, filename, targetPath: targetFilename, targetText: text);
-    final Ledger ledger = Book().process(full.parsed, recover: true);
+    return _bookEdit(
+      source: source,
+      filename: filename,
+      targetFilename: targetFilename,
+      targetText: text,
+      original: original,
+      snippet: snippet,
+      // Replace the directive span [begin+1, end] with the snippet.
+      startLine: begin + 1,
+      endLine: end,
+      firstLine: firstLine,
+    );
+  }
+
+  // Splices the edit into the cached parse (or a fresh one when cold) and books it.
+  // Only errors inside the edited span reject the edit.
+  AppendOutcome _bookEdit({
+    required String source,
+    required String filename,
+    required String targetFilename,
+    required String targetText,
+    required String original,
+    required String snippet,
+    required int startLine,
+    required int endLine,
+    required int firstLine,
+  }) {
+    final bool root = targetFilename == filename;
+    final bool cached =
+        _merged != null &&
+        _source == source &&
+        _filename == filename &&
+        (root || _includes[targetFilename] == original);
+    final parser.ParsedLedger base;
+    final Map<String, String> includes;
+    if (cached) {
+      base = _merged!;
+      includes = <String, String>{..._includes, if (!root) targetFilename: targetText};
+    } else {
+      final _IncludeRead full = root
+          ? _parseWithIncludes(targetText, filename)
+          : _parseWithIncludes(source, filename, targetPath: targetFilename, targetText: targetText);
+      base = full.parsed;
+      includes = full.read;
+    }
+    final int lastLine = firstLine + _snippetLineCount(snippet) - 1;
+    final parser.ParsedLedger spliced = const parser.BeancountParser().splice(
+      base,
+      snippet,
+      filename: targetFilename,
+      startLine: startLine,
+      endLine: endLine,
+    );
+    final Ledger ledger = Book().process(spliced, recover: true);
     final List<ProcessingError> errors = switch (ledger) {
       LedgerDirectives(:final List<ProcessingError> errors) => errors,
       LedgerErrors(:final List<ProcessingError> errors) => errors,
@@ -232,9 +289,32 @@ class _Memory {
           error.message,
     ];
     if (snippetErrors.isNotEmpty) return AppendFailed(snippetErrors);
-    _includes = full.read;
+    // The spliced parse is the next prepare's input, so a save rebooks without a reparse.
+    _includes = includes;
+    _merged = spliced;
     _snapshot = null;
-    return AppendOk(text);
+    if (root) {
+      _source = targetText;
+      final parser.ParsedLedger? parsed = _parsed;
+      if (parsed != null) {
+        // The root-only parse feeds option rewrites; splice it alongside the merged one.
+        _parsed = identical(parsed, _merged)
+            ? spliced
+            : const parser.BeancountParser().splice(
+                parsed,
+                snippet,
+                filename: targetFilename,
+                startLine: startLine,
+                endLine: endLine,
+              );
+      }
+    }
+    return AppendOk(targetText);
+  }
+
+  int _snippetLineCount(String snippet) {
+    final List<String> lines = snippet.replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
+    return lines.last.isEmpty ? lines.length - 1 : lines.length;
   }
 
   _IncludeRead _parseWithIncludes(String source, String filename, {String? targetPath, String? targetText}) {
