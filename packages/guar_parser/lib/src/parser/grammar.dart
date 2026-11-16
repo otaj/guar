@@ -461,13 +461,13 @@ class BeancountGrammar {
       return ParsedLedger.errors(errors: state.errors, warnings: warnings(), options: state.options, info: info());
     }
     if (state.tagStack.isNotEmpty) {
-      final ParsedLedger? halted = fail('invalid pushtag', firstLine + lines.length - 1);
+      final ParsedLedger? halted = fail('invalid pushtag', _lastLine(lines));
       if (halted != null) {
         return halted;
       }
     }
     if (state.metaStack.isNotEmpty) {
-      final ParsedLedger? halted = fail('invalid pushmeta', firstLine + lines.length - 1);
+      final ParsedLedger? halted = fail('invalid pushmeta', _lastLine(lines));
       if (halted != null) {
         return halted;
       }
@@ -480,6 +480,12 @@ class BeancountGrammar {
       options: state.options,
       info: info(),
     );
+  }
+
+  // The number of the last real line; split('\n') leaves an empty tail when the file ends with a newline.
+  int _lastLine(List<String> lines) {
+    final int last = firstLine + lines.length - 1;
+    return lines.isNotEmpty && lines.last.isEmpty ? last - 1 : last;
   }
 
   String? _parseInclude(String line) {
