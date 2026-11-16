@@ -56,6 +56,11 @@ class _LegDraft {
   String priceNumber = '';
   String priceCurrency = '';
   String flag = '';
+  // Controllers live with the leg so rebuilds keep the cursor and are disposed with the screen.
+  TextEditingController? accountCtl;
+  TextEditingController? numberCtl;
+  TextEditingController? costCtl;
+  TextEditingController? priceCtl;
   // Cost details the form does not edit but must not lose when saving.
   d.BeanDate? costDate;
   String? costLabel;
@@ -66,6 +71,8 @@ class _MetaDraft {
   String key = '';
   String value = '';
   String type = 'text';
+  TextEditingController? keyCtl;
+  TextEditingController? valueCtl;
 }
 
 class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
@@ -100,6 +107,19 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     widget.session.removeListener(_onSession);
     _payee.dispose();
     _narration.dispose();
+    for (final _LegDraft leg in _legs) {
+      leg.numberCtl?.dispose();
+      leg.costCtl?.dispose();
+      leg.priceCtl?.dispose();
+      for (final _MetaDraft row in leg.meta) {
+        row.keyCtl?.dispose();
+        row.valueCtl?.dispose();
+      }
+    }
+    for (final _MetaDraft row in _meta) {
+      row.keyCtl?.dispose();
+      row.valueCtl?.dispose();
+    }
     super.dispose();
   }
 
@@ -725,7 +745,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         flex: 3,
         child: TextFormField(
           key: const Key('leg-0-number'),
-          controller: TextEditingController(text: _legs[0].number),
+          controller: _legs[0].numberCtl ??= TextEditingController(text: _legs[0].number),
           decoration: InputDecoration(
             labelText: GuarLocalizations.of(context).labelAmount,
             prefixIcon: const Icon(Icons.tag, size: 20),
@@ -771,7 +791,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (_freeAccounts) {
       return TextFormField(
         key: Key('leg-$index-account'),
-        controller: TextEditingController(text: leg.accountName),
+        controller: leg.accountCtl ??= TextEditingController(text: leg.accountName),
         decoration: InputDecoration(labelText: label),
         onChanged: (String value) {
           leg
@@ -1075,7 +1095,15 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
                     key: Key('leg-$index-remove'),
                     icon: Icon(Icons.close, size: 20, color: theme.colorScheme.error),
                     onPressed: () {
-                      setState(() => _legs.removeAt(index));
+                      final _LegDraft removed = _legs.removeAt(index);
+                      removed.accountCtl?.dispose();
+                      removed.numberCtl?.dispose();
+                      removed.costCtl?.dispose();
+                      removed.priceCtl?.dispose();
+                      for (final _MetaDraft row in removed.meta) {
+                        row.keyCtl?.dispose();
+                        row.valueCtl?.dispose();
+                      }
                       _queueCheck();
                     },
                   ),
@@ -1101,7 +1129,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               _legNumberCurrencyRow(
                 numberKey: Key('leg-$index-price'),
                 currencyKey: Key('leg-$index-price-currency'),
-                number: leg.priceNumber,
+                numberCtl: leg.priceCtl ??= TextEditingController(text: leg.priceNumber),
                 currency: leg.priceCurrency,
                 label: leg.priceMode == 'total' ? l10n.totalPrice : l10n.pricePerUnit,
                 currencies: currencies,
@@ -1131,7 +1159,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               _legNumberCurrencyRow(
                 numberKey: Key('leg-$index-cost'),
                 currencyKey: Key('leg-$index-cost-currency'),
-                number: leg.costNumber,
+                numberCtl: leg.costCtl ??= TextEditingController(text: leg.costNumber),
                 currency: leg.costCurrency,
                 label: leg.costMode == 'total' ? l10n.totalCost : l10n.costPerUnit,
                 currencies: currencies,
@@ -1158,7 +1186,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
     if (_freeAccounts) {
       return TextFormField(
         key: Key('leg-$index-account'),
-        controller: TextEditingController(text: leg.accountName),
+        controller: leg.accountCtl ??= TextEditingController(text: leg.accountName),
         decoration: InputDecoration(labelText: l10n.labelAccount),
         onChanged: (String value) {
           leg
@@ -1195,7 +1223,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         flex: 3,
         child: TextFormField(
           key: Key('leg-$index-number'),
-          controller: TextEditingController(text: leg.number),
+          controller: leg.numberCtl ??= TextEditingController(text: leg.number),
           decoration: InputDecoration(
             labelText: GuarLocalizations.of(context).labelAmount,
             hintText: GuarLocalizations.of(context).autoHint,
@@ -1230,7 +1258,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
   Widget _legNumberCurrencyRow({
     required Key numberKey,
     required Key currencyKey,
-    required String number,
+    required TextEditingController numberCtl,
     required String currency,
     required String label,
     required List<String> currencies,
@@ -1243,7 +1271,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
         flex: 3,
         child: TextFormField(
           key: numberKey,
-          controller: TextEditingController(text: number),
+          controller: numberCtl,
           decoration: InputDecoration(labelText: label),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp('[0-9.]'))],
@@ -1361,7 +1389,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               flex: 2,
               child: TextFormField(
                 key: Key('meta-$index-key'),
-                controller: TextEditingController(text: rows[index].key),
+                controller: rows[index].keyCtl ??= TextEditingController(text: rows[index].key),
                 decoration: InputDecoration(hintText: GuarLocalizations.of(context).keyHint, isDense: true),
                 onChanged: (String value) {
                   rows[index].key = value;
@@ -1407,7 +1435,7 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               flex: 3,
               child: TextFormField(
                 key: Key('meta-$index-value'),
-                controller: TextEditingController(text: rows[index].value),
+                controller: rows[index].valueCtl ??= TextEditingController(text: rows[index].value),
                 decoration: InputDecoration(hintText: GuarLocalizations.of(context).valueHint, isDense: true),
                 onChanged: (String value) {
                   rows[index].value = value;
@@ -1420,7 +1448,11 @@ class _TransactionEditorScreenState extends State<TransactionEditorScreen> {
               child: IconButton(
                 icon: Icon(Icons.close, size: 16, color: Theme.of(context).colorScheme.error),
                 onPressed: () {
-                  setState(() => rows.removeAt(index));
+                  setState(() {
+                    final _MetaDraft removed = rows.removeAt(index);
+                    removed.keyCtl?.dispose();
+                    removed.valueCtl?.dispose();
+                  });
                   _queueCheck();
                 },
               ),

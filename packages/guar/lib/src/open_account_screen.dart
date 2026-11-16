@@ -22,6 +22,8 @@ class _MetaDraft {
   String key = '';
   String value = '';
   String type = 'text';
+  TextEditingController? keyCtl;
+  TextEditingController? valueCtl;
 }
 
 class _OpenAccountScreenState extends State<OpenAccountScreen> {
@@ -49,6 +51,10 @@ class _OpenAccountScreenState extends State<OpenAccountScreen> {
     _date.dispose();
     _account.dispose();
     _currencies.dispose();
+    for (final _MetaDraft row in _meta) {
+      row.keyCtl?.dispose();
+      row.valueCtl?.dispose();
+    }
     super.dispose();
   }
 
@@ -247,7 +253,7 @@ class _OpenAccountScreenState extends State<OpenAccountScreen> {
             Expanded(
               child: TextFormField(
                 key: Key('meta-$index-key'),
-                controller: TextEditingController(text: _meta[index].key),
+                controller: _meta[index].keyCtl ??= TextEditingController(text: _meta[index].key),
                 decoration: InputDecoration(labelText: l10n.keyLabel),
                 onChanged: (String value) {
                   _meta[index].key = value;
@@ -281,7 +287,7 @@ class _OpenAccountScreenState extends State<OpenAccountScreen> {
             Expanded(
               child: TextFormField(
                 key: Key('meta-$index-value'),
-                controller: TextEditingController(text: _meta[index].value),
+                controller: _meta[index].valueCtl ??= TextEditingController(text: _meta[index].value),
                 decoration: InputDecoration(labelText: l10n.valueLabel),
                 onChanged: (String value) {
                   _meta[index].value = value;
@@ -292,7 +298,11 @@ class _OpenAccountScreenState extends State<OpenAccountScreen> {
             IconButton(
               icon: const Icon(Icons.close),
               onPressed: () {
-                setState(() => _meta.removeAt(index));
+                setState(() {
+                  final _MetaDraft removed = _meta.removeAt(index);
+                  removed.keyCtl?.dispose();
+                  removed.valueCtl?.dispose();
+                });
                 _queueCheck();
               },
             ),
