@@ -266,7 +266,10 @@ class EntriesTable extends BqlTable {
       return const QueryValue.null_();
     }),
     'meta': ColumnSpec(QueryType.meta, (Object row) => QueryValue.meta((row as Directive).meta)),
-    'accounts': ColumnSpec(QueryType.accounts, (Object row) => QueryValue.accounts(_entryAccounts(row as Directive))),
+    'accounts': ColumnSpec(
+      QueryType.accounts,
+      (Object row) => QueryValue.accounts(directiveAccounts(row as Directive)),
+    ),
   };
 
   @override
@@ -398,7 +401,7 @@ String _entryId(Directive directive) {
   return payload.hashCode.toRadixString(16);
 }
 
-Set<Account> _entryAccounts(Directive directive) => switch (directive.body) {
+Set<Account> directiveAccounts(Directive directive) => switch (directive.body) {
   TransactionBody(:final Transaction value) => <Account>{for (final Posting posting in value.postings) posting.account},
   OpenBody(:final Account account) => <Account>{account},
   CloseBody(:final Account account) => <Account>{account},

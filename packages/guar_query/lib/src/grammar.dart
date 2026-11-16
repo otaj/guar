@@ -510,19 +510,35 @@ class BqlGrammar extends GrammarDefinition<Statement> {
   Parser<int> integerLit() =>
       token((digit().plus().flatten() & char('.').not()).pick(0).map((dynamic value) => int.parse(value as String)));
 
-  Parser<Decimal> decimalLit() =>
-      token((digit().plus() & char('.') & digit().star() | char('.') & digit().plus()).flatten().map(Decimal.parse));
-
-  Parser<BeanDate> dateLit() => token(
-    (digit().times(4).flatten() & char('-') & digit().times(2).flatten() & char('-') & digit().times(2).flatten()).map(
-      (
-        List<dynamic> values,
-      ) => BeanDate(
-        year: int.parse(values[0] as String),
-        month: int.parse(values[2] as String),
-        day: int.parse(values[4] as String),
+  Parser<Decimal> decimalLit() => token(
+    (digit().plus() & char('.') & digit().star() | char('.') & digit().plus()).flatten().map(
+      (dynamic value) => Decimal.parse(
+        (value as String).endsWith('.')
+            ? '$value'
+                  '0'
+            : value,
       ),
     ),
+  );
+
+  Parser<BeanDate> dateLit() => token(
+    (digit().times(4).flatten() & char('-') & digit().times(2).flatten() & char('-') & digit().times(2).flatten())
+        .where(
+          (List<dynamic> values) => isValidBeanDate(
+            int.parse(values[0] as String),
+            int.parse(values[2] as String),
+            int.parse(values[4] as String),
+          ),
+        )
+        .map(
+          (
+            List<dynamic> values,
+          ) => BeanDate(
+            year: int.parse(values[0] as String),
+            month: int.parse(values[2] as String),
+            day: int.parse(values[4] as String),
+          ),
+        ),
   );
 }
 

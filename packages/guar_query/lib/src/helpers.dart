@@ -2,6 +2,17 @@
 
 import 'package:guar_domain/guar_domain.dart';
 
+import 'package:guar_query/src/result.dart';
+
+// User-supplied regex patterns must become a query error, never a thrown RegExp format error.
+RegExp userRegExp(String pattern) {
+  try {
+    return RegExp(pattern);
+  } on FormatException {
+    throw QueryException('invalid regular expression: $pattern');
+  }
+}
+
 DateDelta? parseInterval(String text) {
   final RegExpMatch? match = RegExp(
     r'^([+-]?\d+)\s+(day|week|month|year|decade|century|millennium)s?$',
