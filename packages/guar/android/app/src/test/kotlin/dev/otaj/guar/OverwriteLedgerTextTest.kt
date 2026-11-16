@@ -26,6 +26,15 @@ class OverwriteLedgerTextTest {
         file.delete()
     }
 
+    @Test
+    fun backupReplacesThePreviousCopy() {
+        val dir = Files.createTempDirectory("ledger-backup").toFile()
+        writeBackup(dir, "ledger.beancount", "one\n".toByteArray())
+        writeBackup(dir, "ledger.beancount", "two\n".toByteArray())
+        assertEquals("two\n", File(dir, "ledger.beancount").readText())
+        dir.deleteRecursively()
+    }
+
     private fun rewrite(
         file: File,
         text: String,
