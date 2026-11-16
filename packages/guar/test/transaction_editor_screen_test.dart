@@ -427,6 +427,30 @@ void main() {
     expect(tester.widget<FilledButton>(find.byKey(const Key('save'))).onPressed, isNull);
     expect(documents.files[path], original);
   });
+
+  testWidgets('advanced mode removes a leg from the screen and the draft', (WidgetTester tester) async {
+    final Directory dir = Directory.systemTemp.createTempSync('guar_editor');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/ledger.beancount';
+    final _FakeDocuments documents = _FakeDocuments(LedgerDocument(uri: path, displayName: path), <String, String>{
+      path:
+          '2020-01-01 custom "guar_option" "advanced_ui" "TRUE"\n'
+          '2026-01-01 open Assets:Cash\n'
+          '2026-01-01 open Expenses:Food\n',
+    });
+    await _openSession(tester, documents);
+
+    await _openEditor(tester);
+    _tallViewport(tester);
+    await tester.tap(find.byKey(const Key('add-leg')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('leg-2')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('leg-2-remove')));
+    // One frame: the removal must rebuild now, not after the validation debounce.
+    await tester.pump();
+    expect(find.byKey(const Key('leg-2')), findsNothing);
+  });
 }
 
 String _today() {

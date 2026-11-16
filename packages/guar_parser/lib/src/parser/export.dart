@@ -354,4 +354,5 @@ String _booking(BookingMethod method) => switch (method) {
 
 String _date(BeanDate date) => '$date';
 
-String _quote(String value) => '"$value"';
+// Values can hold quotes and backslashes once \" and \\ parse; escape them for the round trip.
+String _quote(String value) => '"${value.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';

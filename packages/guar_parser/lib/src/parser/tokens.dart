@@ -19,8 +19,14 @@ Parser<BeanDate> date() {
       .map((List<dynamic> values) => BeanDate(year: values[0] as int, month: values[2] as int, day: values[4] as int));
 }
 
-Parser<String> quotedString() =>
-    (char('"') & pattern('^"').star().flatten() & char('"')).map((List<dynamic> values) => values[1] as String);
+// Beancount strings process backslash escapes: \" yields a quote, \X yields X.
+Parser<String> quotedString() => (char('"') & _stringChars().star() & char('"')).map((List<dynamic> values) {
+  final List<String> parts = values[1] as List<String>;
+  return parts.join();
+});
+
+// Petitparser patterns are literal characters; this class is [^ " backslash] with any line allowed.
+Parser<String> _stringChars() => (pattern(r'^"\') | (char(r'\') & pattern('^\n')).pick(1)).cast<String>();
 
 Parser<Account> account() {
   final Parser<String> segment = (uppercase() & (word() | char('-')).star()).flatten();
@@ -45,7 +51,15 @@ Parser<BeanNumber> numberLiteral() {
   });
 }
 
+// Division by zero inside an expression must fail the amount, not throw out of the parser.
+class _DivideByZero implements Exception {
+  const _DivideByZero();
+}
+
 Decimal _divide(Decimal left, Decimal right, int maxScale) {
+  if (right == Decimal.zero) {
+    throw const _DivideByZero();
+  }
   // Finite expansions keep exact decimals; repeating ones round to maxScale from the expression.
   final Rational quotient = left / right;
   if (_hasFiniteDecimalExpansion(quotient)) {
@@ -132,9 +146,28 @@ Parser<_ExprNum> _numberExprValue() {
   return expr;
 }
 
-final Parser<BeanNumber> _numberExpr = _numberExprValue().token().map(
-  (Token<_ExprNum> token) =>
-      BeanNumber(verbatim: token.buffer.substring(token.start, token.stop), resolved: token.value.value),
+// A delegate that turns a thrown _DivideByZero into an ordinary parse failure.
+class _RescueParser extends DelegateParser<BeanNumber, BeanNumber> {
+  _RescueParser(super.delegate);
+
+  @override
+  Result<BeanNumber> parseOn(Context context) {
+    try {
+      return delegate.parseOn(context);
+    } on _DivideByZero catch (_) {
+      return context.failure('division by zero');
+    }
+  }
+
+  @override
+  _RescueParser copy() => _RescueParser(delegate);
+}
+
+final Parser<BeanNumber> _numberExpr = _RescueParser(
+  _numberExprValue().token().map(
+    (Token<_ExprNum> token) =>
+        BeanNumber(verbatim: token.buffer.substring(token.start, token.stop), resolved: token.value.value),
+  ),
 );
 
 Parser<BeanNumber> numberExpr() => _numberExpr;

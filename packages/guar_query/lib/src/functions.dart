@@ -498,7 +498,7 @@ List<FuncSpec> builtinFunctions() => <FuncSpec>[
     TableEnv env,
     List<QueryValue> args,
   ) {
-    final RegExp pattern = RegExp(args[0].asText() ?? '');
+    final RegExp pattern = userRegExp(args[0].asText() ?? '');
     final List<String> values = _setStrings(args[1])..sort();
     for (final String value in values) {
       if (pattern.hasMatch(value)) return QueryValue.text(value);

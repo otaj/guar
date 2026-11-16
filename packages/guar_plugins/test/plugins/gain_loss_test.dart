@@ -14,6 +14,39 @@ void main() {
     expect(booked(_header), isEmpty);
   });
 
+  test('an invalid key regex is a config error, not a crash', () {
+    expect(
+      messages(
+        'plugin "beancount_reds_plugins.capital_gains_classifier.gain_loss" '
+        '"{\'Income(.*\' : [\':Capital-Gains\', \':Capital-Gains:Gains\', \':Capital-Gains:Losses\']}"\n'
+        '2014-01-01 open Assets:Brokerage\n'
+        '2014-01-01 open Assets:Bank\n'
+        '2014-01-01 open Income:Capital-Gains\n',
+      ),
+      contains('Invalid configuration for gain_loss plugin; skipping.'),
+    );
+  });
+
+  test('the key regex anchors at the start of the account, like Python re.match', () {
+    const String source =
+        'plugin "beancount_reds_plugins.capital_gains_classifier.gain_loss" '
+        '"{\'Gains\' : [\':Capital-Gains\', \':Capital-Gains:Gains\', \':Capital-Gains:Losses\']}"\n'
+        '2014-01-01 open Assets:Brokerage\n'
+        '2014-01-01 open Assets:Bank\n'
+        '2014-01-01 open Income:Capital-Gains\n'
+        '\n'
+        '2014-02-01 * "Sell"\n'
+        '  Assets:Brokerage         -1 ORNG {1 USD} @ 2 USD\n'
+        '  Assets:Bank               2 USD\n'
+        '  Income:Capital-Gains     -1 USD\n';
+    final List<Directive> directives = booked(source);
+    // 'Gains' only matches mid-string; Python re.match would not rewrite this account.
+    expect(
+      opens(directives),
+      contains('Income:Capital-Gains'),
+    );
+  });
+
   test('classifies gains and losses', () {
     final List<Directive> directives = booked(
       '$_header'

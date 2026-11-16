@@ -36,7 +36,8 @@ BookPluginResult effectiveDate(List<Directive> directives, LedgerOptions options
     interesting.add(directive);
   }
 
-  final Random random = Random();
+  // Seeded like zerosum so the generated link names stay stable across runs.
+  final Random random = Random(6);
   final List<Directive> linked = <Directive>[
     for (final Directive directive in interesting) _withLink(directive, random),
   ];
@@ -60,7 +61,11 @@ BookPluginResult effectiveDate(List<Directive> directives, LedgerOptions options
         continue;
       }
       final String when = compareBeanDate(date, directive.date) > 0 ? 'later' : 'earlier';
-      final String holdPrefix = holding[found]![when]!;
+      final String? holdPrefix = holding[found]?[when];
+      if (holdPrefix == null) {
+        // Python crashes with a KeyError here; report it as a plugin configuration error.
+        return configError(directives, 'Invalid configuration for effective_date plugin; skipping.');
+      }
       final String holdAccount = posting.account.name.replaceAll(found, holdPrefix);
       newAccounts.add(holdAccount);
       final Posting holdPosting = posting.copyWith(account: rewriteAccount(holdAccount, options));
@@ -85,6 +90,7 @@ Map<String, Map<String, String>>? _holdingAccounts(String? config) {
   for (final MapEntry<Object?, Object?> entry in parsed.map!.entries) {
     if (entry.key is! String || entry.value is! Map) return null;
     final Map<Object?, Object?> inner = entry.value! as Map<Object?, Object?>;
+    // Python accepts partial hold maps and crashes only when a key is used; error at the use site.
     holding[entry.key! as String] = <String, String>{
       for (final MapEntry<Object?, Object?> item in inner.entries)
         if (item.key is String && item.value is String) item.key! as String: item.value! as String,

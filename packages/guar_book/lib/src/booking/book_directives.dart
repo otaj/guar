@@ -163,10 +163,12 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
   // Book reductions against ante-inventory.
   final List<MutablePosting> booked = <MutablePosting>[];
   final List<d.ProcessingError> errors = <d.ProcessingError>[];
+  // Reductions already applied in this transaction, so a later posting matches the remaining lots.
+  final Map<String, d.Inventory> working = <String, d.Inventory>{};
   for (final MutablePosting posting in mutable) {
     final d.Amount? units = posting.units;
     final d.BookingMethod method = methods[posting.account.name] ?? defaultMethod;
-    final d.Inventory balance = balances[posting.account.name] ?? const d.Inventory();
+    final d.Inventory balance = working[posting.account.name] ?? balances[posting.account.name] ?? const d.Inventory();
     final bool isReduction =
         units != null &&
         (posting.cost != null || posting.pendingCost != null) &&
@@ -203,6 +205,13 @@ d.Directive? mapNonTransaction(p.ParsedDirective directive, d.AccountPrefixes pr
       return (directive: null, errors: reduced.errors);
     }
     booked.addAll(reduced.postings);
+    d.Inventory updated = balance;
+    for (final MutablePosting applied in reduced.postings) {
+      if (applied.units != null) {
+        updated = updated.addPosition(d.Position(units: applied.units!, cost: applied.cost)).inventory;
+      }
+    }
+    working[posting.account.name] = updated;
   }
 
   final InferredTolerances tolerancesMax = inferTolerances(booked, options);
@@ -374,9 +383,13 @@ List<d.Position> _matchLots(d.Inventory balance, d.Amount units, d.Cost? costHin
   Decimal totalCost = Decimal.zero;
   final Set<String> unitCurrencies = <String>{};
   final Set<String> costCurrencies = <String>{};
+  bool mixedSigns = false;
   for (final d.Position match in matches) {
     unitCurrencies.add(match.units.currency.name);
     costCurrencies.add(match.cost!.currency.name);
+    if (match.units.number.sign != matches.first.units.number.sign) {
+      mixedSigns = true;
+    }
     totalUnits += match.units.number;
     totalCost += match.units.number * match.cost!.number;
   }
@@ -386,6 +399,16 @@ List<d.Position> _matchLots(d.Inventory balance, d.Amount units, d.Cost? costHin
       postings: const <MutablePosting>[],
       errors: <d.ProcessingError>[
         d.ProcessingError(message: 'Cannot merge positions in multiple currencies: $detail', location: location),
+      ],
+    );
+  }
+  if (mixedSigns || totalUnits == Decimal.zero) {
+    // Averaging opposite-sign lots would fabricate a cost on real holdings.
+    final String detail = matches.map(_positionString).join(', ');
+    return (
+      postings: const <MutablePosting>[],
+      errors: <d.ProcessingError>[
+        d.ProcessingError(message: 'Cannot average opposite-sign positions: $detail', location: location),
       ],
     );
   }

@@ -84,4 +84,12 @@ void main() {
     final ParsedLedger ledger = parser.parse('not a directive\n', filename: 'ledger.beancount');
     expect(() => parser.export(ledger), throwsStateError);
   });
+
+  test('escapes quotes and backslashes so the export parses again', () {
+    const String source = '2014-01-01 * "say \\"hi\\"" ""\n  Assets:Cash  1 USD\n  Assets:Bank\n';
+    final ParsedLedger ledger = parser.parse(source, filename: 'ledger.beancount');
+    final String exported = parser.export(ledger);
+    expect(exported, contains(r'"say \"hi\""'));
+    expect(directives(parser.parse(exported, filename: 'ledger.beancount')), isNotNull);
+  });
 }

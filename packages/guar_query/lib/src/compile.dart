@@ -5,6 +5,7 @@ import 'package:guar_domain/guar_domain.dart';
 
 import 'package:guar_query/src/ast.dart';
 import 'package:guar_query/src/functions.dart';
+import 'package:guar_query/src/helpers.dart';
 import 'package:guar_query/src/result.dart';
 import 'package:guar_query/src/tables.dart';
 import 'package:guar_query/src/value.dart';
@@ -71,6 +72,7 @@ class _Compiler {
     table = tables['']!;
   }
 
+  int _positional = 0;
   final TableEnv env;
   final Map<String, BqlTable> tables;
   final Object? params;
@@ -140,6 +142,9 @@ class _Compiler {
         for (final int index in groupIndexes)
           if (!_isDateDerived(targets[index].eval)) targets[index].eval,
       ];
+    } else if (table.columns.containsKey('account')) {
+      // Without a partition the running balance would be ledger-global; journal balances run per account.
+      _balanceWindow!.partition = <_Eval>[_Column(table.columns['account']!, name: 'account')];
     } else if (targets.any((_Target target) => target.isAggregate)) {
       final List<int> nonAgg = <int>[
         for (int i = 0; i < targets.length; i++)
@@ -235,7 +240,8 @@ class _Compiler {
     if (targets is Asterisk) {
       return <_Target>[
         for (final String name in table.wildcardColumns)
-          _Target(_Column(table.columns[name]!, name: name), name, table.columns[name]!.type),
+          // balance needs its per-group window like an explicit balance column.
+          _Target(compileExpr(Expr.column(name)), name, table.columns[name]!.type),
       ];
     }
     final List<Target> list = targets as List<Target>;
@@ -420,7 +426,11 @@ class _Compiler {
   _Eval _compileFunction(String fname, List<Object> operands) {
     final String name = fname.toLowerCase();
     if (name == 'meta' && operands.length == 1 && operands.single is Expr) {
-      return _Subscript(_Column(table.columns['meta']!, name: 'meta'), _constText(operands.single as Expr));
+      final ColumnSpec? column = table.columns['meta'];
+      if (column == null) {
+        throw QueryException('meta() is not available in the ${table.name} table');
+      }
+      return _Subscript(_Column(column, name: 'meta'), _constText(operands.single as Expr));
     }
     if (name == 'entry_meta' && operands.length == 1 && operands.single is Expr) {
       return _EntryMeta(_constText(operands.single as Expr));
@@ -475,6 +485,9 @@ class _Compiler {
 
   String _constText(Expr expr) {
     final _Eval compiled = compileExpr(expr);
+    if (compiled is! _Constant) {
+      throw QueryException('meta key must be a constant expression');
+    }
     final QueryValue value = compiled.call(const Object());
     return value.asText() ?? '';
   }
@@ -482,8 +495,9 @@ class _Compiler {
   QueryValue _resolveParam(String? name) {
     final Object? parameters = params;
     if (name == null) {
-      if (parameters is List && parameters.isNotEmpty) {
-        return queryValueFromLiteral(parameters.first);
+      if (parameters is List && _positional < parameters.length) {
+        // Positional placeholders consume the parameter list in order.
+        return queryValueFromLiteral(parameters[_positional++]);
       }
       throw QueryException('query parameter missing');
     }
@@ -511,11 +525,11 @@ class _Compiler {
         final List<QueryValue> keyValues = <QueryValue>[
           for (final int index in query.groupIndexes!) query.targets[index].eval.call(row),
         ];
-        final String key = keyValues.map(_stringifyValue).join('\u0001');
+        final String key = keyValues.map(_groupKeyPart).join('\u0001');
         groups.putIfAbsent(key, () => _Group(keyValues, aggregates.length)).update(aggregates, row);
       }
       for (final _Group group in groups.values) {
-        final List<QueryValue> values = group.finalize(query.targets, aggregates);
+        final List<QueryValue> values = group.finalize(query.targets, aggregates, query.groupIndexes!);
         if (query.havingIndex != null && !isTruthy(values[query.havingIndex!])) continue;
         rows.add(values);
       }
@@ -544,7 +558,7 @@ class _Compiler {
       final Set<String> seen = <String>{};
       projected = <List<QueryValue>>[
         for (final List<QueryValue> row in projected)
-          if (seen.add(row.map(_stringifyValue).join('\u0001'))) row,
+          if (seen.add(row.map(_groupKeyPart).join('\u0001'))) row,
       ];
     }
     if (query.limit != null && projected.length > query.limit!) {
@@ -571,15 +585,15 @@ class _Group {
     }
   }
 
-  List<QueryValue> finalize(List<_Target> targets, List<_Aggregate> aggregates) {
+  List<QueryValue> finalize(List<_Target> targets, List<_Aggregate> aggregates, List<int> groupIndexes) {
     for (final _Aggregate aggregate in aggregates) {
       aggregate.lookup = () => stores[aggregate.slot] ?? _emptyAgg(aggregate);
     }
     try {
-      int keyIndex = 0;
       return <QueryValue>[
-        for (final _Target target in targets)
-          if (target.isAggregate) target.eval.call(const Object()) else keys[keyIndex++],
+        // _compileSelect rejects non-aggregates outside GROUP BY, so every i is in groupIndexes.
+        for (int i = 0; i < targets.length; i++)
+          if (targets[i].isAggregate) targets[i].eval.call(const Object()) else keys[groupIndexes.indexOf(i)],
       ];
     } finally {
       for (final _Aggregate aggregate in aggregates) {
@@ -974,7 +988,7 @@ class _Match extends _Eval {
   QueryValue call(Object row) {
     final String text = left.call(row).asText() ?? '';
     final String pattern = right.call(row).asText() ?? '';
-    final RegExp regex = RegExp(pattern);
+    final RegExp regex = userRegExp(pattern);
     final bool matched = kind == MatchKind.search ? regex.hasMatch(text) : regex.matchAsPrefix(text) != null;
     return QueryValue.boolean(not ? !matched : matched);
   }
@@ -1018,13 +1032,17 @@ class _Quantified extends _Eval {
       rhs = QueryValue.list((right as _Subquery).values());
     }
     final Set<String> items = membershipStrings(rhs);
+    // The needle side does not change per row; compile it once.
+    final RegExp? needlePattern = op == '~' || op == '?~'
+        ? userRegExp(needle.asText() ?? _stringifyValue(needle))
+        : null;
     bool test(String item) {
       final String text = needle.asText() ?? _stringifyValue(needle);
       return switch (op) {
         '=' => text == item,
         '!=' => text != item,
-        '~' => RegExp(item).hasMatch(text) || RegExp(text).hasMatch(item),
-        '?~' => RegExp(item).matchAsPrefix(text) != null || RegExp(text).matchAsPrefix(item) != null,
+        '~' => userRegExp(item).hasMatch(text) || needlePattern!.hasMatch(item),
+        '?~' => userRegExp(item).matchAsPrefix(text) != null || needlePattern!.matchAsPrefix(item) != null,
         _ => text == item,
       };
     }
@@ -1059,6 +1077,9 @@ class _Arith extends _Eval {
     final Decimal? leftNum = _number(a);
     final Decimal? rightNum = _number(b);
     if (leftNum == null || rightNum == null) return const QueryValue.null_();
+    if (rightNum == Decimal.zero && (op == ArithOp.div || op == ArithOp.mod)) {
+      throw QueryException('division by zero');
+    }
     return switch (op) {
       ArithOp.add => _numValue(a, b, leftNum + rightNum),
       ArithOp.sub => _numValue(a, b, leftNum - rightNum),
@@ -1179,28 +1200,19 @@ class _HasAccount extends _Eval {
   QueryType get type => QueryType.boolean;
   @override
   QueryValue call(Object row) {
-    final RegExp regex = RegExp('(?i)${pattern.call(row).asText() ?? ''}');
+    final RegExp regex = userRegExp('(?i)${pattern.call(row).asText() ?? ''}');
     final List<String> accounts = switch (row) {
       PostingRow(:final Transaction transaction) => <String>[
         for (final Posting posting in transaction.postings) posting.account.name,
       ],
-      Directive(:final DirectiveBody body) => <String>[
-        for (final Account account in _directiveAccounts(body)) account.name,
+      Directive() => <String>[
+        for (final Account account in directiveAccounts(row)) account.name,
       ],
       _ => const <String>[],
     };
     return QueryValue.boolean(accounts.any(regex.hasMatch));
   }
 }
-
-Set<Account> _directiveAccounts(DirectiveBody body) => switch (body) {
-  TransactionBody(:final Transaction value) => <Account>{for (final Posting posting in value.postings) posting.account},
-  OpenBody(:final Account account) => <Account>{account},
-  CloseBody(:final Account account) => <Account>{account},
-  BalanceBody(:final Account account) => <Account>{account},
-  BudgetBody(:final Account account) || BudgetOffBody(:final Account account) => <Account>{account},
-  _ => <Account>{},
-};
 
 class _Coalesce extends _Eval {
   _Coalesce(this.args);
@@ -1218,16 +1230,21 @@ class _Coalesce extends _Eval {
 }
 
 class _Subquery extends _Eval {
-  _Subquery(this.compiler, this.select);
+  // Compiled in the constructor, so placeholders resolve in text order; executed once.
+  _Subquery(this.compiler, this.select) : compiled = compiler._compileSelect(select);
   final _Compiler compiler;
   final SelectStatement select;
+  final _CompiledSelect compiled;
+  List<QueryValue>? _cached;
   @override
   QueryType get type => QueryType.set;
+
   List<QueryValue> values() {
-    final _CompiledSelect compiled = compiler._compileSelect(select);
+    final List<QueryValue>? cached = _cached;
+    if (cached != null) return cached;
     final QueryResult result = compiler._execute(compiled);
     if (result is! QueryTable) return const <QueryValue>[];
-    return <QueryValue>[
+    return _cached = <QueryValue>[
       for (final QueryRow row in result.rows)
         if (row.values.isNotEmpty) row.values.first,
     ];
@@ -1326,6 +1343,10 @@ QueryValue _unwrapMeta(MetaValue value) => switch (value) {
   MetaNumber(:final Decimal value) => QueryValue.number(value),
   MetaAmount(:final Amount value) => QueryValue.amount(value),
 };
+
+// Group and distinct keys must not collide: NULL and '' stringify the same, and payloads may hold the joiner.
+String _groupKeyPart(QueryValue value) =>
+    value.isNull ? '\u0000' : _stringifyValue(value).replaceAll('\u0001', '\u0001\u0001');
 
 String _stringifyValue(QueryValue value) => switch (value) {
   QueryNull() => '',

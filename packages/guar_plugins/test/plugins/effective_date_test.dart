@@ -12,6 +12,38 @@ void main() {
     expect(booked(_plugin), isEmpty);
   });
 
+  test('a holding map without the needed key is a config error, not a crash', () {
+    expect(
+      messages(
+        'plugin "beancount_reds_plugins.effective_date.effective_date" '
+        '"{\'Expenses\': {\'later\': \'Assets:Hold:Expenses\'}}"\n'
+        '2014-01-01 open Liabilities:Mastercard\n'
+        '2014-01-01 open Expenses:Taxes:Federal\n'
+        '2014-02-01 * "Estimated taxes for 2013"\n'
+        '  Liabilities:Mastercard        -2000 USD\n'
+        '  Expenses:Taxes:Federal         2000 USD\n'
+        '    effective_date: 2013-12-31\n',
+      ),
+      contains('Invalid configuration for effective_date plugin; skipping.'),
+    );
+  });
+
+  test('a holding map with only the needed key works, like Python', () {
+    final List<({BeanDate date, Transaction value})> txns = _txns(
+      booked(
+        'plugin "beancount_reds_plugins.effective_date.effective_date" '
+        '"{\'Expenses\': {\'earlier\': \'Liabilities:Hold:Expenses\'}}"\n'
+        '2014-01-01 open Liabilities:Mastercard\n'
+        '2014-01-01 open Expenses:Taxes:Federal\n'
+        '2014-02-01 * "Estimated taxes for 2013"\n'
+        '  Liabilities:Mastercard        -2000 USD\n'
+        '  Expenses:Taxes:Federal         2000 USD\n'
+        '    effective_date: 2013-12-31\n',
+      ),
+    );
+    expect(txns, hasLength(2));
+  });
+
   test('leaves transactions without effective dates unchanged', () {
     const String source =
         '$_plugin'

@@ -53,41 +53,44 @@ class _BalancesScreenState extends State<BalancesScreen> {
       LedgerErrors() => const <Directive>[],
     };
     final Map<AccountType, List<_AccountNode>> types = _trees(directives, inventoryFromLedger(ledger));
-    final List<Widget> rows = _rows(types);
+    final List<_BalanceRow> rows = _rows(types);
     return CustomScrollView(
       slivers: <Widget>[
         SliverList.builder(
           itemCount: rows.length,
-          itemBuilder: (BuildContext context, int index) => rows[index],
+          itemBuilder: (BuildContext context, int index) => _rowTile(context, rows[index]),
         ),
       ],
     );
   }
 
-  List<Widget> _rows(Map<AccountType, List<_AccountNode>> types) {
-    final List<Widget> rows = <Widget>[];
+  // The list holds data, not widgets, so SliverList builds only the visible rows.
+  List<_BalanceRow> _rows(Map<AccountType, List<_AccountNode>> types) {
+    final List<_BalanceRow> rows = <_BalanceRow>[];
     for (final AccountType type in _typeOrder) {
       final List<_AccountNode>? roots = types[type];
       if (roots == null || roots.isEmpty) continue;
-      rows
-        ..add(_TypeHeader(type))
-        ..addAll(_flatten(type, roots));
+      rows.add(_BalanceRow.header(type));
+      _flatten(type, roots, rows);
     }
     return rows;
   }
 
-  List<Widget> _flatten(AccountType type, List<_AccountNode> roots) {
-    final List<Widget> rows = <Widget>[];
+  Widget _rowTile(BuildContext context, _BalanceRow row) => switch (row) {
+    _BalanceRow(type: final AccountType type, node: null) => _TypeHeader(type),
+    _BalanceRow(node: final _AccountNode node, depth: final int depth, key: final String key) => _AccountTile(
+      node: node,
+      depth: depth,
+      expanded: _expanded.contains(key),
+      onToggle: node.hasChildren ? () => _toggle(row.key) : null,
+    ),
+    _ => const SizedBox.shrink(),
+  };
+
+  void _flatten(AccountType type, List<_AccountNode> roots, List<_BalanceRow> rows) {
     void visit(_AccountNode node, int depth, String path) {
       final String key = '${type.name}:$path';
-      rows.add(
-        _AccountTile(
-          node: node,
-          depth: depth,
-          expanded: _expanded.contains(key),
-          onToggle: node.hasChildren ? () => _toggle(key) : null,
-        ),
-      );
+      rows.add(_BalanceRow.node(node, depth, key));
       if (_expanded.contains(key)) {
         for (final _AccountNode child in node.sortedChildren) {
           visit(child, depth + 1, '$path:${child.segment}');
@@ -98,7 +101,6 @@ class _BalancesScreenState extends State<BalancesScreen> {
     for (final _AccountNode root in roots) {
       visit(root, 0, root.segment);
     }
-    return rows;
   }
 
   void _toggle(String key) {
@@ -113,6 +115,17 @@ const List<AccountType> _typeOrder = <AccountType>[
   AccountType.liabilities,
   AccountType.equity,
 ];
+
+class _BalanceRow {
+  const _BalanceRow.header(this.type) : node = null, depth = 0, key = '';
+
+  const _BalanceRow.node(this.node, this.depth, this.key) : type = null;
+
+  final AccountType? type;
+  final _AccountNode? node;
+  final int depth;
+  final String key;
+}
 
 class _AccountNode {
   _AccountNode(this.segment);

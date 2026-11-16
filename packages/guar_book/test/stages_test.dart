@@ -25,6 +25,29 @@ void main() {
     expect((txns.single.value.origin as SourceOrigin).location.filename, 'pad.beancount');
   });
 
+  test('two identical pad directives pad their own shortfalls, not the first one twice', () {
+    const String source = '''
+2020-01-01 open Assets:Checking
+2020-01-01 open Equity:Opening-Balances
+2020-01-01 pad Assets:Checking Equity:Opening-Balances
+2020-01-02 balance Assets:Checking 100.00 USD
+2020-01-03 pad Assets:Checking Equity:Opening-Balances
+2020-01-04 balance Assets:Checking 200.00 USD
+''';
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'pad.beancount'));
+    expect(ledger, isA<LedgerDirectives>(), reason: ledger.toString());
+    final List<Transaction> pads = (ledger as LedgerDirectives).directives
+        .map((Directive d) => d.body)
+        .whereType<TransactionBody>()
+        .map((TransactionBody body) => body.value)
+        .toList();
+    // Both pads are byte-identical; the second must pad the 200 assertion, not repeat the 100 one.
+    expect(pads.map((Transaction pad) => pad.postings.first.units.number), <Decimal>[
+      Decimal.parse('100.00'),
+      Decimal.parse('100.00'),
+    ]);
+  });
+
   test('pad transactions follow insert-entry on posting accounts', () {
     const String source = '''
 2020-01-01 custom "fava-option" "insert-entry" "Assets:Checking"

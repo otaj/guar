@@ -108,6 +108,35 @@ void main() {
     expect(documents.files[root], File(root).readAsStringSync());
   });
 
+  test('session addTransaction into an included file refreshes the snapshot', () async {
+    final Directory dir = _tempLedger();
+    final String root = '${dir.path}/ledger.beancount';
+    final String included = '${dir.path}/2026.beancount';
+    File(root).writeAsStringSync(
+      '2026-11-01 open Assets:Cash\n2026-11-01 open Expenses:Food\ninclude "2026.beancount"\n',
+    );
+    File(included).writeAsStringSync('');
+    final _PathDocuments documents = _PathDocuments(root, File(root).readAsStringSync());
+    final LedgerSession session = LedgerSession(documents);
+    addTearDown(session.dispose);
+    await session.load();
+    final int directivesBefore = switch (session.snapshot?.booked.ledger) {
+      LedgerDirectives(:final List<Directive> directives) => directives.length,
+      _ => 0,
+    };
+
+    await session.addTransaction(
+      included,
+      '2026-11-02 * "Grocer" "Lunch"\n  Expenses:Food  12.30 USD\n  Assets:Cash\n',
+    );
+    expect(session.error, isNull);
+    final int directivesAfter = switch (session.snapshot?.booked.ledger) {
+      LedgerDirectives(:final List<Directive> directives) => directives.length,
+      _ => 0,
+    };
+    expect(directivesAfter, directivesBefore + 1);
+  });
+
   test('validateTransaction reports balance errors', () async {
     final Directory dir = _tempLedger();
     final String path = '${dir.path}/ledger.beancount';

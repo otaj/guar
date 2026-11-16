@@ -10,7 +10,8 @@ StageResult applyPad(List<Directive> directives, LedgerOptions options, Processi
   final List<Directive> out = <Directive>[];
   final Decimal multiplier = options.inferredToleranceMultiplier.value;
 
-  for (final Directive directive in directives) {
+  for (int index = 0; index < directives.length; index++) {
+    final Directive directive = directives[index];
     out.add(directive);
     final DirectiveBody body = directive.body;
     switch (body) {
@@ -22,7 +23,6 @@ StageResult applyPad(List<Directive> directives, LedgerOptions options, Processi
               .inventory;
         }
       case PadBody(:final Account account, :final Account sourceAccount):
-        final int index = directives.indexOf(directive);
         // Per currency: shortfall at the first failing assertion between this pad
         // and the next pad for the account, including intervening transactions.
         final Map<String, Decimal> flowed = <String, Decimal>{};

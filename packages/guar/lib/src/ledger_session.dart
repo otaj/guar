@@ -279,6 +279,8 @@ class LedgerSession extends ChangeNotifier {
               } else {
                 try {
                   included.write(replacement.target, text);
+                  // The root source is unchanged; force a rebook so the UI sees the new entry.
+                  snapshot = null;
                 } on FileSystemException {
                   _fail(edit, GuarFailure.couldNotWriteIncluded);
                 }
@@ -335,6 +337,8 @@ class LedgerSession extends ChangeNotifier {
               } else {
                 try {
                   included.write(txn.target, text);
+                  // The root source is unchanged; force a rebook so the UI sees the new entry.
+                  snapshot = null;
                 } on FileSystemException {
                   _fail(edit, GuarFailure.couldNotWriteIncluded);
                 }

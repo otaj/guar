@@ -14,8 +14,8 @@ Ledger book(String source) {
   return booked;
 }
 
-QueryTable run(Ledger ledger, String query) {
-  final QueryResult result = Query(clock: () => DateTime.utc(2022, 4, 5)).run(ledger, query);
+QueryTable run(Ledger ledger, String query, {Object? params}) {
+  final QueryResult result = Query(clock: () => DateTime.utc(2022, 4, 5)).run(ledger, query, params: params);
   expect(
     result,
     isA<QueryTable>(),
@@ -411,6 +411,64 @@ option "operating_currency" "USD"
         options: LedgerOptions(),
       );
       expectError(ledger, 'SELECT account');
+    });
+  });
+
+  group('engine edges', () {
+    test('group keys land in their own columns when GROUP BY order differs', () {
+      final Ledger ledger = book(common);
+      final QueryTable table = run(ledger, 'SELECT account, count(*), year FROM postings GROUP BY year, account');
+      expect(table.columns.map((QueryColumn column) => column.name), <String>['account', 'count(*)', 'year']);
+      for (final QueryRow row in table.rows) {
+        expect((row.values[0] as QueryAccount).value.name.contains(':'), isTrue);
+        expect(row.values[2], isA<QueryInteger>());
+      }
+    });
+
+    test('positional parameters bind in order', () {
+      final Ledger ledger = book(common);
+      final QueryTable table = run(
+        ledger,
+        'SELECT count(*) FROM postings WHERE date >= %s AND date < %s',
+        params: <Object>[BeanDate(year: 2011, month: 1, day: 1), BeanDate(year: 2012, month: 1, day: 1)],
+      );
+      // Only 2011 postings: 2 (Dinner with Uno and its two postings each? one txn = 2 postings).
+      expect((table.rows.single.values[0] as QueryInteger).value, 2);
+    });
+
+    test('group keys keep NULL and empty text apart', () {
+      final Ledger ledger = book(common);
+      final QueryTable table = run(ledger, 'SELECT payee, count(*) FROM postings GROUP BY 1');
+      // The fixture has only NULL payees; a single group proves NULL rows are not merged with '' rows.
+      expect(table.rows, hasLength(1));
+    });
+
+    test('division by zero is a query error', () {
+      expectError(book(common), 'SELECT 1 / 0');
+    });
+
+    test('an invalid regex in a WHERE clause is a query error', () {
+      expectError(book(common), 'SELECT account WHERE account ~ "("');
+    });
+
+    test('a subquery is executed once, not per outer row', () {
+      final Ledger ledger = book(common);
+      final QueryTable table = run(
+        ledger,
+        "SELECT count(*) FROM postings WHERE account IN (SELECT account WHERE account ~ 'Expenses')",
+      );
+      expect((table.rows.single.values[0] as QueryInteger).value, 5);
+    });
+
+    test('subquery placeholders resolve in text order', () {
+      final Ledger ledger = book(common);
+      final QueryTable table = run(
+        ledger,
+        'SELECT count(*) FROM postings WHERE account IN (SELECT account WHERE account ~ %s) AND year = %s',
+        params: <Object>['Expenses', 2011],
+      );
+      // Only the 2011 Expenses posting passes both the subquery filter and the year filter.
+      expect((table.rows.single.values[0] as QueryInteger).value, 1);
     });
   });
 }

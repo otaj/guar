@@ -20,6 +20,34 @@ void main() {
     expect(booked('plugin "beancount_reds_plugins.zerosum.zerosum" "{}"\n'), isEmpty);
   });
 
+  test('a string date range is a config error, not a crash', () {
+    expect(
+      messages(
+        "plugin \"beancount_reds_plugins.zerosum.zerosum\" \"{'zerosum_accounts': {'Assets:A': ('T', '90')}}\"\n"
+        '2014-01-01 open Assets:Account1\n'
+        '2014-01-01 open Income:Misc\n'
+        '2014-01-15 *\n'
+        '  Income:Misc          -1000 USD\n'
+        '  Assets:Account1\n',
+      ),
+      contains('Invalid configuration for zerosum plugin; skipping.'),
+    );
+  });
+
+  test('a non-numeric tolerance is a config error, not a crash', () {
+    expect(
+      messages(
+        "plugin \"beancount_reds_plugins.zerosum.zerosum\" \"{'tolerance': 'abc'}\"\n"
+        '2014-01-01 open Assets:Account1\n'
+        '2014-01-01 open Income:Misc\n'
+        '2014-01-15 *\n'
+        '  Income:Misc          -1000 USD\n'
+        '  Assets:Account1\n',
+      ),
+      contains('Invalid configuration for zerosum plugin; skipping.'),
+    );
+  });
+
   test('empty config leaves postings unchanged', () {
     final List<String> names = _matched(
       booked(

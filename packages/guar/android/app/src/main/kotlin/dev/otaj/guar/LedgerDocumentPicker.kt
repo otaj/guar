@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContract
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -222,6 +223,7 @@ class LedgerDocumentPicker(
         uri: Uri,
         text: String,
     ) {
+        backup(uri)
         val descriptor =
             activity.contentResolver.openFileDescriptor(uri, "w")
                 ?: throw IOException("Guar could not write the new ledger.")
@@ -229,6 +231,20 @@ class LedgerDocumentPicker(
             FileOutputStream(pfd.fileDescriptor).use { output ->
                 overwriteLedgerText(output.channel, text)
             }
+        }
+    }
+
+    // One best-effort copy of the current ledger in app-private storage: a crash between
+    // truncate and write must not destroy the user's accounting file.
+    private fun backup(uri: Uri) {
+        try {
+            val bytes =
+                activity.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: return
+            val name = displayName(uri)
+            writeBackup(File(activity.filesDir, "ledger-backups"), name, bytes)
+        } catch (_: IOException) {
+            // Keep writing even when the backup cannot be made.
         }
     }
 
@@ -368,6 +384,21 @@ internal fun overwriteLedgerText(
         }
     }
     channel.truncate(bytes.size.toLong())
+}
+
+internal fun writeBackup(
+    directory: File,
+    name: String,
+    bytes: ByteArray,
+) {
+    directory.mkdirs()
+    // Keep the previous generation: a corrupted file must not erase the last good copy.
+    val current = File(directory, name)
+    val previous = File(directory, "$name.old")
+    if (current.exists()) {
+        current.renameTo(previous)
+    }
+    current.writeBytes(bytes)
 }
 
 private fun picked(

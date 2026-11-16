@@ -218,4 +218,27 @@ void main() {
     final MetaValue? metaAccount = (ledger as LedgerDirectives).directives.single.meta.lookup('related');
     expect(metaAccount, MetaValue.account(Account(name: 'Expenses:Food', type: AccountType.expenses)));
   });
+
+  test('the second reduction in a transaction cannot reuse the lots the first took', () {
+    const String source = '''
+2024-01-01 open Assets:Inv
+2024-01-01 open Assets:Cash
+2024-01-02 * "buy"
+  Assets:Inv 8 HOOL {400 USD}
+  Assets:Cash -3200 USD
+2024-01-03 * "sell twice"
+  Assets:Inv -5 HOOL {}
+  Assets:Inv -5 HOOL {}
+  Assets:Cash 4000 USD
+''';
+    final Ledger ledger = Book().process(const p.BeancountParser().parse(source, filename: 'inv.beancount'));
+    final List<ProcessingError> errors = switch (ledger) {
+      LedgerDirectives(:final List<ProcessingError> errors) => errors,
+      LedgerErrors(:final List<ProcessingError> errors) => errors,
+    };
+    expect(
+      errors.map((ProcessingError error) => error.message),
+      contains('Not enough lots to reduce'),
+    );
+  });
 }

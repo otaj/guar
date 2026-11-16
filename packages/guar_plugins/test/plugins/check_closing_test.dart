@@ -22,12 +22,35 @@ const String _source =
 
 void main() {
   test('inserts a zero balance the day after the closing posting', () {
-    expect(balances(booked(_source)), <String>['2018-02-17 Assets:US:Brokerage:Main:Options 0 QQQ180216C160']);
+    // Upstream runs this fixture with expect_errors=True: the account is left at -1400,
+    // so the D+1 zero assertion (evaluated after the transaction) fails.
+    expect(messages(_source), contains(contains('Balance failed for "Assets:US:Brokerage:Main:Options"')));
+    expect(balances(booked(_source, recover: true)), <String>[
+      '2018-02-17 Assets:US:Brokerage:Main:Options 0 QQQ180216C160',
+    ]);
+  });
+
+  test('a closing trade that zeroes the account passes the assertion', () {
+    final List<String> errors = messages(
+      'plugin "beancount.plugins.check_closing"\n'
+      '2018-02-15 open Assets:US:Brokerage:Main:Options\n'
+      '2018-02-15 open Assets:US:Brokerage:Main:Cash\n'
+      '2018-02-15 open Income:US:Brokerage:Main:PnL\n'
+      '2018-02-15 * "buy"\n'
+      '  Assets:US:Brokerage:Main:Options   1400 QQQ180216C160 {2.70 USD}\n'
+      '  Assets:US:Brokerage:Main:Cash  -3780.00 USD\n'
+      '2018-02-16 * "SOLD -14 QQQ 100 16 FEB 18 160 CALL @5.31"\n'
+      '  Assets:US:Brokerage:Main:Options     -1400 QQQ180216C160 {2.70 USD} @ 5.31 USD\n'
+      '    closing: TRUE\n'
+      '  Assets:US:Brokerage:Main:Cash      7421.13 USD\n'
+      '  Income:US:Brokerage:Main:PnL       -3641.13 USD\n',
+    );
+    expect(errors, isEmpty);
   });
 
   test('strips the closing metadata from the posting', () {
     final List<String> keys = <String>[
-      for (final Directive directive in booked(_source))
+      for (final Directive directive in booked(_source, recover: true))
         if (directive.body case TransactionBody(:final Transaction value))
           for (final Posting posting in value.postings)
             for (final MetaEntry entry in posting.meta.entries) entry.key,

@@ -86,7 +86,7 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
       messages: messages,
       l10n: l10n,
     );
-    final List<Widget> rows = _rows(visible);
+    final List<({BeanDate? date, Directive? directive})> rowData = _rows(visible);
     return CustomScrollView(
       slivers: <Widget>[
         SliverToBoxAdapter(
@@ -119,8 +119,8 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
             ),
           ),
         SliverList.builder(
-          itemCount: rows.length,
-          itemBuilder: (BuildContext context, int index) => rows[index],
+          itemCount: rowData.length,
+          itemBuilder: (BuildContext context, int index) => _rowTile(rowData[index], colors),
         ),
       ],
     );
@@ -136,20 +136,26 @@ class _DirectivesScreenState extends State<DirectivesScreen> {
   };
 
   // Date groups newest first; directives within a day keep file order.
-  List<Widget> _rows(List<Directive> visible) {
-    final ColorScheme colors = Theme.of(context).colorScheme;
+  // The list holds data, not widgets, so SliverList builds only the visible rows.
+  List<({BeanDate? date, Directive? directive})> _rows(List<Directive> visible) {
     final Map<BeanDate, List<Directive>> grouped = <BeanDate, List<Directive>>{};
     for (final Directive directive in visible) {
       grouped.putIfAbsent(directive.date, () => <Directive>[]).add(directive);
     }
     final List<BeanDate> dates = grouped.keys.toList()..sort((BeanDate a, BeanDate b) => compareBeanDate(b, a));
-    return <Widget>[
-      for (final BeanDate date in dates) ...<Widget>[
-        _DateHeader(date),
-        for (final Directive directive in grouped[date]!) _tileRow(directive, colors),
+    return <({BeanDate? date, Directive? directive})>[
+      for (final BeanDate date in dates) ...<({BeanDate? date, Directive? directive})>[
+        (date: date, directive: null),
+        for (final Directive directive in grouped[date]!) (date: null, directive: directive),
       ],
     ];
   }
+
+  Widget _rowTile(({BeanDate? date, Directive? directive}) row, ColorScheme colors) => switch (row) {
+    (date: final BeanDate date, directive: null) => _DateHeader(date),
+    (date: null, directive: final Directive directive) => _tileRow(directive, colors),
+    _ => const SizedBox.shrink(),
+  };
 
   Widget _tileRow(Directive directive, ColorScheme colors) => switch (directive.body) {
     TransactionBody(:final Transaction value) => _TransactionTile(

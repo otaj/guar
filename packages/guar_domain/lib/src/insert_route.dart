@@ -15,14 +15,15 @@ BeanLocation insertLocation({
   required List<Directive> existing,
   required ProcessingInfo info,
 }) {
-  final Set<String> tree = _filesInTree(existing, info);
+  final _InsertContext context = _contextFor(existing, info);
   final String root = info.filename ?? '';
-  final ({String filename, int lineno})? match = _matchingInsertEntry(date, _accountsForInsert(body), existing);
+  final ({String filename, int lineno})? match = _matchingInsertEntry(date, _accountsForInsert(body), context.rules);
   if (match != null) {
     return BeanLocation(filename: match.filename, linenoBegin: match.lineno, linenoEnd: match.lineno);
   }
-  final String fallback = _defaultFile(existing, tree) ?? root;
-  final int line = _appendLine(fallback, existing, info);
+  final String fallback = context.defaultFile ?? root;
+  final int last = context.lastLines[fallback] ?? 0;
+  final int line = last == 0 ? 1 : last + 1;
   return BeanLocation(filename: fallback, linenoBegin: line, linenoEnd: line);
 }
 
@@ -57,16 +58,7 @@ List<String> _accountsForInsert(DirectiveBody body) => switch (body) {
   PriceBody() || CommodityBody() || EventBody() || QueryBody() => const <String>[],
 };
 
-({String filename, int lineno})? _matchingInsertEntry(BeanDate date, List<String> accounts, List<Directive> existing) {
-  final List<({BeanDate date, String filename, int lineno, RegExp pattern})> rules =
-      <({BeanDate date, String filename, int lineno, RegExp pattern})>[
-        for (final Directive directive in existing) ?_insertEntryRule(directive),
-      ]..sort(
-        (
-          ({BeanDate date, String filename, int lineno, RegExp pattern}) a,
-          ({BeanDate date, String filename, int lineno, RegExp pattern}) b,
-        ) => compareBeanDate(b.date, a.date),
-      );
+({String filename, int lineno})? _matchingInsertEntry(BeanDate date, List<String> accounts, List<_InsertRule> rules) {
   for (final String account in accounts) {
     for (final ({BeanDate date, String filename, int lineno, RegExp pattern}) rule in rules) {
       if (compareBeanDate(rule.date, date) >= 0) {
@@ -111,6 +103,59 @@ List<String> _accountsForInsert(DirectiveBody body) => switch (body) {
   );
 }
 
+// Insert routing scans the whole directive list per generated entry; stages call this
+// once per entry with the same input list, so the scans are cached by list identity.
+// shortcut: keyed on identity, a stage that mutates its input list between inserts must clear it.
+typedef _InsertRule = ({BeanDate date, String filename, int lineno, RegExp pattern});
+
+class _InsertContext {
+  const _InsertContext(this.existing, this.info, this.rules, this.defaultFile, this.lastLines);
+
+  final List<Directive> existing;
+  final ProcessingInfo info;
+  final List<_InsertRule> rules;
+  final String? defaultFile;
+  final Map<String, int> lastLines;
+}
+
+_InsertContext? _insertContextCache;
+
+_InsertContext _contextFor(List<Directive> existing, ProcessingInfo info) {
+  final _InsertContext? cached = _insertContextCache;
+  if (cached != null && identical(cached.existing, existing) && identical(cached.info, info)) {
+    return cached;
+  }
+  final Set<String> tree = _filesInTree(existing, info);
+  final List<_InsertRule> rules = <_InsertRule>[
+    for (final Directive directive in existing) ?_insertEntryRule(directive),
+  ]..sort((_InsertRule a, _InsertRule b) => compareBeanDate(b.date, a.date));
+  final Map<String, int> lastLines = _lastLines(existing, info);
+  return _insertContextCache = _InsertContext(existing, info, rules, _defaultFile(existing, tree), lastLines);
+}
+
+Map<String, int> _lastLines(List<Directive> existing, ProcessingInfo info) {
+  final Map<String, int> lastLines = <String, int>{};
+  void consider(BeanLocation location) {
+    final int previous = lastLines[location.filename] ?? 0;
+    if (location.linenoEnd > previous) {
+      lastLines[location.filename] = location.linenoEnd;
+    }
+  }
+
+  for (final OptionSetting setting in info.optionSettings) {
+    consider(setting.location);
+  }
+  for (final Plugin plugin in info.plugin) {
+    consider(plugin.location);
+  }
+  for (final Directive directive in existing) {
+    if (directive.origin case SourceOrigin(:final BeanLocation location)) {
+      consider(location);
+    }
+  }
+  return lastLines;
+}
+
 String? _defaultFile(List<Directive> existing, Set<String> tree) {
   String? target;
   for (final Directive directive in existing) {
@@ -139,28 +184,6 @@ String? _defaultFile(List<Directive> existing, Set<String> tree) {
     }
   }
   return target;
-}
-
-int _appendLine(String filename, List<Directive> existing, ProcessingInfo info) {
-  int last = 0;
-  void consider(BeanLocation location) {
-    if (location.filename == filename && location.linenoEnd > last) {
-      last = location.linenoEnd;
-    }
-  }
-
-  for (final OptionSetting setting in info.optionSettings) {
-    consider(setting.location);
-  }
-  for (final Plugin plugin in info.plugin) {
-    consider(plugin.location);
-  }
-  for (final Directive directive in existing) {
-    if (directive.origin case SourceOrigin(:final BeanLocation location)) {
-      consider(location);
-    }
-  }
-  return last == 0 ? 1 : last + 1;
 }
 
 Set<String> _filesInTree(List<Directive> existing, ProcessingInfo info) {
