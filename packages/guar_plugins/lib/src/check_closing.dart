@@ -44,9 +44,11 @@ BookPluginResult checkClosing(List<Directive> directives, LedgerOptions options,
       );
     }
 
+    // Beancount validates balance assertions in date order, so this D+1 assertion is
+    // evaluated after the transaction; emit it after to match in list order.
     out
-      ..addAll(balances)
-      ..add(directive.copyWith(body: DirectiveBody.transaction(body.value.copyWith(postings: postings))));
+      ..add(directive.copyWith(body: DirectiveBody.transaction(body.value.copyWith(postings: postings))))
+      ..addAll(balances);
   }
   return (directives: out, errors: const <ProcessingError>[]);
 }
