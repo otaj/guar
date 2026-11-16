@@ -199,7 +199,7 @@ List<ProcessingError> validateTransactionBalances(List<Directive> directives, Le
       final Amount weight = postingWeight(mutable);
       residual.update(weight.currency.name, (Decimal value) => value + weight.number, ifAbsent: () => weight.number);
     }
-    final InferredTolerances tolerances = inferPostingTolerances(body.value.postings, options);
+    final InferredTolerances tolerances = inferBookedTolerances(body.value.postings, options);
     final List<MapEntry<String, Decimal>> large = <MapEntry<String, Decimal>>[
       for (final MapEntry<String, Decimal> entry in residual.entries)
         if (entry.value.abs() > tolerances[entry.key]) entry,

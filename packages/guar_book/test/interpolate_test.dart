@@ -2,6 +2,7 @@
 
 import 'package:decimal/decimal.dart';
 import 'package:guar_book/src/booking/interpolate.dart';
+import 'package:guar_domain/guar_domain.dart';
 import 'package:test/test.dart';
 
 void main() {

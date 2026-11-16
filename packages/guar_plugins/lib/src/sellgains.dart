@@ -29,16 +29,16 @@ BookPluginResult validateSellGains(
           final Amount unitPrice = posting.price!;
           _accumulate(price, unitPrice.currency.name, unitPrice.number * -posting.units.number);
         } else if (_isProceedAccount(posting.account)) {
-          final Amount weight = _postingWeight(posting);
+          final Amount weight = postingWeightOf(posting.units, cost: posting.cost, price: posting.price);
           _accumulate(proceeds, weight.currency.name, weight.number);
         }
       }
 
-      final Map<String, Decimal> tolerances = _inferTolerances(value.postings, options);
+      final InferredTolerances tolerances = inferBookedTolerances(value.postings, options);
       final Map<String, Decimal> remaining = Map<String, Decimal>.from(proceeds);
       bool invalid = false;
       for (final MapEntry<String, Decimal> entry in price.entries) {
-        final Decimal tolerance = (tolerances[entry.key] ?? Decimal.zero) * _extraToleranceMultiplier;
+        final Decimal tolerance = tolerances[entry.key] * _extraToleranceMultiplier;
         final Decimal counterpart = remaining.remove(entry.key) ?? Decimal.zero;
         if ((entry.value - counterpart).abs() > tolerance) {
           invalid = true;
@@ -69,59 +69,6 @@ bool _isProceedAccount(Account account) => switch (account.type) {
   AccountType.assets || AccountType.liabilities || AccountType.equity || AccountType.expenses => true,
   AccountType.income => false,
 };
-
-Amount _postingWeight(Posting posting) {
-  final Cost? cost = posting.cost;
-  if (cost != null) {
-    return Amount(number: posting.units.number * cost.number, currency: cost.currency);
-  }
-  final Amount? price = posting.price;
-  if (price != null) {
-    return Amount(number: posting.units.number * price.number, currency: price.currency);
-  }
-  return posting.units;
-}
-
-Map<String, Decimal> _inferTolerances(List<Posting> postings, LedgerOptions options) {
-  final Decimal multiplier = options.inferredToleranceMultiplier.value;
-  final Set<String> seen = <String>{};
-  for (final Posting posting in postings) {
-    seen.add(posting.units.currency.name);
-    final Cost? cost = posting.cost;
-    if (cost != null) seen.add(cost.currency.name);
-    final Amount? price = posting.price;
-    if (price != null) seen.add(price.currency.name);
-  }
-
-  final Map<String, Decimal> tolerances = <String, Decimal>{};
-  Decimal fallback = Decimal.zero;
-  for (final InferredTolerance preset in options.inferredToleranceDefault) {
-    switch (preset.key) {
-      case CurrencyKeyAll():
-        fallback = preset.value;
-      case CurrencyKeyCurrency(:final Currency value):
-        if (seen.contains(value.name)) {
-          tolerances[value.name] = preset.value;
-        }
-    }
-  }
-
-  for (final Posting posting in postings) {
-    final int scale = posting.units.scale;
-    if (scale <= 0) continue;
-    final Decimal tolerance = Decimal.parse('1e-$scale') * multiplier;
-    final String currency = posting.units.currency.name;
-    final Decimal? existing = tolerances[currency];
-    tolerances[currency] = existing == null || tolerance > existing ? tolerance : existing;
-  }
-
-  if (fallback != Decimal.zero) {
-    for (final String currency in seen) {
-      tolerances.putIfAbsent(currency, () => fallback);
-    }
-  }
-  return tolerances;
-}
 
 Map<String, Decimal> _difference(Map<String, Decimal> price, Map<String, Decimal> proceeds) {
   final Map<String, Decimal> out = Map<String, Decimal>.from(price);

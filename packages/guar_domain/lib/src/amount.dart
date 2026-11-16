@@ -4,6 +4,7 @@ import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'package:guar_domain/src/account.dart';
+import 'package:guar_domain/src/cost.dart';
 
 part 'amount.freezed.dart';
 
@@ -56,4 +57,15 @@ abstract class Amount with _$Amount {
     }
     return left.number.compareTo(right.number);
   }
+}
+
+// The weight of a posting: cost basis when costed, price value when priced, else units.
+Amount postingWeightOf(Amount units, {Cost? cost, Amount? price}) {
+  if (cost != null) {
+    return Amount(number: units.number * cost.number, currency: cost.currency);
+  }
+  if (price != null) {
+    return Amount(number: units.number * price.number, currency: price.currency);
+  }
+  return units;
 }

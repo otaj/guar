@@ -20,5 +20,6 @@ export 'origin.dart';
 export 'position.dart';
 export 'posting.dart';
 export 'prices.dart';
+export 'tolerances.dart';
 export 'transaction.dart';
 export 'validation.dart';
