@@ -437,6 +437,9 @@ void _ledgerIsolate(SendPort send) {
       reply.send(_answer(memory, pair[0]));
     } on FormatException catch (error) {
       reply.send(_Failure('format', error.message));
+    } on Object catch (error) {
+      // Any other throw must answer the caller, not kill the ledger isolate.
+      reply.send(_Failure('format', '$error'));
     }
   });
 }
