@@ -48,6 +48,15 @@ StageResult applyDocuments(List<Directive> directives, LedgerOptions options, Pr
       if (!accounts.contains(accountName)) {
         continue;
       }
+      if (!isValidBeanDate(year, month, day)) {
+        errors.add(
+          ProcessingError(
+            message: 'Invalid date in document name "$name"',
+            location: BeanLocation(linenoBegin: 0, linenoEnd: 0),
+          ),
+        );
+        continue;
+      }
       added.add(
         Directive(
           origin: insertOrigin(
