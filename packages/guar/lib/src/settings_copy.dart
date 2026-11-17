@@ -176,51 +176,7 @@ SettingCopy precisionCopy(GuarLocalizations l10n) => (
 SettingCopy languageCopy(GuarLocalizations l10n) =>
     (summary: l10n.languageSummary, detail: l10n.languageDetail, warning: null);
 
-SettingCopy hideCopy(GuarHide item, GuarLocalizations l10n) => switch (item) {
-  GuarHide.generated => (
-    summary: l10n.copyHideGeneratedSummary,
-    detail: l10n.copyHideGeneratedDetail,
-    warning: null,
-  ),
-  GuarHide.transaction => (
-    summary: l10n.copyHideTransactionSummary,
-    detail: l10n.copyHideTransactionDetail,
-    warning: null,
-  ),
-  GuarHide.price => (
-    summary: l10n.copyHidePriceSummary,
-    detail: l10n.copyHidePriceDetail,
-    warning: null,
-  ),
-  GuarHide.balance => (
-    summary: l10n.copyHideBalanceSummary,
-    detail: l10n.copyHideBalanceDetail,
-    warning: null,
-  ),
-  GuarHide.open => (summary: l10n.copyHideOpenSummary, detail: l10n.copyHideOpenDetail, warning: null),
-  GuarHide.close => (summary: l10n.copyHideCloseSummary, detail: l10n.copyHideCloseDetail, warning: null),
-  GuarHide.commodity => (
-    summary: l10n.copyHideCommoditySummary,
-    detail: l10n.copyHideCommodityDetail,
-    warning: null,
-  ),
-  GuarHide.pad => (summary: l10n.copyHidePadSummary, detail: l10n.copyHidePadDetail, warning: null),
-  GuarHide.document => (
-    summary: l10n.copyHideDocumentSummary,
-    detail: l10n.copyHideDocumentDetail,
-    warning: null,
-  ),
-  GuarHide.note => (summary: l10n.copyHideNoteSummary, detail: l10n.copyHideNoteDetail, warning: null),
-  GuarHide.event => (summary: l10n.copyHideEventSummary, detail: l10n.copyHideEventDetail, warning: null),
-  GuarHide.query => (summary: l10n.copyHideQuerySummary, detail: l10n.copyHideQueryDetail, warning: null),
-  GuarHide.custom => (summary: l10n.copyHideCustomSummary, detail: l10n.copyHideCustomDetail, warning: null),
-  GuarHide.budget => (summary: l10n.copyHideBudgetSummary, detail: l10n.copyHideBudgetDetail, warning: null),
-  GuarHide.budgetOff => (
-    summary: l10n.copyHideBudgetOffSummary,
-    detail: l10n.copyHideBudgetOffDetail,
-    warning: null,
-  ),
-};
+SettingCopy hideCopy(GuarLocalizations l10n) => (summary: l10n.hideSummary, detail: l10n.hideDetail, warning: null);
 
 String hideLabel(GuarHide item, GuarLocalizations l10n) => switch (item) {
   GuarHide.generated => l10n.hideGenerated,

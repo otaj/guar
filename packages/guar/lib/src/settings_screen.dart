@@ -205,14 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 (bool value) => _toggle(() => _includeInferredPrices = value),
               ),
               _section(l10n.sectionLedgerScreen, l10n.ledgerScreenSummary),
-              for (final GuarHide item in GuarHide.values)
-                _switch(
-                  'hide-${item.token}',
-                  hideLabel(item, l10n),
-                  hideCopy(item, l10n),
-                  _hidden.contains(item.token),
-                  (bool value) => _setHidden(item.token, hidden: value),
-                ),
+              _hideSetting(l10n),
               _section(l10n.sectionLedger, l10n.ledgerSummary),
               _textField('title', l10n.labelTitle, titleCopy(l10n)),
               _stringList(
@@ -424,6 +417,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged(next);
         }
       },
+    ),
+  );
+
+  // One multi-select dropdown instead of a switch per directive type.
+  Widget _hideSetting(GuarLocalizations l10n) => SettingBlock(
+    helpKey: const Key('help-hideDirectives'),
+    label: l10n.hideTitle,
+    copy: hideCopy(l10n),
+    child: PopupMenuButton<void>(
+      key: const Key('hideDirectives'),
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
+      child: InputDecorator(
+        decoration: const InputDecoration(border: OutlineInputBorder(), suffixIcon: Icon(Icons.arrow_drop_down)),
+        child: Text(l10n.hideCount(_hidden.length)),
+      ),
+      itemBuilder: (BuildContext context) => <PopupMenuItem<void>>[
+        PopupMenuItem<void>(
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 360),
+            child: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (BuildContext context, void Function(VoidCallback) setMenu) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    for (final GuarHide item in GuarHide.values)
+                      CheckboxListTile(
+                        key: Key('hide-${item.token}'),
+                        title: Text(hideLabel(item, l10n)),
+                        value: !_hidden.contains(item.token),
+                        onChanged: (bool? included) {
+                          setMenu(() {});
+                          _setHidden(item.token, hidden: included == false);
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     ),
   );
 

@@ -537,95 +537,26 @@ class GuarLocalizationsEn extends GuarLocalizations {
   String get copyPrecisionWarning => 'No effect in Guar. Amounts keep the digits that were recorded.';
 
   @override
-  String get copyHideGeneratedSummary => 'Leaves entries from plugins and padding off the list.';
+  String get hideTitle => 'Hidden directives';
 
   @override
-  String get copyHideGeneratedDetail =>
-      'Hides entries that plugins or balance padding added. What you wrote stays visible, and nothing is removed from the file.';
+  String get hideSummary => 'One dropdown for every directive type shown on the ledger screen.';
 
   @override
-  String get copyHideTransactionSummary => 'Leaves transactions off the list.';
+  String get hideDetail =>
+      'The dropdown lists all directive types with a checkmark for each one kept on the ledger screen. Unchecked types are left off the list and stay in the file.';
 
   @override
-  String get copyHideTransactionDetail => 'Hides transactions on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHidePriceSummary => 'Leaves prices off the list.';
-
-  @override
-  String get copyHidePriceDetail => 'Hides price directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideBalanceSummary => 'Leaves balance assertions off the list.';
-
-  @override
-  String get copyHideBalanceDetail => 'Hides balance assertions on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideOpenSummary => 'Leaves account opens off the list.';
-
-  @override
-  String get copyHideOpenDetail => 'Hides open directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideCloseSummary => 'Leaves account closes off the list.';
-
-  @override
-  String get copyHideCloseDetail => 'Hides close directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideCommoditySummary => 'Leaves commodities off the list.';
-
-  @override
-  String get copyHideCommodityDetail => 'Hides commodity directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHidePadSummary => 'Leaves pads off the list.';
-
-  @override
-  String get copyHidePadDetail => 'Hides pad directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideDocumentSummary => 'Leaves documents off the list.';
-
-  @override
-  String get copyHideDocumentDetail => 'Hides document directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideNoteSummary => 'Leaves notes off the list.';
-
-  @override
-  String get copyHideNoteDetail => 'Hides notes on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideEventSummary => 'Leaves events off the list.';
-
-  @override
-  String get copyHideEventDetail => 'Hides events on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideQuerySummary => 'Leaves queries off the list.';
-
-  @override
-  String get copyHideQueryDetail => 'Hides query directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideCustomSummary => 'Leaves custom directives off the list.';
-
-  @override
-  String get copyHideCustomDetail => 'Hides custom directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideBudgetSummary => 'Leaves budgets off the list.';
-
-  @override
-  String get copyHideBudgetDetail => 'Hides budget directives on the ledger screen. They stay in the file.';
-
-  @override
-  String get copyHideBudgetOffSummary => 'Leaves budget-off directives off the list.';
-
-  @override
-  String get copyHideBudgetOffDetail => 'Hides budget-off directives on the ledger screen. They stay in the file.';
+  String hideCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hidden',
+      one: '1 hidden',
+      zero: 'All shown',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get everyDirectiveHidden => 'Every directive is hidden.';
