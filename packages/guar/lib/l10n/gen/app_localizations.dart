@@ -1075,185 +1075,29 @@ abstract class GuarLocalizations {
   /// **'No effect in Guar. Amounts keep the digits that were recorded.'**
   String get copyPrecisionWarning;
 
-  /// No description provided for @copyHideGeneratedSummary.
+  /// No description provided for @hideTitle.
   ///
   /// In en, this message translates to:
-  /// **'Leaves entries from plugins and padding off the list.'**
-  String get copyHideGeneratedSummary;
+  /// **'Hidden directives'**
+  String get hideTitle;
 
-  /// No description provided for @copyHideGeneratedDetail.
+  /// No description provided for @hideSummary.
   ///
   /// In en, this message translates to:
-  /// **'Hides entries that plugins or balance padding added. What you wrote stays visible, and nothing is removed from the file.'**
-  String get copyHideGeneratedDetail;
+  /// **'One dropdown for every directive type shown on the ledger screen.'**
+  String get hideSummary;
 
-  /// No description provided for @copyHideTransactionSummary.
+  /// No description provided for @hideDetail.
   ///
   /// In en, this message translates to:
-  /// **'Leaves transactions off the list.'**
-  String get copyHideTransactionSummary;
+  /// **'The dropdown lists all directive types with a checkmark for each one kept on the ledger screen. Unchecked types are left off the list and stay in the file.'**
+  String get hideDetail;
 
-  /// No description provided for @copyHideTransactionDetail.
+  /// No description provided for @hideCount.
   ///
   /// In en, this message translates to:
-  /// **'Hides transactions on the ledger screen. They stay in the file.'**
-  String get copyHideTransactionDetail;
-
-  /// No description provided for @copyHidePriceSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves prices off the list.'**
-  String get copyHidePriceSummary;
-
-  /// No description provided for @copyHidePriceDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides price directives on the ledger screen. They stay in the file.'**
-  String get copyHidePriceDetail;
-
-  /// No description provided for @copyHideBalanceSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves balance assertions off the list.'**
-  String get copyHideBalanceSummary;
-
-  /// No description provided for @copyHideBalanceDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides balance assertions on the ledger screen. They stay in the file.'**
-  String get copyHideBalanceDetail;
-
-  /// No description provided for @copyHideOpenSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves account opens off the list.'**
-  String get copyHideOpenSummary;
-
-  /// No description provided for @copyHideOpenDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides open directives on the ledger screen. They stay in the file.'**
-  String get copyHideOpenDetail;
-
-  /// No description provided for @copyHideCloseSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves account closes off the list.'**
-  String get copyHideCloseSummary;
-
-  /// No description provided for @copyHideCloseDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides close directives on the ledger screen. They stay in the file.'**
-  String get copyHideCloseDetail;
-
-  /// No description provided for @copyHideCommoditySummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves commodities off the list.'**
-  String get copyHideCommoditySummary;
-
-  /// No description provided for @copyHideCommodityDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides commodity directives on the ledger screen. They stay in the file.'**
-  String get copyHideCommodityDetail;
-
-  /// No description provided for @copyHidePadSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves pads off the list.'**
-  String get copyHidePadSummary;
-
-  /// No description provided for @copyHidePadDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides pad directives on the ledger screen. They stay in the file.'**
-  String get copyHidePadDetail;
-
-  /// No description provided for @copyHideDocumentSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves documents off the list.'**
-  String get copyHideDocumentSummary;
-
-  /// No description provided for @copyHideDocumentDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides document directives on the ledger screen. They stay in the file.'**
-  String get copyHideDocumentDetail;
-
-  /// No description provided for @copyHideNoteSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves notes off the list.'**
-  String get copyHideNoteSummary;
-
-  /// No description provided for @copyHideNoteDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides notes on the ledger screen. They stay in the file.'**
-  String get copyHideNoteDetail;
-
-  /// No description provided for @copyHideEventSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves events off the list.'**
-  String get copyHideEventSummary;
-
-  /// No description provided for @copyHideEventDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides events on the ledger screen. They stay in the file.'**
-  String get copyHideEventDetail;
-
-  /// No description provided for @copyHideQuerySummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves queries off the list.'**
-  String get copyHideQuerySummary;
-
-  /// No description provided for @copyHideQueryDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides query directives on the ledger screen. They stay in the file.'**
-  String get copyHideQueryDetail;
-
-  /// No description provided for @copyHideCustomSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves custom directives off the list.'**
-  String get copyHideCustomSummary;
-
-  /// No description provided for @copyHideCustomDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides custom directives on the ledger screen. They stay in the file.'**
-  String get copyHideCustomDetail;
-
-  /// No description provided for @copyHideBudgetSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves budgets off the list.'**
-  String get copyHideBudgetSummary;
-
-  /// No description provided for @copyHideBudgetDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides budget directives on the ledger screen. They stay in the file.'**
-  String get copyHideBudgetDetail;
-
-  /// No description provided for @copyHideBudgetOffSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Leaves budget-off directives off the list.'**
-  String get copyHideBudgetOffSummary;
-
-  /// No description provided for @copyHideBudgetOffDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Hides budget-off directives on the ledger screen. They stay in the file.'**
-  String get copyHideBudgetOffDetail;
+  /// **'{count, plural, =0{All shown}one{1 hidden}other{{count} hidden}}'**
+  String hideCount(int count);
 
   /// No description provided for @everyDirectiveHidden.
   ///

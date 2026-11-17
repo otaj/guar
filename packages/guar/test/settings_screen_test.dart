@@ -468,13 +468,14 @@ void main() {
     await _pumpApp(tester, documents);
     await _showSettings(tester);
 
-    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-price'))).value, isFalse);
-    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-generated'))).value, isFalse);
-
-    await tester.ensureVisible(find.byKey(const Key('hide-generated')));
-    await tester.tap(find.byKey(const Key('hide-generated')));
+    await tester.ensureVisible(find.byKey(const Key('hideDirectives')));
+    await tester.tap(find.byKey(const Key('hideDirectives')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('hide-price')));
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('hide-price'))).value, isTrue);
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('hide-generated'))).value, isTrue);
+
+    await tester.tap(find.byKey(const Key('hide-generated')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('hide-price')));
     await tester.pumpAndSettle();
 
@@ -491,8 +492,12 @@ void main() {
       '2020-01-01 open Assets:Bank\n'
       '2020-01-05 price EUR 1.10 USD\n',
     );
-    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-price'))).value, isTrue);
-    expect(tester.widget<SwitchListTile>(find.byKey(const Key('hide-generated'))).value, isTrue);
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('hide-price'))).value, isFalse);
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('hide-generated'))).value, isFalse);
+
+    // Close the popup; it stays open while toggling.
+    await tester.tapAt(const Offset(10, 400));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Ledger'));
     await tester.pumpAndSettle();
